@@ -7,12 +7,10 @@ services:
             - 8080:8080
             - 80:80
             - 1935:1935
-        network_mode: host
         restart: on-failure
 
     proto:
         build: ./proto
         ports:
-            - 8080:8080
-        network_mode: host
-        restart: on-failure
+            - 8081:8080 # Changement de port (site web de dev sur 8081 maintenant)
+        restart: on-failure 
