@@ -140,12 +140,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const player1 = initializePlayer(
         "videoElement1",
-        `${host}:80/hls/stream1.m3u8`
+        `${host}/hls/stream1.m3u8`
     );
 
     const player2 = initializePlayer(
         "videoElement2",
-        `${host}:80/hls/stream2.m3u8`
+        `${host}/hls/stream2.m3u8`
     );
 
     setupDraggableResizable();

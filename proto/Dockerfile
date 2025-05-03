@@ -1,8 +1,6 @@
 FROM ubuntu:latest
 
-# EXPOSE 8080
-EXPOSE 80
-# EXPOSE 1935
+EXPOSE 8080
 
 RUN apt update
 
