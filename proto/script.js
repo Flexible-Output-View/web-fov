@@ -116,6 +116,10 @@ function initializePlayer(videoElementId, streamUrl) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+
+    let host = window.location.protocol + "//" + window.location.hostname;
+    console.log(host);
+
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
 
@@ -136,12 +140,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const player1 = initializePlayer(
         "videoElement1",
-        "http://localhost:8080/hls/stream1.m3u8"
+        `${host}:80/hls/stream1.m3u8`
     );
 
     const player2 = initializePlayer(
         "videoElement2",
-        "http://localhost:8080/hls/stream2.m3u8"
+        `${host}:80/hls/stream2.m3u8`
     );
 
     setupDraggableResizable();
