@@ -1,0 +1,42 @@
+name: Angular Tests
+
+on:
+    push:
+        paths:
+            - "fov-angular/**"
+    pull_request:
+        branches: [main]
+        paths:
+            - "fov-angular/**"
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+                  cache-dependency-path: fov-angular/package-lock.json
+
+            - name: Install dependencies
+              run: |
+                  cd fov-angular
+                  npm ci
+
+            - name: Run tests
+              run: |
+                  cd fov-angular
+                  npm test -- --watch=false --browsers=ChromeHeadless
+
+            - name: Upload test results
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-results
+                  path: fov-angular/coverage/
+                  if-no-files-found: error
