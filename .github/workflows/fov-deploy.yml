@@ -1,0 +1,32 @@
+name: Deploy Developpement - WEB-FOV
+
+# Deploy the developpement website (dev branch) to the self-hosted deploy server
+
+on:
+  push:
+    branches:
+      - "dev"
+      - "ci/deploy"
+
+jobs:
+    Deploy-dev:
+        runs-on: [ self-hosted, linux, x64, deploy ]
+        steps:
+        - name: "Checkout code"
+          uses: actions/checkout@v4
+
+        - name: "Stop previous container"
+          run: cd /home/deploy/web-deploy/dev/ && docker-compose down
+
+        - name: "Clean docker images"
+          run: cd /home/deploy/web-deploy/dev/ && docker system prune
+
+        - name: "Remove folder content"
+          run: rm -rf /home/deploy/web-deploy/dev/
+
+        - name: "Copy repository"
+          run: cp -r . /home/deploy/web-deploy/dev/
+
+        - name: "Run the docker compose stack"
+          run: cd /home/deploy/web-deploy/dev/ && docker-compose up -d --no-deps --build
+
