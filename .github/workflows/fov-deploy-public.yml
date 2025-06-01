@@ -16,7 +16,7 @@ jobs:
           uses: actions/checkout@v4
 
         - name: "Stop previous container"
-          run: cd /home/ubuntu/web-deploy/main/ && docker-compose down
+          run: cd /home/ubuntu/web-deploy/main/ && docker compose down
 
         - name: "Clean docker images"
           run: cd /home/ubuntu/web-deploy/main/ && docker system prune
@@ -28,5 +28,5 @@ jobs:
           run: cp -r . /home/ubuntu/web-deploy/main/
 
         - name: "Run the docker compose stack"
-          run: cd /home/ubuntu/web-deploy/main/ && docker-compose up -d --no-deps --build
+          run: cd /home/ubuntu/web-deploy/main/ && docker compose up -d --no-deps --build
 
