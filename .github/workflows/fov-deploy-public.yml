@@ -1,0 +1,32 @@
+name: Deploy Public - WEB-FOV
+
+# Deploy the release website (main branch) to the epitech vm "Public-Deploy"
+
+on:
+  push:
+    branches:
+      - "main"
+      - "37-deploy-du-site-production-dans-vm-epitech"
+
+jobs:
+    Deploy-main:
+        runs-on: [ self-hosted, linux, x64, release, public ]
+        steps:
+        - name: "Checkout code"
+          uses: actions/checkout@v4
+
+        - name: "Stop previous container"
+          run: cd /home/ubuntu/web-deploy/main/ && docker-compose down
+
+        - name: "Clean docker images"
+          run: cd /home/ubuntu/web-deploy/main/ && docker system prune
+
+        - name: "Remove folder content"
+          run: rm -rf /home/ubuntu/web-deploy/main/
+
+        - name: "Copy repository"
+          run: cp -r . /home/ubuntu/web-deploy/main/
+
+        - name: "Run the docker compose stack"
+          run: cd /home/ubuntu/web-deploy/main/ && docker-compose up -d --no-deps --build
+
