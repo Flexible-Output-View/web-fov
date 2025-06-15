@@ -11,7 +11,7 @@ services:
             - internal_network
 
     backend-fov:
-        build: ./proto
+        build: ./fov-angular
         restart: on-failure
         networks:
             - internal_network
