@@ -11,4 +11,4 @@ RUN rm package-lock.json; rm -rf node_modules; exit 0
 
 RUN npm i
 
-CMD [ "ng", "serve", "--port", "8080", "--host", "0.0.0.0" ]
+CMD [ "ng", "serve", "--port", "8080", "--host", "0.0.0.0", "--disable-host-check"]
