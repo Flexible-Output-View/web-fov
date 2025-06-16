@@ -7,6 +7,7 @@ on:
     branches:
       - "dev"
       - "ci/deploy"
+      - "30-cicd-déploiement-web-angular"
 
 jobs:
     Deploy-dev:
