@@ -7,6 +7,7 @@ on:
     branches:
       - "main"
       - "37-deploy-du-site-production-dans-vm-epitech"
+      - "30-cicd-déploiement-web-angular"
 
 jobs:
     Deploy-main:

@@ -239,3 +239,7 @@ dist
 .test
 .code
 .vscache
+
+.vscode
+.vscode/*
+package-lock.json
