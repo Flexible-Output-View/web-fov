@@ -1,13 +1,11 @@
 name: Angular Tests
 
 on:
-    push:
-        paths:
-            - "fov-angular/**"
-    pull_request:
-        branches: [main]
-        paths:
-            - "fov-angular/**"
+  push:
+    paths:
+        - "fov-angular/**"
+  pull_request:
+    branches: [main]
 
 jobs:
     test:
@@ -20,13 +18,13 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version: "20"
-                  cache: "npm"
-                  cache-dependency-path: fov-angular/package-lock.json
+                #   cache: "npm"
+                #   cache-dependency-path: fov-angular/package-lock.json
 
             - name: Install dependencies
               run: |
                   cd fov-angular
-                  npm ci
+                  npm i
 
             - name: Run tests with coverage
               run: |

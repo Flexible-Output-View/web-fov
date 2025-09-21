@@ -1,21 +1,8 @@
-version: "3"
 
 services:
-    nginx:
-        build: ./nginx
+    fov-stack:
+        build: .
         ports:
-            - 80:80         # Port interface web
+            - 8080:80       # Port interface web
             - 1935:1935     # Port RTMP
         restart: on-failure
-        networks:
-            - internal_network
-
-    backend-fov:
-        build: ./proto
-        restart: on-failure
-        networks:
-            - internal_network
-
-networks:
-    internal_network:
-        driver: bridge
