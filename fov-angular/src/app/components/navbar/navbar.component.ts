@@ -9,4 +9,11 @@ import { RouterModule } from '@angular/router';
 	templateUrl: './navbar.component.html',
 	styleUrl: './navbar.component.scss'
 })
-export class NavbarComponent { }
+export class NavbarComponent {
+  isDarkTheme = true;
+
+  toggleTheme() {
+    this.isDarkTheme = !this.isDarkTheme;
+    document.body.classList.toggle('theme-light');
+  }
+}

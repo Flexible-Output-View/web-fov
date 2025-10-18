@@ -1,1 +1,41 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --bg-primary: #151515;
+  --bg-secondary: #1f1f1f;
+  --text-primary: #F5F5EB;
+  --text-secondary: #a0a0a0;
+  --accent-primary: #1FB8FF;
+  --accent-secondary: #0090FF;
+  --border-color: #333333;
+  --card-bg: #1f1f1f;
+
+  --spacing-xs: 0.5rem;
+  --spacing-sm: 1rem;
+  --spacing-md: 1.5rem;
+  --spacing-lg: 2rem;
+  --spacing-xl: 3rem;
+}
+
+.theme-light {
+  --bg-primary: #F8F6F1;
+  --bg-secondary: #FFFFFF;
+  --text-primary: #14140A;
+  --text-secondary: #666666;
+  --accent-primary: #004BBD;
+  --accent-secondary: #0085FA;
+  --border-color: #e5e5e5;
+  --card-bg: #FFFFFF;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1.6;
+  transition: all 0.3s ease;
+}
