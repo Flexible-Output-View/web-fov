@@ -1,44 +1,24 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FeaturedCarouselComponent } from '../../components/featured-carousel/featured-carousel.component';
+import { CategoryCardComponent, Category } from '../../components/category-card/category-card.component';
+import { StreamCardComponent, Stream } from '../../components/stream-card/stream-card.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule],
+  imports: [
+    CommonModule,
+    FeaturedCarouselComponent,
+    CategoryCardComponent,
+    StreamCardComponent
+  ],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent {
-  currentSlide = 0;
 
-  featuredStreams = [
-    {
-      streamer: 'StreamerPro',
-      title: 'Grand tournoi League of Legends ! 🏆',
-      game: 'League of Legends',
-      viewers: '1.2K',
-      thumbnail: 'assets/stream-thumbnail1.png',
-      avatar: 'assets/profile-avatar.png'
-    },
-    {
-      streamer: 'GamingQueen',
-      title: 'Just chatting avec la communauté 💬',
-      game: 'Just Chatting',
-      viewers: '856',
-      thumbnail: 'assets/stream-thumbnail2.png',
-      avatar: 'assets/profile-avatar.png'
-    },
-    {
-      streamer: 'ProPlayer',
-      title: 'Road to Champion - Competitive Gameplay',
-      game: 'Valorant',
-      viewers: '2.1K',
-      thumbnail: 'assets/stream-thumbnail3.png',
-      avatar: 'assets/profile-avatar.png'
-    }
-  ];
-
-  popularCategories = [
+  popularCategories: Category[] = [
     { name: 'League of Legends', viewers: '125K', image: 'assets/category-lol.png' },
     { name: 'Just Chatting', viewers: '98K', image: 'assets/category-chat.png' },
     { name: 'Valorant', viewers: '87K', image: 'assets/category-valorant.png' },
@@ -46,7 +26,7 @@ export class HomeComponent {
     { name: 'Minecraft', viewers: '65K', image: 'assets/category-minecraft.png' },
   ];
 
-  recommendedStreams = [
+  recommendedStreams: Stream[] = [
     {
       streamer: 'NewStreamer',
       title: 'Premier stream ! Supportez-moi !',
@@ -73,11 +53,4 @@ export class HomeComponent {
     }
   ];
 
-  nextSlide() {
-    this.currentSlide = (this.currentSlide + 1) % this.featuredStreams.length;
-  }
-
-  prevSlide() {
-    this.currentSlide = this.currentSlide === 0 ? this.featuredStreams.length - 1 : this.currentSlide - 1;
-  }
 }

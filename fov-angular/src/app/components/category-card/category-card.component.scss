@@ -1,0 +1,34 @@
+.category-card {
+  background: var(--card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s ease;
+  border: 1px solid var(--border-color);
+
+  &:hover {
+    transform: translateY(-4px);
+  }
+
+  .category-image {
+    width: 100%;
+    height: 120px;
+    
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .category-name {
+    padding: var(--spacing-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .category-viewers {
+    padding: 0 var(--spacing-sm) var(--spacing-sm);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+  }
+}

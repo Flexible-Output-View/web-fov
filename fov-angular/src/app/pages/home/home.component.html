@@ -4,39 +4,8 @@
       <h2>Lives populaires</h2>
     </div>
     
-    <div class="carousel">
-      <button class="carousel-btn carousel-btn-prev" (click)="prevSlide()">
-        ‹
-      </button>
-      
-      <div class="carousel-container">
-        <div class="carousel-track" [style.transform]="'translateX(-' + currentSlide * 100 + '%)'">
-          <div class="carousel-slide" *ngFor="let stream of featuredStreams">
-            <div class="featured-stream">
-              <div class="stream-thumbnail">
-                <div class="live-indicator">EN DIRECT</div>
-                <div class="viewer-count">{{ stream.viewers }} spectateurs</div>
-                <img [src]="stream.thumbnail" [alt]="stream.title" class="thumbnail-img">
-              </div>
-              <div class="stream-info">
-                <div class="streamer-avatar">
-                  <img [src]="stream.avatar" [alt]="stream.streamer">
-                </div>
-                <div class="stream-details">
-                  <h3 class="stream-title">{{ stream.title }}</h3>
-                  <p class="streamer-name">{{ stream.streamer }}</p>
-                  <p class="stream-game">{{ stream.game }}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <button class="carousel-btn carousel-btn-next" (click)="nextSlide()">
-        ›
-      </button>
-    </div>
+    <app-featured-carousel></app-featured-carousel>
+
   </section>
 
   <section class="section">
@@ -44,13 +13,12 @@
       <h2>Catégories populaires</h2>
     </div>
     <div class="categories-grid">
-      <div class="category-card" *ngFor="let category of popularCategories">
-        <div class="category-image">
-          <img [src]="category.image" [alt]="category.name">
-        </div>
-        <div class="category-name">{{ category.name }}</div>
-        <div class="category-viewers">{{ category.viewers }} spectateurs</div>
-      </div>
+      
+      <app-category-card 
+        *ngFor="let category of popularCategories" 
+        [category]="category">
+      </app-category-card>
+
     </div>
   </section>
 
@@ -59,23 +27,12 @@
       <h2>Chaînes que vous pourriez aimer</h2>
     </div>
     <div class="streams-grid">
-      <div class="stream-card" *ngFor="let stream of recommendedStreams">
-        <div class="stream-thumbnail">
-          <img [src]="stream.thumbnail" [alt]="stream.title" class="thumbnail-img">
-          <div class="live-indicator">EN DIRECT</div>
-          <div class="viewer-count">{{ stream.viewers }} spectateurs</div>
-        </div>
-        <div class="stream-info">
-          <div class="streamer-avatar">
-            <img [src]="stream.avatar" [alt]="stream.streamer">
-          </div>
-          <div class="stream-details">
-            <h4 class="stream-title">{{ stream.title }}</h4>
-            <p class="streamer-name">{{ stream.streamer }}</p>
-            <p class="stream-game">{{ stream.game }}</p>
-          </div>
-        </div>
-      </div>
+      
+      <app-stream-card 
+        *ngFor="let stream of recommendedStreams" 
+        [stream]="stream">
+      </app-stream-card>
+
     </div>
   </section>
 </div>
