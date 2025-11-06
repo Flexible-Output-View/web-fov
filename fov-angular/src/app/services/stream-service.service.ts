@@ -117,7 +117,9 @@ export class StreamService {
   }
 
   getStreamsByCategory(categoryName: string): Stream[] {
-    return this.allStreams.filter(stream => stream.category === categoryName);
+    return this.allStreams.filter(
+      stream => stream.category === categoryName && stream.isLive
+    );
   }
 
   getCategoryNameBySlug(slug: string): string {
