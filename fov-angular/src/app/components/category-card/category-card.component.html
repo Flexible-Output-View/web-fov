@@ -1,7 +1,9 @@
-<div class="category-card">
-  <div class="category-image">
-    <img [src]="category.image" [alt]="category.name">
+<a [routerLink]="['/discover', category.name | slugify]" class="card-link">
+  <div class="category-card">
+    <div class="category-image">
+      <img [src]="category.image" [alt]="category.name">
+    </div>
+    <div class="category-name">{{ category.name }}</div>
+    <div class="category-viewers">{{ category.viewers }} spectateurs</div>
   </div>
-  <div class="category-name">{{ category.name }}</div>
-  <div class="category-viewers">{{ category.viewers }} spectateurs</div>
-</div>
+</a>

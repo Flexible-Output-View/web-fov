@@ -1,6 +1,7 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { StreamService } from '../../services/stream-service.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -9,34 +10,18 @@ import { RouterModule } from '@angular/router';
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.scss']
 })
-export class SidebarComponent {
+export class SidebarComponent implements OnInit {
 
   @Input() isCollapsed = false;
-
   @Output() toggleCollapse = new EventEmitter<void>();
   
-  followedChannels = [
-    { 
-      name: 'StreamerPro', 
-      game: 'League of Legends', 
-      avatar: 'assets/stream-thumbnail1.png', 
-      isLive: true,
-      viewers: '1.2K'
-    },
-    { 
-      name: 'Domingo', 
-      game: 'Just Chatting', 
-      avatar: 'assets/stream-thumbnail2.png', 
-      isLive: false 
-    },
-    { 
-      name: 'ProPlayer', 
-      game: 'Valorant', 
-      avatar: 'assets/stream-thumbnail3.png', 
-      isLive: true,
-      viewers: '876'
-    }
-  ];
+  followedChannels: any[] = [];
+
+  constructor(private streamService: StreamService) {}
+
+  ngOnInit() {
+    this.followedChannels = this.streamService.getFollowedChannels();
+  }
 
   onToggleCollapse() {
     this.toggleCollapse.emit();

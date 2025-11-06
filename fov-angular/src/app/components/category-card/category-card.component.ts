@@ -1,5 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterModule } from '@angular/router';
+import { SlugifyPipe } from '../../pipes/slugify.pipe';
 
 export interface Category {
   name: string;
@@ -10,7 +12,7 @@ export interface Category {
 @Component({
   selector: 'app-category-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterModule, SlugifyPipe],
   templateUrl: './category-card.component.html',
   styleUrls: ['./category-card.component.scss']
 })

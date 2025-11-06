@@ -4,10 +4,11 @@ import { CommonModule } from '@angular/common';
 export interface Stream {
   streamer: string;
   title: string;
-  game: string;
+  category: string;
   viewers: string | number;
   thumbnail: string;
   avatar: string;
+  isLive: boolean;
 }
 
 @Component({
