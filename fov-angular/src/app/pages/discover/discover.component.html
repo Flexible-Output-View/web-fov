@@ -1,4 +1,56 @@
-<div class="page">
-    <h1>Page de Découverte</h1>
-    <p>Bienvenue sur FOV - Votre plateforme de streaming personnalisable</p>
+<div *ngIf="!categoryName; else categoryView">
+  
+  <div class="discover-page">
+    <h1>Découvrir</h1>
+    <div class="tabs">
+      <button class="tab-btn" 
+              [class.active]="activeTab === 'categories'" 
+              (click)="setActiveTab('categories')">
+        Catégories
+      </button>
+      <button class="tab-btn" 
+              [class.active]="activeTab === 'channels'" 
+              (click)="setActiveTab('channels')">
+        Chaînes live
+      </button>
+    </div>
+
+    <div class="tab-content">
+      <div *ngIf="activeTab === 'categories'" class="categories-grid">
+        <app-category-card 
+          *ngFor="let category of allCategories" 
+          [category]="category">
+        </app-category-card>
+      </div>
+      <div *ngIf="activeTab === 'channels'" class="streams-grid">
+        <app-stream-card 
+          *ngFor="let stream of liveStreams" 
+          [stream]="stream">
+        </app-stream-card>
+      </div>
+    </div>
+  </div>
+
 </div>
+
+
+<ng-template #categoryView>
+  <div class="category-page">
+    <h1>{{ categoryName }}</h1>
+
+    <div *ngIf="streams.length > 0; else noStreams">
+      <div class="streams-grid">
+        <app-stream-card 
+          *ngFor="let stream of streams" 
+          [stream]="stream">
+        </app-stream-card>
+      </div>
+    </div>
+
+    <ng-template #noStreams>
+      <p class="no-streams-msg">
+        Il n'y a aucun stream en direct dans la catégorie "{{ categoryName }}" pour le moment.
+      </p>
+    </ng-template>
+  </div>
+</ng-template>
