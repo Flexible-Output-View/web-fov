@@ -1,4 +1,76 @@
-<div class="page">
-    <h1>Page de Suivi</h1>
-    <p>Bienvenue sur FOV - Votre plateforme de streaming personnalisable</p>
+<div class="followed-page">
+  <h1>Suivis</h1>
+
+  <div class="tabs">
+    <button class="tab-btn"
+            [class.active]="activeTab === 'channels'"
+            (click)="setActiveTab('channels')">
+      Chaînes
+    </button>
+    <button class="tab-btn"
+            [class.active]="activeTab === 'categories'"
+            (click)="setActiveTab('categories')">
+      Catégories
+    </button>
+  </div>
+
+  <div class="tab-content">
+
+    <div *ngIf="activeTab === 'channels'">
+
+      <section class="section">
+        <div class="section-header">
+          <h2>Actuellement en direct</h2>
+        </div>
+        
+        <div *ngIf="liveChannels.length > 0; else noLive">
+          <div class="streams-grid">
+            <app-stream-card 
+              *ngFor="let stream of liveChannels" 
+              [stream]="stream">
+            </app-stream-card>
+          </div>
+        </div>
+        <ng-template #noLive>
+          <p class="no-channels-msg">Aucune des chaînes que vous suivez n'est en direct.</p>
+        </ng-template>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h2>Hors ligne</h2>
+        </div>
+        
+        <div *ngIf="offlineChannels.length > 0; else noOffline">
+          <div class="offline-grid">
+            <a *ngFor="let channel of offlineChannels" 
+               [routerLink]="['/profile', channel.streamer]" 
+               class="offline-card">
+              <img [src]="channel.avatar" [alt]="channel.streamer" class="avatar">
+              <span class="channel-name">{{ channel.streamer }}</span>
+            </a>
+          </div>
+        </div>
+        <ng-template #noOffline>
+          <p class="no-channels-msg">Aucune chaîne hors ligne.</p>
+        </ng-template>
+      </section>
+
+    </div>
+
+    <div *ngIf="activeTab === 'categories'">
+      <div *ngIf="followedCategories.length > 0; else noCategories">
+        <div class="categories-grid">
+          <app-category-card 
+            *ngFor="let category of followedCategories" 
+            [category]="category">
+          </app-category-card>
+        </div>
+      </div>
+      <ng-template #noCategories>
+        <p class="no-channels-msg">Vous ne suivez encore aucune catégorie.</p>
+      </ng-template>
+    </div>
+
+  </div>
 </div>
