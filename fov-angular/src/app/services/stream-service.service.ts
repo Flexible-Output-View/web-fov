@@ -95,24 +95,41 @@ export class StreamService {
     // Later it will come from the user's followed channels data
     return [
       { 
-        name: 'Skyyart', 
-        category: 'League of Legends', 
-        avatar: 'assets/stream-thumbnail1.png', 
-        isLive: true,
-        viewers: '91.2K'
+        streamer: 'Skyyart',
+        title: 'Grand tournoi League of Legends ! 🏆',
+        category: 'League of Legends',
+        viewers: '91.2K',
+        thumbnail: 'assets/stream-thumbnail1.png',
+        avatar: 'assets/stream-thumbnail1.png',
+        isLive: true
       },
       { 
-        name: 'Domingo', 
-        category: 'Just Chatting', 
-        avatar: 'assets/stream-thumbnail2.png', 
-        isLive: true,
-        viewers: '8.6K'
+        streamer: 'Domingo',
+        title: 'Just chatting avec la communauté 💬',
+        category: 'Just Chatting',
+        viewers: '8.6K',
+        thumbnail: 'assets/stream-thumbnail2.png',
+        avatar: 'assets/stream-thumbnail2.png',
+        isLive: true
       },
       { 
-        name: 'Zerator',
-        avatar: 'assets/stream-thumbnail3.png', 
-        isLive: false,
+        streamer: 'Zerator',
+        title: '',
+        category: '',
+        viewers: '',
+        thumbnail: '',
+        avatar: 'assets/stream-thumbnail3.png',
+        isLive: false
       }
+    ];
+  }
+
+  getFollowedCategories(): Category[] {
+    // For the moment hard code
+    // Later it will come from the user's followed categories data
+    return [
+      { name: 'League of Legends', viewers: '125K', image: 'assets/category/leagues-of-legends.png' },
+      { name: 'Just Chatting', viewers: '98K', image: 'assets/category/just-chatting.png' },
     ];
   }
 
