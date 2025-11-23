@@ -1,4 +1,38 @@
-<div class="page">
-    <h1>Page d'Accueil</h1>
-    <p>Bienvenue sur FOV - Votre plateforme de streaming personnalisable</p>
+<div class="home-page">
+  <section class="section">
+    <div class="section-header">
+      <h2>Lives populaires</h2>
+    </div>
+    
+    <app-featured-carousel></app-featured-carousel>
+
+  </section>
+
+  <section class="section">
+    <div class="section-header">
+      <h2>Catégories populaires</h2>
+    </div>
+    <div class="categories-grid">
+      
+      <app-category-card 
+        *ngFor="let category of popularCategories" 
+        [category]="category">
+      </app-category-card>
+
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-header">
+      <h2>Chaînes que vous pourriez aimer</h2>
+    </div>
+    <div class="streams-grid">
+      
+      <app-stream-card 
+        *ngFor="let stream of recommendedStreams" 
+        [stream]="stream">
+      </app-stream-card>
+
+    </div>
+  </section>
 </div>

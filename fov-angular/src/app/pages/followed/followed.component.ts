@@ -1,12 +1,34 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { StreamService } from '../../services/stream-service.service';
+import { Stream, StreamCardComponent } from '../../components/stream-card/stream-card.component';
+import { Category, CategoryCardComponent } from '../../components/category-card/category-card.component';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-followed',
-  imports: [CommonModule],
+  standalone: true,
+  imports: [CommonModule, StreamCardComponent, CategoryCardComponent, RouterModule],
   templateUrl: './followed.component.html',
-  styleUrl: './followed.component.scss'
+  styleUrls: ['./followed.component.scss']
 })
-export class FollowedComponent {
+export class FollowedComponent implements OnInit {
 
+  liveChannels: Stream[] = [];
+  offlineChannels: Stream[] = [];
+  followedCategories: Category[] = [];
+  activeTab: string = 'channels';
+
+  constructor(private streamService: StreamService) {}
+
+  ngOnInit() {
+    const allFollowed = this.streamService.getFollowedChannels();
+    this.liveChannels = allFollowed.filter(channel => channel.isLive);
+    this.offlineChannels = allFollowed.filter(channel => !channel.isLive);
+    this.followedCategories = this.streamService.getFollowedCategories();
+  }
+
+  setActiveTab(tab: string) {
+    this.activeTab = tab;
+  }
 }

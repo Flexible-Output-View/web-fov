@@ -5,9 +5,11 @@ import { DiscoverComponent } from './pages/discover/discover.component';
 import { ProfileComponent } from './pages/profile/profile.component';
 
 export const routes: Routes = [
-    { path: '', component: HomeComponent },
-    { path: 'followed', component: FollowedComponent },
-    { path: 'discover', component: DiscoverComponent },
-    { path: 'profile', component: ProfileComponent },
-    { path: '**', redirectTo: '' }
+  { path: '', component: HomeComponent },
+  { path: 'followed', component: FollowedComponent },
+  { path: 'discover', component: DiscoverComponent },
+  { path: 'discover/:name', component: DiscoverComponent }, 
+  { path: 'profile', component: ProfileComponent },
+  
+  { path: '**', redirectTo: '' }
 ];

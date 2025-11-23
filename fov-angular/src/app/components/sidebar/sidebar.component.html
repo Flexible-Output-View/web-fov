@@ -1,0 +1,37 @@
+<nav class="sidebar" [class.collapsed]="isCollapsed">
+  
+  <div class="sidebar-header">
+    <h3 class="section-title" *ngIf="!isCollapsed">Chaînes suivies</h3>
+    
+    <button class="sidebar-toggle" (click)="onToggleCollapse()" [title]="isCollapsed ? 'Déplier' : 'Rabattre'">
+      <span *ngIf="!isCollapsed">‹</span>
+      <span *ngIf="isCollapsed">›</span>
+    </button>
+  </div>
+
+  <div class="sidebar-section">
+    <ul class="channel-list">
+        <li *ngFor="let channel of followedChannels" class="channel-item">
+            
+            <a [routerLink]="['/profile', channel.streamer]" 
+            class="channel-link" 
+            [class.is-live]="channel.isLive"
+            
+            [title]="isCollapsed ? (channel.streamer + ' - ' + (channel.isLive ? 'En live' : 'Hors ligne')) : channel.streamer">
+            
+            <img [src]="channel.avatar" [alt]="channel.streamer" class="avatar">
+            
+            <div class="channel-info" *ngIf="!isCollapsed">
+                <span class="channel-name">{{ channel.streamer }}</span>
+                <span class="channel-category">{{ channel.category }}</span>
+            </div>
+
+            <div class="live-info" *ngIf="channel.isLive && !isCollapsed">
+                <span class="live-dot"></span>
+                <span class="viewer-count">{{ channel.viewers }}</span>
+            </div>
+            </a>
+        </li>
+    </ul>
+  </div>
+</nav>
