@@ -13,16 +13,16 @@
     <ul class="channel-list">
         <li *ngFor="let channel of followedChannels" class="channel-item">
             
-            <a [routerLink]="['/profile', channel.name]" 
+            <a [routerLink]="['/profile', channel.streamer]" 
             class="channel-link" 
             [class.is-live]="channel.isLive"
             
-            [title]="isCollapsed ? (channel.name + ' - ' + (channel.isLive ? 'En live' : 'Hors ligne')) : channel.name">
+            [title]="isCollapsed ? (channel.streamer + ' - ' + (channel.isLive ? 'En live' : 'Hors ligne')) : channel.streamer">
             
-            <img [src]="channel.avatar" [alt]="channel.name" class="avatar">
+            <img [src]="channel.avatar" [alt]="channel.streamer" class="avatar">
             
             <div class="channel-info" *ngIf="!isCollapsed">
-                <span class="channel-name">{{ channel.name }}</span>
+                <span class="channel-name">{{ channel.streamer }}</span>
                 <span class="channel-category">{{ channel.category }}</span>
             </div>
 
