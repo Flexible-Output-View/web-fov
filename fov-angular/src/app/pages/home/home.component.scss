@@ -1,14 +1,31 @@
-.page {
-    max-width: 1200px;
-    margin: 0 auto;
+.home-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-lg);
+
+  .section {
+    margin-bottom: var(--spacing-xl);
     
-    h1 {
-        color: #333;
-        margin-bottom: 1rem;
+    .section-header {
+      margin-bottom: var(--spacing-md);
+      
+      h2 {
+        font-size: 1.5rem;
+        color: var(--text-primary);
+        font-weight: 600;
+      }
     }
-    
-    p {
-        color: #666;
-        font-size: 1.1rem;
-    }
+  }
+
+  .categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+  }
+
+  .streams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+  }
 }
