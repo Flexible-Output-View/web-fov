@@ -26,9 +26,9 @@ app.use((err, req, res, next) => {
 async function start() {
     try {
         // verify connection
-        //const conn = await db.getConnection();
-        //await conn.ping();
-        //conn.release();
+        const conn = await db.getConnection();
+        await conn.ping();
+        conn.release();
         console.log('✅ Connected to BDD');
 
         app.listen(PORT, () => {
