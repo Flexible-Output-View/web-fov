@@ -1,38 +1,137 @@
-<div class="home-page">
-  <section class="section">
-    <div class="section-header">
-      <h2>Lives populaires</h2>
+<div class="fov-dashboard">
+  
+  <!-- Toolbar -->
+  <div class="fov-toolbar">
+    <div class="toolbar-left">
+      <h3>FOV Player</h3>
+      <span class="track-info">{{ tracks.length }} piste(s)</span>
     </div>
     
-    <app-featured-carousel></app-featured-carousel>
-
-  </section>
-
-  <section class="section">
-    <div class="section-header">
-      <h2>Catégories populaires</h2>
-    </div>
-    <div class="categories-grid">
+    <div class="toolbar-center">
+      <button (click)="playAll()" class="btn-control" [disabled]="isPlaying">
+        <span class="icon">▶</span> Play
+      </button>
+      <button (click)="pauseAll()" class="btn-control" [disabled]="!isPlaying">
+        <span class="icon">⏸</span> Pause
+      </button>
       
-      <app-category-card 
-        *ngFor="let category of popularCategories" 
-        [category]="category">
-      </app-category-card>
-
+      <!-- Timeline -->
+      <div class="timeline-container">
+        <span class="time-display">{{ formatTime(currentTime) }}</span>
+        <input 
+          type="range" 
+          class="timeline-slider"
+          [min]="0" 
+          [max]="duration || 100"
+          [value]="currentTime"
+          (input)="onSeek($event)"
+          [disabled]="duration === 0"
+        >
+        <span class="time-display">{{ formatTime(duration) }}</span>
+      </div>
     </div>
-  </section>
-
-  <section class="section">
-    <div class="section-header">
-      <h2>Chaînes que vous pourriez aimer</h2>
+    
+    <div class="toolbar-right">
+      <button (click)="toggleEditMode()" [class.active]="editMode" class="btn-primary">
+        {{ editMode ? 'SAVE LAYOUT' : 'EDIT LAYOUT' }}
+      </button>
+      <button (click)="resetLayout()" *ngIf="editMode" class="btn-danger">RESET</button>
     </div>
-    <div class="streams-grid">
+  </div>
+
+  <!-- Workspace -->
+  <div class="fov-workspace">
+    
+    <!-- Stage -->
+    <div class="fov-stage" id="stageArea">
       
-      <app-stream-card 
-        *ngFor="let stream of recommendedStreams" 
-        [stream]="stream">
-      </app-stream-card>
+      <ng-container *ngFor="let track of tracks; let i = index">
+        <div 
+          [id]="'videoWrapper' + i" 
+          class="video-container"
+          [class.editable]="editMode"
+        >
+          <div class="drag-bar" *ngIf="editMode">{{ track.name }}</div>
+          <video 
+            [id]="'videoElement' + i"
+            playsinline
+          ></video>
+          <div class="resize-handle"></div>
+          <div class="track-indicator">
+            <span>{{ track.name }}</span>
+            <span *ngIf="track.hasAudio">🔊</span>
+          </div>
+        </div>
+      </ng-container>
+      
+    </div>
+
+    <!-- Sidebar -->
+    <div class="fov-sidebar">
+      
+      <!-- Sources -->
+      <!-- Sources -->
+    <div class="panel-section">
+      <h4>Sources</h4>
+      <ul class="source-list">
+        <li *ngFor="let wrapper of videoWrappers; let i = index" class="stream-item">
+          <span>{{ wrapper.track.name }}</span>
+          <div class="controls-container">
+            <button 
+              class="icon-btn" 
+              [class.hidden]="!wrapper.visible"
+              [disabled]="!editMode"
+              (click)="toggleVisibility(wrapper)"
+            >
+              {{ wrapper.visible ? '👁' : '👁‍🗨' }}
+            </button>
+            <button 
+              class="icon-btn" 
+              (click)="moveUp(i)" 
+              [disabled]="!editMode || i === 0"
+            >▲</button>
+            <button 
+              class="icon-btn" 
+              (click)="moveDown(i)" 
+              [disabled]="!editMode || i === videoWrappers.length - 1"
+            >▼</button>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+      <!-- Audio Mixer -->
+      <div class="panel-section">
+        <h4>Audio Mixer</h4>
+        <div *ngFor="let wrapper of videoWrappers" class="audio-control">
+          <div class="label-row">
+            <label>{{ wrapper.track.name }}</label>
+            <span>{{ getVolumePercent(wrapper.playerId) }}</span>
+          </div>
+          <input 
+            type="range" 
+            min="0" max="1" step="0.01" 
+            [value]="wrapper.volume"
+            (input)="setVolume(wrapper.playerId, $event)"
+          >
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="panel-section">
+        <h4>Status</h4>
+        <div class="status-info">
+          <div class="status-row">
+            <span>État:</span>
+            <span [class.playing]="isPlaying">{{ isPlaying ? '▶ Lecture' : '⏸ Pause' }}</span>
+          </div>
+          <div class="status-row">
+            <span>Temps:</span>
+            <span>{{ formatTime(currentTime) }} / {{ formatTime(duration) }}</span>
+          </div>
+        </div>
+      </div>
 
     </div>
-  </section>
+  </div>
 </div>
