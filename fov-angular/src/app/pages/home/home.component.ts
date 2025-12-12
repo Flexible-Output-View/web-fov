@@ -1,5 +1,9 @@
-import { Component, OnInit, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FeaturedCarouselComponent } from '../../components/featured-carousel/featured-carousel.component';
+import { CategoryCardComponent, Category } from '../../components/category-card/category-card.component';
+import { StreamCardComponent, Stream } from '../../components/stream-card/stream-card.component';
+import { StreamService } from '../../services/stream-service.service';
 import Hls from 'hls.js';
 
 interface Track {
@@ -12,9 +16,12 @@ interface Track {
 interface VideoWrapper {
   playerId: string;
   track: Track;
-  element: HTMLElement | null;
-  videoElement: HTMLVideoElement | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
   hls: Hls | null;
+  videoElement: HTMLVideoElement | null;
   visible: boolean;
   zIndex: number;
   volume: number;
@@ -23,421 +30,356 @@ interface VideoWrapper {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FeaturedCarouselComponent, CategoryCardComponent, StreamCardComponent],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
-  tracks: Track[] = [
-  { index: 0, name: 'second', videoUrl: 'second.m3u8', hasAudio: true },
-  { index: 1, name: 'first', videoUrl: 'first.m3u8', hasAudio: true }
-];
+  availableTracks: Track[] = [
+    { index: 0, name: 'second', videoUrl: 'second.m3u8', hasAudio: true },
+    { index: 1, name: 'first', videoUrl: 'first.m3u8', hasAudio: true }
+  ];
 
   videoWrappers: VideoWrapper[] = [];
-  
   editMode = false;
   isPlaying = false;
   currentTime = 0;
   duration = 0;
-  
+
+  activeDragWrapper: VideoWrapper | null = null;
+  activeResizeWrapper: VideoWrapper | null = null;
+  dragStartX = 0;
+  dragStartY = 0;
+  initialX = 0;
+  initialY = 0;
+  initialW = 0;
+  initialH = 0;
+
+  syncStats: Map<string, number> = new Map();
+  maxDrift = 0;
   private masterPlayerId: string | null = null;
   private syncInterval: any = null;
-  private cleanupFns: (() => void)[] = [];
-  
-  private readonly SYNC_THRESHOLD = 0.15;
+  private trackIdCounter = 0;
   private readonly BASE_URL = 'assets/hls_out/';
+  private readonly SYNC_THRESHOLD = 0.15;
 
-  ngOnInit() {}
+  popularCategories: Category[] = [];
+  recommendedStreams: Stream[] = [];
+
+  constructor(private streamService: StreamService) {}
+
+  ngOnInit() {
+    this.popularCategories = this.streamService.getPopularCategories().slice(0, 5);
+    this.recommendedStreams = this.streamService.getRecommendedStreams();
+  }
 
   ngAfterViewInit() {
     setTimeout(() => {
-      this.initAllPlayers();
+      this.addTrack('first');
     }, 100);
   }
 
   ngOnDestroy() {
     this.stopSyncMonitoring();
-    this.videoWrappers.forEach(w => {
-      if (w.hls) w.hls.destroy();
-    });
-    this.cleanupFns.forEach(fn => fn());
+    this.videoWrappers.forEach(w => w.hls?.destroy());
   }
 
-  private initAllPlayers() {
-    this.tracks.forEach((track, index) => {
-      const videoEl = document.getElementById(`videoElement${index}`) as HTMLVideoElement;
-      const wrapperEl = document.getElementById(`videoWrapper${index}`) as HTMLElement;
-      
-      if (!videoEl || !wrapperEl) {
-        console.warn(`Elements not found for track ${index}`);
-        return;
-      }
+  addTrack(templateName: string) {
+    const template = this.availableTracks.find(t => t.name === templateName);
+    if (!template) return;
 
-      const playerId = `player_${track.name}`;
-      let hls: Hls | null = null;
+    const uniqueId = this.trackIdCounter++;
+    const track: Track = { ...template, index: uniqueId, name: `${template.name}_${uniqueId}` };
+    
+    const stage = document.getElementById('stageArea');
+    const stageW = stage ? stage.offsetWidth : 800;
+    const stageH = stage ? stage.offsetHeight : 450;
+    const isFirst = this.videoWrappers.length === 0;
 
-      videoEl.playsInline = true;
-      videoEl.controls = false;
-      videoEl.muted = true;
-      videoEl.volume = 1;
+    const newWrapper: VideoWrapper = {
+      playerId: `player_${track.name}`,
+      track,
+      x: isFirst ? 0 : 20,
+      y: isFirst ? 0 : 20 + (this.videoWrappers.length - 1) * 20,
+      width: isFirst ? stageW : 300,
+      height: isFirst ? stageH : 169,
+      hls: null,
+      videoElement: null,
+      visible: true,
+      zIndex: 100,
+      volume: 1
+    };
 
-      if (Hls.isSupported()) {
-        hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: false,
-          backBufferLength: 90,
-          maxBufferLength: 30,
-        });
+    this.videoWrappers.push(newWrapper);
+    
+    setTimeout(() => this.initHlsForWrapper(newWrapper), 50);
+    setTimeout(() => this.refreshLayoutState(), 50);
+  }
 
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error(`[${track.name}] HLS Error:`, data);
-          if (data.fatal) {
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              hls?.startLoad();
-            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-              hls?.recoverMediaError();
-            }
-          }
-        });
+  removeTrack(wrapper: VideoWrapper) {
+    if (!this.editMode) return;
+    if (this.videoWrappers.length <= 1) return;
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          console.log(`[${track.name}] Ready`);
-        });
+    const wasmaster = (wrapper.playerId === this.masterPlayerId);
 
-        hls.loadSource(this.BASE_URL + track.videoUrl);
-        hls.attachMedia(videoEl);
-      } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-        videoEl.src = this.BASE_URL + track.videoUrl;
-      }
-
-      const wrapper: VideoWrapper = {
-        playerId,
-        track,
-        element: wrapperEl,
-        videoElement: videoEl,
-        hls,
-        visible: true,
-        zIndex: 100 - index,
-        volume: 1
-      };
-
-      this.videoWrappers.push(wrapper);
-
-      if (index === 0) {
-        this.masterPlayerId = playerId;
-        this.setupMasterListeners(videoEl);
-      }
-
-      this.applyInitialLayout(wrapperEl, index);
-    });
+    if (wrapper.hls) wrapper.hls.destroy();
+    this.videoWrappers = this.videoWrappers.filter(w => w !== wrapper);
+    this.syncStats.delete(wrapper.track.name);
 
     setTimeout(() => {
-      this.setupDraggableResizable();
-      this.updateZIndexes();
+      this.refreshLayoutState();
+
+      if (this.videoWrappers.length > 0) {
+        const newMaster = this.videoWrappers[0];
+        this.masterPlayerId = newMaster.playerId;
+        this.setupMasterListeners();
+
+        if (wasmaster) {
+          this.syncStats.clear();
+          this.maxDrift = 0;
+          this.syncAllToMaster();
+        }
+      }
     }, 50);
   }
 
-  private setupMasterListeners(videoEl: HTMLVideoElement) {
-    videoEl.addEventListener('timeupdate', () => {
-      this.currentTime = videoEl.currentTime;
-    });
+  private initHlsForWrapper(wrapper: VideoWrapper) {
+    const videoEl = document.getElementById(`videoElement_${wrapper.track.index}`) as HTMLVideoElement;
+    if (!videoEl) return;
 
-    videoEl.addEventListener('loadedmetadata', () => {
-      this.duration = videoEl.duration;
-    });
+    wrapper.videoElement = videoEl;
+    videoEl.volume = wrapper.volume;
+    videoEl.muted = (wrapper.volume === 0);
 
-    videoEl.addEventListener('play', () => {
-      this.isPlaying = true;
-    });
+    if (Hls.isSupported()) {
+      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      wrapper.hls = hls;
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) data.type === Hls.ErrorTypes.NETWORK_ERROR ? hls.startLoad() : hls.recoverMediaError();
+      });
+      hls.loadSource(this.BASE_URL + wrapper.track.videoUrl);
+      hls.attachMedia(videoEl);
+    } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+      videoEl.src = this.BASE_URL + wrapper.track.videoUrl;
+    }
 
-    videoEl.addEventListener('pause', () => {
-      this.isPlaying = false;
-    });
+    if (this.videoWrappers[0] === wrapper) {
+      this.masterPlayerId = wrapper.playerId;
+      this.setupMasterListeners();
+    }
 
-    videoEl.addEventListener('seeked', () => {
-      this.syncAllToMaster();
+    if (this.isPlaying) videoEl.play().catch(() => {});
+  }
+
+  startDrag(event: PointerEvent, wrapper: VideoWrapper) {
+    if (!this.editMode) return;
+    if ((event.target as HTMLElement).classList.contains('resize-handle')) return;
+
+    this.activeDragWrapper = wrapper;
+    this.dragStartX = event.clientX;
+    this.dragStartY = event.clientY;
+    this.initialX = wrapper.x;
+    this.initialY = wrapper.y;
+    
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  startResize(event: PointerEvent, wrapper: VideoWrapper) {
+    if (!this.editMode) return;
+    
+    this.activeResizeWrapper = wrapper;
+    this.dragStartX = event.clientX;
+    this.initialW = wrapper.width;
+    this.initialH = wrapper.height;
+    
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    event.stopPropagation();
+    event.preventDefault();
+  }
+
+  @HostListener('window:pointermove', ['$event'])
+  onPointerMove(event: PointerEvent) {
+    const stage = document.getElementById('stageArea');
+    if (!stage) return;
+
+    const stageRect = stage.getBoundingClientRect();
+
+    if (this.activeDragWrapper) {
+      const dx = event.clientX - this.dragStartX;
+      const dy = event.clientY - this.dragStartY;
+
+      let newX = this.initialX + dx;
+      let newY = this.initialY + dy;
+
+      const maxX = stageRect.width - this.activeDragWrapper.width;
+      const maxY = stageRect.height - this.activeDragWrapper.height;
+
+      newX = Math.max(0, Math.min(newX, maxX));
+      newY = Math.max(0, Math.min(newY, maxY));
+
+      this.activeDragWrapper.x = newX;
+      this.activeDragWrapper.y = newY;
+
+    } else if (this.activeResizeWrapper) {
+      const dx = event.clientX - this.dragStartX;
+      let newW = Math.max(150, this.initialW + dx);
+
+      const maxW = stageRect.width - this.activeResizeWrapper.x;
+      newW = Math.min(newW, maxW);
+
+      const newH = newW / (16 / 9);
+
+      const maxH = stageRect.height - this.activeResizeWrapper.y;
+      if (newH > maxH) {
+        const adjustedH = maxH;
+        newW = adjustedH * (16 / 9);
+      }
+
+      this.activeResizeWrapper.width = newW;
+      this.activeResizeWrapper.height = newW / (16 / 9);
+    }
+  }
+
+  @HostListener('window:pointerup', ['$event'])
+  onPointerUp(event: PointerEvent) {
+    if (this.activeDragWrapper || this.activeResizeWrapper) {
+      this.activeDragWrapper = null;
+      this.activeResizeWrapper = null;
+    }
+  }
+
+  private refreshLayoutState() {
+    this.videoWrappers.forEach((w, i) => {
+      w.zIndex = 100 + (this.videoWrappers.length - i);
     });
   }
 
-  private applyInitialLayout(wrapper: HTMLElement, index: number) {
-  if (index === 0) {
-    // Premier dans la liste = PIP (petit, au premier plan)
-    wrapper.style.top = '20px';
-    wrapper.style.left = '20px';
-    wrapper.style.width = '300px';
-    wrapper.style.height = '169px';
-  } else {
-    // Les autres = fond (plein écran, arrière-plan)
-    wrapper.style.top = '0px';
-    wrapper.style.left = '0px';
-    wrapper.style.width = '100%';
-    wrapper.style.height = '100%';
+  resetLayout() {
+    const stage = document.getElementById('stageArea');
+    const stageW = stage ? stage.offsetWidth : 800;
+    const stageH = stage ? stage.offsetHeight : 450;
+
+    this.videoWrappers.forEach((w, i) => {
+      if (i === 0) {
+        w.x = 0; w.y = 0; w.width = stageW; w.height = stageH;
+      } else {
+        w.x = 20; w.y = 20 + (i - 1) * 190; w.width = 300; w.height = 169;
+      }
+      w.visible = true;
+    });
   }
-}
 
-  async playAll() {
-    this.syncAllToMaster();
-    this.startSyncMonitoring();
+  moveUp(index: number) {
+    if (!this.editMode || index <= 0) return;
+    [this.videoWrappers[index], this.videoWrappers[index - 1]] = 
+    [this.videoWrappers[index - 1], this.videoWrappers[index]];
+    
+    this.refreshLayoutState();
+    this.updateMasterReference();
+  }
 
-    for (const wrapper of this.videoWrappers) {
-      if (wrapper.videoElement) {
-        try {
-          await wrapper.videoElement.play();
-          wrapper.videoElement.muted = false;
-          wrapper.videoElement.volume = wrapper.volume;
-          console.log(`[${wrapper.track.name}] Playing`);
-        } catch (e) {
-          console.warn(`[${wrapper.track.name}] Play failed:`, e);
-        }
+  moveDown(index: number) {
+    if (!this.editMode || index >= this.videoWrappers.length - 1) return;
+    [this.videoWrappers[index], this.videoWrappers[index + 1]] = 
+    [this.videoWrappers[index + 1], this.videoWrappers[index]];
+    
+    this.refreshLayoutState();
+    this.updateMasterReference();
+  }
+
+  private updateMasterReference() {
+    if (this.videoWrappers.length > 0) {
+      const newMaster = this.videoWrappers[0];
+      const wasDifferentMaster = this.masterPlayerId !== newMaster.playerId;
+      
+      this.masterPlayerId = newMaster.playerId;
+      this.setupMasterListeners();
+
+      if (wasDifferentMaster) {
+        this.syncStats.clear();
+        this.maxDrift = 0;
+        this.syncAllToMaster();
       }
     }
   }
 
-  pauseAll() {
-    this.stopSyncMonitoring();
-    this.videoWrappers.forEach(w => {
-      if (w.videoElement) w.videoElement.pause();
-    });
+  async playAll() {
+    this.syncAllToMaster();
+    this.startSyncMonitoring();
+    this.isPlaying = true;
+    this.videoWrappers.forEach(w => w.videoElement?.play().catch(() => {}));
   }
 
-  onSeek(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const time = parseFloat(input.value);
-    
-    this.videoWrappers.forEach(w => {
-      if (w.videoElement) {
-        w.videoElement.currentTime = time;
-      }
-    });
+  pauseAll() {
+    this.stopSyncMonitoring();
+    this.isPlaying = false;
+    this.videoWrappers.forEach(w => w.videoElement?.pause());
+  }
+
+  private setupMasterListeners() {
+    if (this.videoWrappers.length === 0) return;
+    const videoEl = this.videoWrappers[0].videoElement;
+    if (!videoEl) return;
+
+    videoEl.ontimeupdate = () => this.currentTime = videoEl.currentTime;
+    videoEl.onloadedmetadata = () => this.duration = videoEl.duration;
+    videoEl.onplay = () => this.isPlaying = true;
+    videoEl.onpause = () => this.isPlaying = false;
+    videoEl.onseeked = () => this.syncAllToMaster();
   }
 
   private syncAllToMaster() {
-    const master = this.videoWrappers.find(w => w.playerId === this.masterPlayerId);
-    if (!master?.videoElement) return;
+    if (this.videoWrappers.length === 0) return;
+    const master = this.videoWrappers[0];
+    if (!master.videoElement) return;
 
     const masterTime = master.videoElement.currentTime;
+    this.maxDrift = 0;
 
-    this.videoWrappers.forEach(w => {
-      if (w.playerId === this.masterPlayerId) return;
-      if (!w.videoElement) return;
+    this.videoWrappers.forEach((w, i) => {
+      if (i === 0 || !w.videoElement) return;
 
-      const diff = Math.abs(w.videoElement.currentTime - masterTime);
-      if (diff > this.SYNC_THRESHOLD) {
-        console.log(`[${w.track.name}] Resync: diff=${diff.toFixed(3)}s`);
+      const drift = w.videoElement.currentTime - masterTime;
+      const absDrift = Math.abs(drift);
+      
+      this.syncStats.set(w.track.name, drift * 1000);
+      if (absDrift > this.maxDrift) this.maxDrift = absDrift;
+
+      if (absDrift > this.SYNC_THRESHOLD) {
         w.videoElement.currentTime = masterTime;
       }
     });
   }
 
-  private startSyncMonitoring() {
+  startSyncMonitoring() {
     this.stopSyncMonitoring();
-    this.syncInterval = setInterval(() => {
-      this.syncAllToMaster();
-    }, 1000);
+    this.syncInterval = setInterval(() => this.syncAllToMaster(), 500);
   }
 
-  private stopSyncMonitoring() {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-      this.syncInterval = null;
+  stopSyncMonitoring() { if (this.syncInterval) clearInterval(this.syncInterval); }
+  
+  toggleVisibility(wrapper: VideoWrapper) { if (this.editMode) wrapper.visible = !wrapper.visible; }
+  toggleEditMode() { this.editMode = !this.editMode; }
+  onSeek(event: Event) {
+    const val = parseFloat((event.target as HTMLInputElement).value);
+    this.videoWrappers.forEach(w => { if(w.videoElement) w.videoElement.currentTime = val; });
+  }
+  setVolume(wrapper: VideoWrapper, event: Event) {
+    const val = parseFloat((event.target as HTMLInputElement).value);
+    wrapper.volume = val;
+    if (wrapper.videoElement) {
+      wrapper.videoElement.volume = val;
+      wrapper.videoElement.muted = (val === 0);
     }
   }
-
-  setVolume(playerId: string, event: Event) {
-    const input = event.target as HTMLInputElement;
-    const volume = parseFloat(input.value);
-    
-    const wrapper = this.videoWrappers.find(w => w.playerId === playerId);
-    if (wrapper) {
-      wrapper.volume = volume;
-      if (wrapper.videoElement) {
-        wrapper.videoElement.volume = volume;
-        wrapper.videoElement.muted = volume === 0;
-      }
-    }
-  }
-
-  getVolumePercent(playerId: string): string {
-    const wrapper = this.videoWrappers.find(w => w.playerId === playerId);
-    return Math.round((wrapper?.volume ?? 1) * 100) + '%';
-  }
-
-  toggleEditMode() {
-    this.editMode = !this.editMode;
-    
-    this.videoWrappers.forEach(w => {
-      if (!w.element) return;
-      const handle = w.element.querySelector('.resize-handle') as HTMLElement;
-      
-      if (this.editMode) {
-        w.element.classList.add('editable');
-        if (handle) handle.style.display = 'block';
-      } else {
-        w.element.classList.remove('editable');
-        if (handle) handle.style.display = 'none';
-      }
-    });
-  }
-
-  resetLayout() {
-    // Réordonner les wrappers selon l'ordre original des tracks
-    this.videoWrappers.sort((a, b) => a.track.index - b.track.index);
-    
-    // Réappliquer le layout ET les z-index
-    this.videoWrappers.forEach((w, index) => {
-      if (w.element) {
-        this.applyInitialLayout(w.element, index);
-        w.visible = true;
-        w.element.style.display = 'flex';
-      }
-    });
-    
-    this.updateZIndexes();
-  }
-
-  toggleVisibility(wrapper: VideoWrapper) {
-    // Bloquer si pas en mode edit
-    if (!this.editMode) return;
-    
-    wrapper.visible = !wrapper.visible;
-    if (wrapper.element) {
-      wrapper.element.style.display = wrapper.visible ? 'flex' : 'none';
-    }
-  }
-
-  moveUp(index: number) {
-    // Bloquer si pas en mode edit
-    if (!this.editMode) return;
-    if (index <= 0) return;
-    
-    [this.videoWrappers[index], this.videoWrappers[index - 1]] = 
-      [this.videoWrappers[index - 1], this.videoWrappers[index]];
-    this.updateZIndexes();
-  }
-
-  moveDown(index: number) {
-    // Bloquer si pas en mode edit
-    if (!this.editMode) return;
-    if (index >= this.videoWrappers.length - 1) return;
-    
-    [this.videoWrappers[index], this.videoWrappers[index + 1]] = 
-      [this.videoWrappers[index + 1], this.videoWrappers[index]];
-    this.updateZIndexes();
-  }
-
-  private updateZIndexes() {
-    const total = this.videoWrappers.length;
-    this.videoWrappers.forEach((w, index) => {
-      // Premier dans la liste (index 0) = z-index le plus haut (au premier plan)
-      // Dernier dans la liste = z-index le plus bas (en arrière-plan)
-      w.zIndex = 100 + (total - index);
-      if (w.element) {
-        w.element.style.zIndex = w.zIndex.toString();
-      }
-    });
-  }
-
-  private setupDraggableResizable() {
-    this.videoWrappers.forEach(w => {
-      if (w.element) {
-        this.makeDraggable(w.element);
-        this.makeResizable(w.element);
-      }
-    });
-  }
-
-  private makeDraggable(element: HTMLElement) {
-    let isDragging = false;
-    let startX = 0, startY = 0;
-    let initialLeft = 0, initialTop = 0;
-
-    const down = (ev: PointerEvent) => {
-      if (!this.editMode) return;
-      if ((ev.target as HTMLElement).classList.contains('resize-handle')) return;
-      
-      isDragging = true;
-      element.setPointerCapture(ev.pointerId);
-      startX = ev.clientX;
-      startY = ev.clientY;
-      initialLeft = element.offsetLeft;
-      initialTop = element.offsetTop;
-      element.style.cursor = 'grabbing';
-      ev.preventDefault();
-    };
-
-    const move = (ev: PointerEvent) => {
-      if (!isDragging) return;
-      element.style.left = `${initialLeft + ev.clientX - startX}px`;
-      element.style.top = `${initialTop + ev.clientY - startY}px`;
-    };
-
-    const up = (ev: PointerEvent) => {
-      if (isDragging) {
-        isDragging = false;
-        try { element.releasePointerCapture(ev.pointerId); } catch(e) {}
-        element.style.cursor = 'default';
-      }
-    };
-
-    element.addEventListener('pointerdown', down);
-    document.addEventListener('pointermove', move);
-    document.addEventListener('pointerup', up);
-
-    this.cleanupFns.push(() => {
-      element.removeEventListener('pointerdown', down);
-      document.removeEventListener('pointermove', move);
-      document.removeEventListener('pointerup', up);
-    });
-  }
-
-  private makeResizable(element: HTMLElement) {
-    const handle = element.querySelector('.resize-handle') as HTMLElement;
-    if (!handle) return;
-    
-    let isResizing = false;
-    let startX = 0, startW = 0;
-    const aspect = 16 / 9;
-
-    const down = (ev: PointerEvent) => {
-      if (!this.editMode) return;
-      isResizing = true;
-      element.setPointerCapture(ev.pointerId);
-      startX = ev.clientX;
-      startW = element.getBoundingClientRect().width;
-      ev.stopPropagation();
-      ev.preventDefault();
-    };
-
-    const move = (ev: PointerEvent) => {
-      if (!isResizing) return;
-      const newW = Math.max(150, startW + ev.clientX - startX);
-      element.style.width = `${newW}px`;
-      element.style.height = `${newW / aspect}px`;
-    };
-
-    const up = (ev: PointerEvent) => {
-      if (isResizing) {
-        isResizing = false;
-        try { element.releasePointerCapture(ev.pointerId); } catch(e) {}
-      }
-    };
-
-    handle.addEventListener('pointerdown', down);
-    document.addEventListener('pointermove', move);
-    document.addEventListener('pointerup', up);
-
-    this.cleanupFns.push(() => {
-      handle.removeEventListener('pointerdown', down);
-      document.removeEventListener('pointermove', move);
-      document.removeEventListener('pointerup', up);
-    });
-  }
-
-  formatTime(seconds: number): string {
-    if (!seconds || isNaN(seconds)) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  getSyncStatus(): string { return this.maxDrift < 0.2 ? '✅ Synced' : '⚠️ Syncing...'; }
+  getMaxDriftMs(): number { return Math.round(this.maxDrift * 1000); }
+  getSyncStatsArray() { return Array.from(this.syncStats.entries()).map(([name, drift]) => ({ name, drift })); }
+  formatTime(s: number) { 
+    if(!s) return '00:00';
+    const m = Math.floor(s/60), sec = Math.floor(s%60);
+    return `${m}:${sec.toString().padStart(2,'0')}`;
   }
 }
