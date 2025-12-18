@@ -5,6 +5,7 @@ const cors = require('cors');
 
 const db = require('./db');
 const apiRoutes = require('./routes');
+const { startMediaServer } = require('./mediaServer');
 
 const PORT = process.env.PORT || 4000;
 
@@ -12,6 +13,10 @@ const app = express();
 app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json());
+const path = require('path');
+
+const mediaRoot = process.env.MEDIA_ROOT || path.join(__dirname, '..', 'media');
+app.use('/hls', express.static(mediaRoot));
 
 app.get('/', (req, res) => res.json({ ok: true, message: 'FOV backend running' }));
 
@@ -30,6 +35,9 @@ async function start() {
         await conn.ping();
         conn.release();
         console.log('✅ Connected to BDD');
+
+        // start media server (RTMP ingest + HLS)
+        startMediaServer();
 
         app.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);

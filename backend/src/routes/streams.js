@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { config } = require('../mediaServer');
 
 // GET /api/streams -> list streams
 router.get('/', async (req, res, next) => {
@@ -23,3 +24,16 @@ router.get('/:id', async (req, res, next) => {
 });
 
 module.exports = router;
+
+// GET /api/streams/:id/hls -> :id = cle de stream
+router.get('/:id/hls', async (req, res, next) => {
+    try {
+        const streamId = req.params.id;
+        const host = req.get('host') || `localhost:${process.env.PORT || 4000}`;
+        const protocol = req.protocol || 'http';
+        const hlsUrl = `${protocol}://${host}/hls/live/${streamId}/index.m3u8`;
+        res.json({ hls: hlsUrl });
+    } catch (err) {
+        next(err);
+    }
+});
