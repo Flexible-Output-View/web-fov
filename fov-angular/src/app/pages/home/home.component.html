@@ -1,150 +1,35 @@
-<div class="fov-dashboard">
-  
-  <div class="fov-toolbar">
-    <div class="toolbar-left">
-      <h3>FOV Player</h3>
-      <span class="track-info">{{ videoWrappers.length }} piste(s)</span>
-      <span class="sync-badge" [class.ok]="maxDrift < 0.2" [class.warn]="maxDrift >= 0.2">
-        {{ getSyncStatus() }} ({{ getMaxDriftMs() }}ms)
-      </span>
-    </div>
-    
-    <div class="toolbar-center">
-      <button (click)="playAll()" class="btn-control" [disabled]="isPlaying || videoWrappers.length === 0">
-        <span class="icon">▶</span> Play
-      </button>
-      <button (click)="pauseAll()" class="btn-control" [disabled]="!isPlaying">
-        <span class="icon">⏸</span> Pause
-      </button>
-      
-      <div class="timeline-container">
-        <span class="time-display">{{ formatTime(currentTime) }}</span>
-        <input type="range" class="timeline-slider" [min]="0" [max]="duration || 100" [value]="currentTime" (input)="onSeek($event)" [disabled]="duration === 0">
-        <span class="time-display">{{ formatTime(duration) }}</span>
-      </div>
-    </div>
-    
-    <div class="toolbar-right">
-      <button (click)="toggleEditMode()" [class.active]="editMode" class="btn-primary">
-        {{ editMode ? 'SAVE LAYOUT' : 'EDIT LAYOUT' }}
-      </button>
-      <button (click)="resetLayout()" *ngIf="editMode" class="btn-danger">RESET</button>
-    </div>
-  </div>
-
-  <div class="add-track-bar">
-    <span>Ajouter une piste :</span>
-    <button (click)="addTrack('second')" class="btn-add">+ Second</button>
-    <button (click)="addTrack('first')" class="btn-add">+ First</button>
-  </div>
-
-  <div class="fov-workspace">
-    
-    <div class="fov-stage" id="stageArea">
-      
-      <ng-container *ngFor="let wrapper of videoWrappers; let i = index">
-        
-        <div 
-          [id]="'videoWrapper_' + wrapper.track.index" 
-          class="video-container"
-          [class.editable]="editMode"
-          [class.is-master]="i === 0" 
-          [style.z-index]="wrapper.zIndex"
-          [style.display]="wrapper.visible ? 'flex' : 'none'"
-          
-          [style.left.px]="wrapper.x"
-          [style.top.px]="wrapper.y"
-          [style.width.px]="wrapper.width"
-          [style.height.px]="wrapper.height"
-          
-          (pointerdown)="startDrag($event, wrapper)"
-        >
-          <div class="drag-bar" *ngIf="editMode">
-            {{ wrapper.track.name }} {{ i === 0 ? '(Master)' : '' }}
-          </div>
-          
-          <video 
-            [id]="'videoElement_' + wrapper.track.index"
-            playsinline
-          ></video>
-
-          <div 
-            class="resize-handle" 
-            *ngIf="editMode"
-            (pointerdown)="startResize($event, wrapper)"
-          ></div>
-
-          <div class="track-indicator">
-            <span>{{ wrapper.track.name }}</span>
-            <span *ngIf="wrapper.track.hasAudio">🔊</span>
-          </div>
-        </div>
-      </ng-container>
-
-    </div>
-
-    <div class="fov-sidebar">
-      <div class="panel-section">
-        <h4>Sources</h4>
-        <ul class="source-list">
-          <li *ngFor="let wrapper of videoWrappers; let i = index" class="stream-item">
-            <span [style.color]="i === 0 ? '#4ade80' : 'white'">
-              {{ i === 0 ? '[REF] ' : '' }}{{ wrapper.track.name }}
-            </span>
-            <div class="controls-container">
-              <button class="icon-btn" [class.hidden]="!wrapper.visible" [disabled]="!editMode" (click)="toggleVisibility(wrapper)">
-                {{ wrapper.visible ? '👁' : '👁‍🗨' }}
-              </button>
-              <button class="icon-btn" (click)="moveUp(i)" [disabled]="!editMode || i === 0">▲</button>
-              <button class="icon-btn" (click)="moveDown(i)" [disabled]="!editMode || i === videoWrappers.length - 1">▼</button>
-              <button class="icon-btn danger" (click)="removeTrack(wrapper)" [disabled]="!editMode || videoWrappers.length <= 1">✕</button>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <div class="panel-section">
-        <h4>Audio Mixer</h4>
-        <div *ngFor="let wrapper of videoWrappers" class="audio-control">
-          <div class="label-row"><label>{{ wrapper.track.name }}</label></div>
-          <input type="range" min="0" max="1" step="0.01" [value]="wrapper.volume" (input)="setVolume(wrapper, $event)">
-        </div>
-      </div>
-
-      <div class="panel-section">
-        <h4>Sync Monitor</h4>
-        <div class="sync-monitor">
-          <div *ngFor="let stat of getSyncStatsArray()" class="sync-row" [class.warn]="stat.drift > 100 || stat.drift < -100">
-            <span>{{ stat.name }}</span>
-            <span>{{ stat.drift >= 0 ? '+' : '' }}{{ stat.drift.toFixed(0) }}ms</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+<!-- Player FOV -->
+<div class="player-container">
+  <app-fov-player
+    [availableTracks]="availableTracks"
+    [baseUrl]="'assets/hls_out/'"
+    [initialTrack]="'first'">
+  </app-fov-player>
 </div>
 
+<!-- Contenu Home classique -->
 <div class="home-page">
   <section class="section">
     <div class="section-header">
       <h2>Lives populaires</h2>
     </div>
-    
     <app-featured-carousel></app-featured-carousel>
-
   </section>
 
   <section class="section">
     <div class="section-header">
       <h2>Catégories populaires</h2>
     </div>
-    <div class="categories-grid">
-      
+    
+    <div *ngIf="isLoadingCategories" class="loading-state">
+      Chargement des catégories...
+    </div>
+    
+    <div *ngIf="!isLoadingCategories" class="categories-grid">
       <app-category-card 
         *ngFor="let category of popularCategories" 
         [category]="category">
       </app-category-card>
-
     </div>
   </section>
 
@@ -153,12 +38,10 @@
       <h2>Chaînes que vous pourriez aimer</h2>
     </div>
     <div class="streams-grid">
-      
       <app-stream-card 
         *ngFor="let stream of recommendedStreams" 
         [stream]="stream">
       </app-stream-card>
-
     </div>
   </section>
 </div>
