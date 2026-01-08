@@ -11,7 +11,7 @@
 
   .category-image {
     width: 100%;
-    height: 120px;
+    aspect-ratio: 3 / 4;
     
     img {
       width: 100%;
@@ -24,6 +24,11 @@
     padding: var(--spacing-sm);
     font-weight: 600;
     color: var(--text-primary);
+    
+    // Une seule ligne avec ellipsis
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .category-viewers {
@@ -37,4 +42,19 @@
   text-decoration: none;
   color: inherit;
   display: block;
+}
+
+// Tooltip custom
+.tooltip {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }

@@ -16,12 +16,18 @@
     </div>
 
     <div class="tab-content">
-      <div *ngIf="activeTab === 'categories'" class="categories-grid">
-        <app-category-card 
-          *ngFor="let category of allCategories" 
-          [category]="category">
-        </app-category-card>
+      <div *ngIf="activeTab === 'categories'">
+        <div *ngIf="isLoadingCategories" class="loading-state">
+          Chargement des catégories depuis Twitch...
+        </div>
+        <div *ngIf="!isLoadingCategories" class="categories-grid">
+          <app-category-card 
+            *ngFor="let category of allCategories" 
+            [category]="category">
+          </app-category-card>
+        </div>
       </div>
+      
       <div *ngIf="activeTab === 'channels'" class="streams-grid">
         <app-stream-card 
           *ngFor="let stream of liveStreams" 

@@ -25,7 +25,8 @@ export class FollowedComponent implements OnInit {
     const allFollowed = this.streamService.getFollowedChannels();
     this.liveChannels = allFollowed.filter(channel => channel.isLive);
     this.offlineChannels = allFollowed.filter(channel => !channel.isLive);
-    this.followedCategories = this.streamService.getFollowedCategories();
+    //TODO: fetch followed categories from user data
+    //this.followedCategories = this.streamService.getFallbackCategories();
   }
 
   setActiveTab(tab: string) {
