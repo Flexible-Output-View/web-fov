@@ -62,7 +62,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly SYNC_THRESHOLD = 0.15;
   private readonly MAX_WIDTH_RATIO = 0.8;
 
-  // ID unique pour ce player (permet plusieurs players sur la même page)
   readonly playerId = `fov_${Math.random().toString(36).substr(2, 9)}`;
 
   ngOnInit() {}

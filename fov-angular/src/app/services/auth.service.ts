@@ -9,16 +9,13 @@ export class AuthService {
   private isLoggedIn = false;
 
   constructor(private router: Router) {
-    // Vérifier si l'utilisateur est connecté (localStorage pour l'instant)
     this.isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
   }
 
   login(email: string, password: string): boolean {
-    // Pour l'instant, simulation de login
-    // Plus tard, appel API vers le backend
+    // Login simulation
     console.log('Login attempt:', email);
     
-    // Simule une connexion réussie
     this.isLoggedIn = true;
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('userEmail', email);
@@ -27,11 +24,9 @@ export class AuthService {
   }
 
   register(username: string, email: string, password: string): boolean {
-    // Pour l'instant, simulation de register
-    // Plus tard, appel API vers le backend
+    // Register simulation
     console.log('Register attempt:', username, email);
     
-    // Simule une inscription réussie
     this.isLoggedIn = true;
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('userEmail', email);

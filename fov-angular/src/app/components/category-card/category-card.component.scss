@@ -24,8 +24,6 @@
     padding: var(--spacing-sm);
     font-weight: 600;
     color: var(--text-primary);
-    
-    // Une seule ligne avec ellipsis
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -44,7 +42,6 @@
   display: block;
 }
 
-// Tooltip custom
 .tooltip {
   position: fixed;
   background: rgba(0, 0, 0, 0.9);
