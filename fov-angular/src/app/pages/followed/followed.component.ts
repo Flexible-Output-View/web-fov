@@ -12,6 +12,7 @@ import { RouterModule } from '@angular/router';
   templateUrl: './followed.component.html',
   styleUrls: ['./followed.component.scss']
 })
+//TODO: HIDE IF THE USER IS NOT CONNECTED
 export class FollowedComponent implements OnInit {
 
   liveChannels: Stream[] = [];

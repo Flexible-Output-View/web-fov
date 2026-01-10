@@ -7,6 +7,7 @@ import { Category } from '../components/category-card/category-card.component';
 })
 export class StreamService {
 
+  //TODO : Replace with real API data fetching
   private allStreams: Stream[] = [
     {
       streamer: 'Skyyart',
@@ -78,6 +79,7 @@ export class StreamService {
     return this.allStreams.filter(stream => stream.isLive);
   }
 
+  //TODO : Replace with real API data fetching
   getFollowedChannels(): Stream[] {
     return [
       {
@@ -110,6 +112,7 @@ export class StreamService {
     ];
   }
 
+  //TODO : Replace with real API data fetching
   getFollowedCategories(): Category[] {
     return [
       { name: 'League of Legends', viewers: '125K', image: 'https://static-cdn.jtvnw.net/ttv-boxart/21779-285x380.jpg' },
