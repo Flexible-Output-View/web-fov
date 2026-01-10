@@ -30,7 +30,6 @@ export class RegisterComponent {
     private authService: AuthService,
     private router: Router
   ) {
-    // Si déjà connecté, rediriger vers profil
     if (this.authService.isAuthenticated()) {
       this.router.navigate(['/profile']);
     }
@@ -39,7 +38,6 @@ export class RegisterComponent {
   onSubmit(): void {
     this.errorMessage = '';
 
-    // Validation
     if (!this.username || !this.email || !this.password || !this.confirmPassword) {
       this.errorMessage = 'Veuillez remplir tous les champs.';
       return;
@@ -57,7 +55,6 @@ export class RegisterComponent {
 
     this.isLoading = true;
 
-    // Simule un délai d'inscription
     setTimeout(() => {
       const success = this.authService.register(this.username, this.email, this.password);
       

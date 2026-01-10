@@ -21,7 +21,6 @@ export class ProfileComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Si pas connecté, rediriger vers login
     if (!this.authService.isAuthenticated()) {
       this.router.navigate(['/login']);
       return;
