@@ -12,6 +12,7 @@ import { RouterModule } from '@angular/router';
   templateUrl: './followed.component.html',
   styleUrls: ['./followed.component.scss']
 })
+//TODO: HIDE IF THE USER IS NOT CONNECTED
 export class FollowedComponent implements OnInit {
 
   liveChannels: Stream[] = [];
@@ -25,7 +26,8 @@ export class FollowedComponent implements OnInit {
     const allFollowed = this.streamService.getFollowedChannels();
     this.liveChannels = allFollowed.filter(channel => channel.isLive);
     this.offlineChannels = allFollowed.filter(channel => !channel.isLive);
-    this.followedCategories = this.streamService.getFollowedCategories();
+    //TODO: fetch followed categories from user data
+    //this.followedCategories = this.streamService.getFallbackCategories();
   }
 
   setActiveTab(tab: string) {

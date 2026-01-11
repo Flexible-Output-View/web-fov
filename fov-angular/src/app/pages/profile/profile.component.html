@@ -1,4 +1,29 @@
-<div class="page">
-    <h1>Page de Profil</h1>
-    <p>Bienvenue sur FOV - Votre plateforme de streaming personnalisable</p>
+<div class="profile-page">
+  <div class="profile-container">
+    <div class="profile-header">
+      <div class="avatar">
+        {{ username.charAt(0).toUpperCase() }}
+      </div>
+      <h1>{{ username }}</h1>
+      <p>{{ email }}</p>
+    </div>
+
+    <div class="profile-content">
+      <div class="profile-section">
+        <h2>Informations du compte</h2>
+        <div class="info-row">
+          <span class="label">Nom d'utilisateur</span>
+          <span class="value">{{ username }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Email</span>
+          <span class="value">{{ email }}</span>
+        </div>
+      </div>
+
+      <button class="btn-logout" (click)="logout()">
+        Se déconnecter
+      </button>
+    </div>
+  </div>
 </div>
