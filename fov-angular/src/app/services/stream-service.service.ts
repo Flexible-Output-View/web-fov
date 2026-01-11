@@ -7,14 +7,7 @@ import { Category } from '../components/category-card/category-card.component';
 })
 export class StreamService {
 
-  private allCategories: Category[] = [
-    { name: 'League of Legends', viewers: '125K', image: 'assets/category/leagues-of-legends.png' },
-    { name: 'Just Chatting', viewers: '98K', image: 'assets/category/just-chatting.png' },
-    { name: 'Valorant', viewers: '87K', image: 'assets/category/valorant.png' },
-    { name: 'Fortnite', viewers: '76K', image: 'assets/category/fortnite.png' },
-    { name: 'Minecraft', viewers: '65K', image: 'assets/category/minecraft.png' },
-  ];
-
+  //TODO : Replace with real API data fetching
   private allStreams: Stream[] = [
     {
       streamer: 'Skyyart',
@@ -72,11 +65,7 @@ export class StreamService {
     }
   ];
 
-  constructor() { }
-
-  getPopularCategories(): Category[] {
-    return this.allCategories;
-  }
+  constructor() {}
 
   getRecommendedStreams(): Stream[] {
     return this.allStreams.slice(0, 3);
@@ -90,11 +79,10 @@ export class StreamService {
     return this.allStreams.filter(stream => stream.isLive);
   }
 
-  getFollowedChannels(): any[] {
-    // For the moment hard code
-    // Later it will come from the user's followed channels data
+  //TODO : Replace with real API data fetching
+  getFollowedChannels(): Stream[] {
     return [
-      { 
+      {
         streamer: 'Skyyart',
         title: 'Grand tournoi League of Legends ! 🏆',
         category: 'League of Legends',
@@ -103,7 +91,7 @@ export class StreamService {
         avatar: 'assets/stream-thumbnail1.png',
         isLive: true
       },
-      { 
+      {
         streamer: 'Domingo',
         title: 'Just chatting avec la communauté 💬',
         category: 'Just Chatting',
@@ -112,7 +100,7 @@ export class StreamService {
         avatar: 'assets/stream-thumbnail2.png',
         isLive: true
       },
-      { 
+      {
         streamer: 'Zerator',
         title: '',
         category: '',
@@ -124,12 +112,11 @@ export class StreamService {
     ];
   }
 
+  //TODO : Replace with real API data fetching
   getFollowedCategories(): Category[] {
-    // For the moment hard code
-    // Later it will come from the user's followed categories data
     return [
-      { name: 'League of Legends', viewers: '125K', image: 'assets/category/leagues-of-legends.png' },
-      { name: 'Just Chatting', viewers: '98K', image: 'assets/category/just-chatting.png' },
+      { name: 'League of Legends', viewers: '125K', image: 'https://static-cdn.jtvnw.net/ttv-boxart/21779-285x380.jpg' },
+      { name: 'Just Chatting', viewers: '98K', image: 'https://static-cdn.jtvnw.net/ttv-boxart/509658-285x380.jpg' },
     ];
   }
 
@@ -139,14 +126,15 @@ export class StreamService {
     );
   }
 
-  getCategoryNameBySlug(slug: string): string {
-    const found = this.allCategories.find(c => 
-      c.name.toLowerCase()
-            .trim()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .replace(/[\s_-]+/g, '-')
-            .replace(/^-+|-+$/g, '') === slug
-    );
-    return found ? found.name : 'Catégorie inconnue';
+  getStreamsByCategorySlug(slug: string): Stream[] {
+    return this.allStreams.filter(stream => {
+      const streamSlug = stream.category
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      return streamSlug === slug && stream.isLive;
+    });
   }
 }

@@ -1,0 +1,22 @@
+{
+  "tracks": [
+
+    {
+      "index": 0,
+      "name": "first",
+      "videoUrl": "first.m3u8",
+      "hasAudio": true,
+      "audioUrl": "first_audio.m3u8"
+    }
+,
+    {
+      "index": 1,
+      "name": "second",
+      "videoUrl": "second.m3u8",
+      "hasAudio": true,
+      "audioUrl": "second_audio.m3u8"
+    }
+  ],
+  "videoCount": 2,
+  "audioCount": 2
+}

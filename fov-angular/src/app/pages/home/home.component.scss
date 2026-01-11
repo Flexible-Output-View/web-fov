@@ -1,3 +1,8 @@
+.player-container {
+  height: 700px;
+  overflow: hidden;
+}
+
 .home-page {
   max-width: 1200px;
   margin: 0 auto;
@@ -5,10 +10,10 @@
 
   .section {
     margin-bottom: var(--spacing-xl);
-    
+
     .section-header {
       margin-bottom: var(--spacing-md);
-      
+
       h2 {
         font-size: 1.5rem;
         color: var(--text-primary);
@@ -19,7 +24,7 @@
 
   .categories-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: var(--spacing-md);
   }
 
@@ -28,4 +33,11 @@
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: var(--spacing-md);
   }
+}
+
+.loading-state {
+  padding: 40px;
+  text-align: center;
+  color: #888;
+  font-size: 1rem;
 }

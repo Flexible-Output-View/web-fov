@@ -10,6 +10,7 @@ import { StreamService } from '../../services/stream-service.service';
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.scss']
 })
+//TODO: HIDE IF THE USER IS NOT CONNECTED
 export class SidebarComponent implements OnInit {
 
   @Input() isCollapsed = false;

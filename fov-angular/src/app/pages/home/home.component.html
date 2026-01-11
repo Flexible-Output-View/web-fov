@@ -1,24 +1,35 @@
+<!-- Player FOV -->
+<div class="player-container">
+  <app-fov-player
+    [availableTracks]="availableTracks"
+    [baseUrl]="'assets/hls_out/'"
+    [initialTrack]="'first'">
+  </app-fov-player>
+</div>
+
+<!-- Contenu Home classique -->
 <div class="home-page">
   <section class="section">
     <div class="section-header">
       <h2>Lives populaires</h2>
     </div>
-    
     <app-featured-carousel></app-featured-carousel>
-
   </section>
 
   <section class="section">
     <div class="section-header">
       <h2>Catégories populaires</h2>
     </div>
-    <div class="categories-grid">
-      
+    
+    <div *ngIf="isLoadingCategories" class="loading-state">
+      Chargement des catégories...
+    </div>
+    
+    <div *ngIf="!isLoadingCategories" class="categories-grid">
       <app-category-card 
         *ngFor="let category of popularCategories" 
         [category]="category">
       </app-category-card>
-
     </div>
   </section>
 
@@ -27,12 +38,10 @@
       <h2>Chaînes que vous pourriez aimer</h2>
     </div>
     <div class="streams-grid">
-      
       <app-stream-card 
         *ngFor="let stream of recommendedStreams" 
         [stream]="stream">
       </app-stream-card>
-
     </div>
   </section>
 </div>
