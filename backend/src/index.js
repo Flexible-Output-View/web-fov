@@ -1,11 +1,14 @@
-require('dotenv').config();
-const express = require('express');
-const morgan = require('morgan');
-const cors = require('cors');
+import * as dotenv from 'dotenv';
+dotenv.config();
 
-const db = require('./db');
-const apiRoutes = require('./routes');
-const { startMediaServer } = require('./mediaServer');
+import express from 'express';
+import morgan from 'morgan';
+import cors from 'cors';
+
+import db from './db.js';
+import apiRoutes from './routes/index.js';
+import { startMediaServer } from './mediaServer.mjs';
+
 
 const PORT = process.env.PORT || 4000;
 
@@ -13,7 +16,7 @@ const app = express();
 app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json());
-const path = require('path');
+import path from 'path';
 
 const mediaRoot = process.env.MEDIA_ROOT || path.join(__dirname, '..', 'media');
 app.use('/hls', express.static(mediaRoot));
@@ -37,7 +40,7 @@ async function start() {
         console.log('✅ Connected to BDD');
 
         // start media server (RTMP ingest + HLS)
-        startMediaServer();
+        await startMediaServer();
 
         app.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);

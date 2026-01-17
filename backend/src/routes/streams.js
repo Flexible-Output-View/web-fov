@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { config } = require('../mediaServer');
+const { config } = require('../mediaServer.mjs');
 
 // GET /api/streams -> list streams
 router.get('/', async (req, res, next) => {
