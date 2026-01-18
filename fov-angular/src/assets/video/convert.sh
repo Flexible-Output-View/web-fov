@@ -49,11 +49,6 @@ get_track_name() {
   esac
 }
 
-# Création du fichier de métadonnées pour Angular
-METADATA_FILE="$OUTPUT_DIR/tracks.json"
-echo "{" > "$METADATA_FILE"
-echo '  "tracks": [' >> "$METADATA_FILE"
-
 # Extraction et conversion des pistes vidéo avec leur audio correspondant
 INDEX=0
 while [ $INDEX -lt $VIDEO_COUNT ]
@@ -69,17 +64,11 @@ do
     HAS_AUDIO="true"
     echo "   📹 Extraction vidéo (stream v:$INDEX) + 🔊 audio (stream a:$INDEX)"
     
-    # Extraire vidéo + audio correspondant dans un fichier temporaire
+    # Créer le HLS avec vidéo ET audio combinés
+    echo "📡 Conversion en HLS avec audio intégré ($NAME.m3u8)"
     ffmpeg -y -i "$INPUT" \
       -map 0:v:$INDEX \
       -map 0:a:$INDEX \
-      -c:v copy \
-      -c:a aac \
-      "${NAME}_combined.mp4" 2>/dev/null
-    
-    # Créer le HLS avec vidéo et audio
-    echo "📡 Conversion en HLS avec audio ($NAME.m3u8)"
-    ffmpeg -y -i "${NAME}_combined.mp4" \
       -c:v copy \
       -c:a aac \
       -hls_time 2 \
@@ -87,41 +76,20 @@ do
       -hls_segment_filename "$OUTPUT_DIR/${NAME}_%03d.ts" \
       -start_number 0 \
       -f hls "$OUTPUT_DIR/${NAME}.m3u8" 2>/dev/null
-    
-    # Créer aussi une version audio seule pour le mixage indépendant
-    echo "🔊 Extraction audio seule (${NAME}_audio.m3u8)"
-    ffmpeg -y -i "$INPUT" \
-      -map 0:a:$INDEX \
-      -c:a aac \
-      -hls_time 2 \
-      -hls_list_size 0 \
-      -hls_segment_filename "$OUTPUT_DIR/${NAME}_audio_%03d.ts" \
-      -start_number 0 \
-      -f hls "$OUTPUT_DIR/${NAME}_audio.m3u8" 2>/dev/null
-    
-    # Nettoyer le fichier temporaire
-    rm -f "${NAME}_combined.mp4"
   else
     echo "   📹 Extraction vidéo seule (stream v:$INDEX) - pas d'audio correspondant"
     
-    # Extraire uniquement la vidéo
+    # Créer le HLS sans audio
+    echo "📡 Conversion en HLS sans audio ($NAME.m3u8)"
     ffmpeg -y -i "$INPUT" \
       -map 0:v:$INDEX \
       -c:v copy \
       -an \
-      "${NAME}_video.mp4" 2>/dev/null
-    
-    # Créer le HLS sans audio
-    echo "📡 Conversion en HLS sans audio ($NAME.m3u8)"
-    ffmpeg -y -i "${NAME}_video.mp4" \
-      -c:v copy \
       -hls_time 2 \
       -hls_list_size 0 \
       -hls_segment_filename "$OUTPUT_DIR/${NAME}_%03d.ts" \
       -start_number 0 \
       -f hls "$OUTPUT_DIR/${NAME}.m3u8" 2>/dev/null
-    
-    rm -f "${NAME}_video.mp4"
   fi
   
   # Ajouter au fichier JSON
@@ -135,20 +103,14 @@ do
   echo "      \"index\": $INDEX," >> "$METADATA_FILE"
   echo "      \"name\": \"$NAME\"," >> "$METADATA_FILE"
   echo "      \"videoUrl\": \"${NAME}.m3u8\"," >> "$METADATA_FILE"
-  echo "      \"hasAudio\": $HAS_AUDIO," >> "$METADATA_FILE"
-  if [ "$HAS_AUDIO" = "true" ]; then
-    echo "      \"audioUrl\": \"${NAME}_audio.m3u8\"" >> "$METADATA_FILE"
-  else
-    echo "      \"audioUrl\": null" >> "$METADATA_FILE"
-  fi
+  echo "      \"hasAudio\": $HAS_AUDIO" >> "$METADATA_FILE"
   echo "    }" >> "$METADATA_FILE"
   
   INDEX=$((INDEX+1))
 done
 
 echo "  ]," >> "$METADATA_FILE"
-echo "  \"videoCount\": $VIDEO_COUNT," >> "$METADATA_FILE"
-echo "  \"audioCount\": $AUDIO_COUNT" >> "$METADATA_FILE"
+echo "  \"videoCount\": $VIDEO_COUNT" >> "$METADATA_FILE"
 echo "}" >> "$METADATA_FILE"
 
 echo ""
