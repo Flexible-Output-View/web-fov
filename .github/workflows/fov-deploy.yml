@@ -6,9 +6,6 @@ on:
   push:
     branches:
       - "dev"
-      - "ci/deploy"
-      - "30-cicd-déploiement-web-angular"
-      - "23-fonctionnalités-de-base-site"
 
 jobs:
     Deploy-dev:
