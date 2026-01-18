@@ -6,8 +6,6 @@ on:
   push:
     branches:
       - "dev"
-      - "ci/deploy"
-      - "30-cicd-déploiement-web-angular"
 
 jobs:
     Deploy-dev:
@@ -16,18 +14,27 @@ jobs:
         - name: "Checkout code"
           uses: actions/checkout@v4
 
+        - name: "Create env file"
+          env:
+            TWITCH_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+            TWITCH_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          run: |
+            cd fov-angular/src/environments/
+            cp environment.example.ts environment.ts
+            sed -i "s|YOUR_CLIENT_ID_HERE|$TWITCH_ID|g" environment.ts
+            sed -i "s|YOUR_CLIENT_SECRET_HERE|$TWITCH_SECRET|g" environment.ts
+
         - name: "Stop previous container"
           run: cd /home/deploy/web-deploy/dev/ && docker-compose down
 
         - name: "Clean docker images"
-          run: cd /home/deploy/web-deploy/dev/ && docker system prune
+          run: cd /home/deploy/web-deploy/dev/ && docker system prune -f 
 
         - name: "Remove folder content"
           run: rm -rf /home/deploy/web-deploy/dev/
 
         - name: "Copy repository"
-          run: cp -r . /home/deploy/web-deploy/dev/
+          run: mkdir -p /home/deploy/web-deploy/dev/ && cp -r . /home/deploy/web-deploy/dev/
 
         - name: "Run the docker compose stack"
           run: cd /home/deploy/web-deploy/dev/ && docker-compose up -d --no-deps --build
-
