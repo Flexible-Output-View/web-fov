@@ -16,7 +16,7 @@ let stopping = false;
 function clearHLSFiles() {
     try {
         for (const file of fs.readdirSync(HLS_DIR)) {
-            fs.unlinkSync(path.join(HLS_DIR, file));
+            fs.rm(path.join(HLS_DIR, file), { recursive: true, force: true });
         }
         console.log("🧹 HLS directory cleared");
     } catch (err) {
