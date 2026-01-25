@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const db = require('../db');
+import db from '../db.js';
 
 //GET /api/users/:id -> fetch a user
 router.get('/:id', async (req, res, next) => {
@@ -24,4 +24,4 @@ router.post('/', async (req, res, next) => {
     }
 });
 
-module.exports = router;
+export default router;

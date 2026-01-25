@@ -1,6 +1,6 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const db = require('../db');
+import db from '../db.js';
 
 // GET /api/categories -> list categories
 router.get('/', async (req, res, next) => {
@@ -22,4 +22,4 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
-module.exports = router;
+export default router;

@@ -1,9 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const db = require('../db');
-const { config } = require('../mediaServer.mjs');
-const fs = require('fs');
-const path = require('path');
+import db from '../db.js';
+import fs from 'fs';
+import path from 'path';
 
 // GET /api/streams -> list streams
 router.get('/', async (req, res, next) => {
@@ -49,8 +48,6 @@ router.get('/:id', async (req, res, next) => {
     }
 });
 
-module.exports = router;
-
 // GET /api/streams/:id/hls -> :id = cle de stream
 router.get('/:id/hls', async (req, res, next) => {
     try {
@@ -63,3 +60,5 @@ router.get('/:id/hls', async (req, res, next) => {
         next(err);
     }
 });
+
+export default router;
