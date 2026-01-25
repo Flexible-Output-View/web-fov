@@ -8,8 +8,10 @@ services:
       - ./backend/media:/var/media
     ports:
       - "4000:4000"   # API
-      - "9999:9999"   # SRT
+      - "9999:9999"
+      - "9999:9999/udp"   # SRT
       - "8000:8000"   # media HTTP (node-media-server)
+    #network_mode: "host"
     restart: unless-stopped
 
   fov-stack:
