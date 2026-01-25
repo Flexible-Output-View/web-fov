@@ -1,9 +1,9 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
 
-const categories = require('./categories');
-const streams = require('./streams');
-const users = require('./users');
+import categories from './categories.js';
+import streams from './streams.js';
+import users from './users.js';
 
 router.use('/categories', categories);
 router.use('/streams', streams);
@@ -11,4 +11,4 @@ router.use('/users', users);
 
 router.get('/', (req, res) => res.json({ ok: true, api: true }));
 
-module.exports = router;
+export default router;
