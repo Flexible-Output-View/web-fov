@@ -24,41 +24,57 @@ function clearHLSFiles() {
     }
 }
 
-// Start (or restart) the FFmpeg listener
-function startFFmpegListener() {
-    if (stopping) return;
+function buildFfmpegArgs(srtURL, videoTrackCount) {
+    const mapArgs = [];
+    const audioCodecArgs = [];
+    const varStreamEntries = [];
 
-    clearHLSFiles();
+    for (let i = 0; i < videoTrackCount; i++) {
+        // map video + optional audio
+        mapArgs.push("-map", `0:v:${i}`);
+        mapArgs.push("-map", "0:a?");
 
-    const srtPort = process.env.SRT_PORT || 9999;
-    const srtURL = `srt://0.0.0.0:${srtPort}?mode=listener`;
+        // audio codec copy per output audio stream
+        audioCodecArgs.push(`-c:a:${i}`, "copy");
+
+        // HLS variant mapping
+        varStreamEntries.push(`v:${i},a:${i}`);
+    }
 
     const ffmpegArgs = [
         "-i", srtURL,
 
-        // map video0 + audio0 and video1 + audio1
-        "-map", "0:v:0", "-map", "0:a?",
-        "-map", "0:v:1", "-map", "0:a?",
+        ...mapArgs,
 
         "-c:v", "copy",
-        "-c:a:0", "copy",
-        "-c:a:1", "copy",
+        ...audioCodecArgs,
 
         "-f", "hls",
         "-hls_time", "2",
         "-hls_list_size", "3",
         "-hls_flags", "delete_segments+independent_segments",
 
-        // NOTICE: %v only in directory name
         "-hls_segment_filename", path.join(HLS_DIR, "%v", "seg%03d.ts"),
 
-        // let var_stream_map know which variants to create
-        "-var_stream_map", "v:0,a:0 v:1,a:1",
+        "-var_stream_map", varStreamEntries.join(" "),
 
-        // playlist inside these variant dirs
         path.join(HLS_DIR, "%v", "playlist.m3u8")
     ];
 
+    return ffmpegArgs;
+}
+
+// Start (or restart) the FFmpeg listener
+function startFFmpegListener(tracks) {
+    if (stopping) return;
+    if (tracks && tracks == 0) return;
+
+    clearHLSFiles();
+
+    const srtPort = process.env.SRT_PORT || 9999;
+    const srtURL = `srt://0.0.0.0:${srtPort}?mode=listener`;
+
+    const ffmpegArgs = buildFfmpegArgs(srtURL, tracks);
 
     console.log("📀 Spawning FFmpeg:", "ffmpeg", ffmpegArgs.join(" "));
 
@@ -91,7 +107,7 @@ async function startMediaServer() {
     });
 
     console.log("🚀 Media server ready — listening for SRT streams...");
-    startFFmpegListener();
+    startFFmpegListener(3);
 }
 
 export { startMediaServer };
