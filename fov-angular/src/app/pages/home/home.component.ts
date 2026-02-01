@@ -26,9 +26,10 @@ export class HomeComponent implements OnInit {
   recommendedStreams: Stream[] = [];
   isLoadingCategories = true;
 
-  availableTracks: Track[] = [
-    { index: 0, name: 'second', videoUrl: 'second.m3u8', hasAudio: true },
-    { index: 1, name: 'first', videoUrl: 'first.m3u8', hasAudio: true }
+  // LOCAL MODE
+  localTracks: Track[] = [
+    { index: 0, name: 'first', videoUrl: 'first.m3u8' },
+    { index: 1, name: 'second', videoUrl: 'second.m3u8' }
   ];
 
   constructor(
