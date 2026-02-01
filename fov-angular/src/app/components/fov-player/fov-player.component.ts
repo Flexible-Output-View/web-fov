@@ -39,8 +39,8 @@ interface ApiTracksResponse {
 })
 export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
 
-  @Input() streamId: string = '';  // ID du stream (optionnel, pour plus tard)
-  @Input() useLocalFiles: boolean = false;  // Mode local pour les tests
+  @Input() streamId: string = '';  // STREAM ID
+  @Input() useLocalFiles: boolean = false;  // LOCAL MODE
   @Input() localBaseUrl: string = 'assets/hls_out/';
   @Input() localTracks: Track[] = [];
 
@@ -92,7 +92,7 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.errorMessage = '';
 
     if (this.useLocalFiles) {
-      // Mode local pour les tests
+      // LOCAL MODE
       this.availableTracks = this.localTracks.length > 0 
         ? this.localTracks 
         : [
@@ -102,7 +102,7 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
       this.initializeAllTracks();
       this.isLoading = false;
     } else {
-      // Mode API
+      // API MODE
       this.http.get<ApiTracksResponse>(`${this.API_URL}/streams/available`).subscribe({
         next: (response) => {
           if (response.tracks && response.tracks.length > 0) {
@@ -234,7 +234,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     videoEl.volume = wrapper.volume;
     videoEl.muted = (wrapper.volume === 0);
 
-    // Construire l'URL complète
     const fullUrl = this.useLocalFiles 
       ? this.localBaseUrl + videoUrl 
       : videoUrl;
@@ -242,7 +241,7 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     if (Hls.isSupported()) {
       const hls = new Hls({ 
         enableWorker: true, 
-        lowLatencyMode: true,  // Mode basse latence pour le live
+        lowLatencyMode: true,
         liveSyncDuration: 3,
         liveMaxLatencyDuration: 10
       });
@@ -260,7 +259,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
       });
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        // Auto-play quand le manifest est chargé (mode live)
         videoEl.play().catch(err => {
           console.warn('Autoplay bloqué:', err);
         });
@@ -278,7 +276,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
       this.setupMasterListeners();
     }
 
-    // Démarrer la synchronisation
     this.startSyncMonitoring();
   }
 
@@ -374,14 +371,12 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
   const stageW = stage ? stage.offsetWidth : 800;
   const stageH = stage ? stage.offsetHeight : 450;
 
-  // Réordonner les wrappers selon l'ordre original
   this.videoWrappers.sort((a, b) => {
     const indexA = this.originalTrackOrder.indexOf(a.track.name.split('_')[0]);
     const indexB = this.originalTrackOrder.indexOf(b.track.name.split('_')[0]);
     return indexA - indexB;
   });
 
-  // Appliquer les positions et tailles
   this.videoWrappers.forEach((w, i) => {
     if (i === 0) {
       w.x = 0;
@@ -407,7 +402,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     w.visible = true;
   });
 
-  // Rafraîchir les z-index
   this.refreshLayoutState();
   this.updateMasterReference();
 }
@@ -531,7 +525,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   refreshStream() {
-    // Recharger les tracks depuis l'API
     this.videoWrappers.forEach(w => w.hls?.destroy());
     this.videoWrappers = [];
     this.loadTracks();

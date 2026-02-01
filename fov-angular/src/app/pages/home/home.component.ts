@@ -26,7 +26,7 @@ export class HomeComponent implements OnInit {
   recommendedStreams: Stream[] = [];
   isLoadingCategories = true;
 
-  // Tracks pour le mode local (tests)
+  // LOCAL MODE
   localTracks: Track[] = [
     { index: 0, name: 'first', videoUrl: 'first.m3u8' },
     { index: 1, name: 'second', videoUrl: 'second.m3u8' }

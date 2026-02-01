@@ -23,18 +23,15 @@
     </div>
   </div>
 
-  <!-- État de chargement -->
   <div class="loading-state" *ngIf="isLoading">
     <span>⏳ Chargement des flux...</span>
   </div>
 
-  <!-- Message d'erreur -->
   <div class="error-state" *ngIf="!isLoading && errorMessage">
     <span>❌ {{ errorMessage }}</span>
     <button (click)="refreshStream()" class="btn-retry">Réessayer</button>
   </div>
 
-  <!-- Player -->
   <div class="fov-workspace" *ngIf="!isLoading && !errorMessage">
     <div class="fov-stage" [id]="'stageArea_' + playerId">
       <ng-container *ngFor="let wrapper of videoWrappers; let i = index">
