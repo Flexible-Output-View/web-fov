@@ -1,8 +1,21 @@
-
 services:
-    fov-stack:
-        build: .
-        ports:
-            - 8080:80       # Port interface web
-            - 1935:1935     # Port RTMP
-        restart: on-failure
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/media:/var/media
+    ports:
+      - "4000:4000"   # API
+      - "9999:9999"
+      - "9999:9999/udp"   # SRT
+      - "8000:8000"   # media HTTP (node-media-server)
+    #network_mode: "host"
+    restart: unless-stopped
+
+  fov-stack:
+    build: .
+    ports:
+      - 8080:80       # Port interface web
+    restart: on-failure
