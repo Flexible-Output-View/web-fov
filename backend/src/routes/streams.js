@@ -17,6 +17,9 @@ router.get('/', async (req, res, next) => {
 // GET /api/streams/available -> available streams for player
 router.get('/available', async (req, res, next) => {
     try {
+        res.set('Cache-Control', 'no-store'); // Disable caching
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         const HLS_DIR = path.join(process.cwd(), "media", "hls");
         const dirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
             .filter(dirent => dirent.isDirectory())
@@ -29,7 +32,7 @@ router.get('/available', async (req, res, next) => {
             name: id,
             videoUrl: `${protocol}://${httpPort}/hls/${id}/playlist.m3u8`
         }));
-        res.json({
+        res.status(200).json({
             tracks: tracks,
             videoCount: tracks.length
         });
