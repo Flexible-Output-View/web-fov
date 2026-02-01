@@ -1,6 +1,7 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
+import cors from 'cors';
 import { spawn } from "child_process";
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), "media");
@@ -52,7 +53,7 @@ function buildFfmpegArgs(srtURL, videoTrackCount) {
         ...audioCodecArgs,
 
         "-f", "hls",
-        "-hls_time", "2",
+        "-hls_time", "6",
         "-hls_list_size", "3",
         "-hls_flags", "delete_segments+independent_segments",
 
@@ -99,6 +100,7 @@ function startFFmpegListener(tracks) {
 async function startMediaServer() {
     // Static Express server to serve HLS files
     const app = express();
+    app.use(cors());
     app.use("/hls", express.static(HLS_DIR));
 
     const httpPort = process.env.MEDIA_HTTP_PORT || 8000;
