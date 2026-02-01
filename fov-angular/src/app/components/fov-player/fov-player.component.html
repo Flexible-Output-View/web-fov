@@ -9,23 +9,13 @@
     </div>
 
     <div class="toolbar-center">
-      <button (click)="playAll()" class="btn-control" [disabled]="isPlaying || videoWrappers.length === 0">
-        <span class="icon">▶</span> Play
-      </button>
-      <button (click)="pauseAll()" class="btn-control" [disabled]="!isPlaying">
-        <span class="icon">⏸</span> Pause
-      </button>
-
-      <div class="timeline-container">
-        <span class="time-display">{{ formatTime(currentTime) }}</span>
-        <input type="range" class="timeline-slider"
-          [min]="0" [max]="duration || 100" [value]="currentTime"
-          (input)="onSeek($event)" [disabled]="duration === 0">
-        <span class="time-display">{{ formatTime(duration) }}</span>
-      </div>
+      <span class="live-indicator">🔴 LIVE</span>
     </div>
 
     <div class="toolbar-right">
+      <button (click)="refreshStream()" class="btn-control" title="Rafraîchir">
+        🔄
+      </button>
       <button (click)="toggleEditMode()" [class.active]="editMode" class="btn-primary">
         {{ editMode ? 'SAVE LAYOUT' : 'EDIT LAYOUT' }}
       </button>
@@ -33,16 +23,19 @@
     </div>
   </div>
 
-  <div class="add-track-bar">
-    <span>Ajouter une piste :</span>
-    <button *ngFor="let track of availableTracks"
-            (click)="addTrack(track.name)"
-            class="btn-add">
-      + {{ track.name }}
-    </button>
+  <!-- État de chargement -->
+  <div class="loading-state" *ngIf="isLoading">
+    <span>⏳ Chargement des flux...</span>
   </div>
 
-  <div class="fov-workspace">
+  <!-- Message d'erreur -->
+  <div class="error-state" *ngIf="!isLoading && errorMessage">
+    <span>❌ {{ errorMessage }}</span>
+    <button (click)="refreshStream()" class="btn-retry">Réessayer</button>
+  </div>
+
+  <!-- Player -->
+  <div class="fov-workspace" *ngIf="!isLoading && !errorMessage">
     <div class="fov-stage" [id]="'stageArea_' + playerId">
       <ng-container *ngFor="let wrapper of videoWrappers; let i = index">
         <div [id]="'videoWrapper_' + playerId + '_' + wrapper.track.index"
@@ -61,13 +54,15 @@
             {{ wrapper.track.name }} {{ i === 0 ? '(Master)' : '' }}
           </div>
 
-          <video [id]="'videoElement_' + playerId + '_' + wrapper.track.index" playsinline></video>
+          <video [id]="'videoElement_' + playerId + '_' + wrapper.track.index" 
+                 playsinline 
+                 autoplay
+                 muted></video>
 
           <div class="resize-handle" *ngIf="editMode" (pointerdown)="startResize($event, wrapper)"></div>
 
           <div class="track-indicator">
             <span>{{ wrapper.track.name }}</span>
-            <span *ngIf="wrapper.track.hasAudio">🔊</span>
           </div>
         </div>
       </ng-container>
@@ -75,7 +70,7 @@
 
     <div class="fov-sidebar">
       <div class="panel-section">
-        <h4>Sources</h4>
+        <h4>Sources ({{ videoWrappers.length }})</h4>
         <ul class="source-list">
           <li *ngFor="let wrapper of videoWrappers; let i = index" class="stream-item">
             <span [style.color]="i === 0 ? '#4ade80' : 'white'">
@@ -88,7 +83,6 @@
               </button>
               <button class="icon-btn" (click)="moveUp(i)" [disabled]="!editMode || i === 0">▲</button>
               <button class="icon-btn" (click)="moveDown(i)" [disabled]="!editMode || i === videoWrappers.length - 1">▼</button>
-              <button class="icon-btn danger" (click)="removeTrack(wrapper)" [disabled]="!editMode || videoWrappers.length <= 1">✕</button>
             </div>
           </li>
         </ul>
