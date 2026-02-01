@@ -362,3 +362,43 @@
     }
   }
 }
+
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #888;
+  font-size: 1.2rem;
+  gap: 20px;
+}
+
+.error-state {
+  color: #ef4444;
+}
+
+.btn-retry {
+  padding: 10px 20px;
+  background: #e94560;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  
+  &:hover {
+    background: #ff6b6b;
+  }
+}
+
+.live-indicator {
+  font-weight: bold;
+  color: #ef4444;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
