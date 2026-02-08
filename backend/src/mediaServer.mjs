@@ -45,6 +45,8 @@ function buildFfmpegArgs(srtURL, videoTrackCount) {
     }
 
     const ffmpegArgs = [
+        "-analyzeduration", "0",
+        "-fflags", "nobuffer",
         "-i", srtURL,
 
         ...mapArgs,
@@ -53,8 +55,8 @@ function buildFfmpegArgs(srtURL, videoTrackCount) {
         ...audioCodecArgs,
 
         "-f", "hls",
-        "-hls_time", "6",
-        "-hls_list_size", "3",
+        "-hls_time", "2",
+        "-hls_list_size", "5",
         "-hls_flags", "delete_segments+independent_segments",
 
         "-hls_segment_filename", path.join(HLS_DIR, "%v", "seg%03d.ts"),
