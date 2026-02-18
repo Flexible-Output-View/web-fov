@@ -7,6 +7,9 @@ RUN npm install -g @angular/cli@latest
 
 # Copy package files and install deps
 COPY package*.json ./
+
+RUN npm i --package-lock-only
+
 RUN npm ci
 
 # Copy rest of the app

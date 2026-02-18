@@ -14,7 +14,7 @@ jobs:
         - name: "Checkout code"
           uses: actions/checkout@v4
 
-        - name: "Create env file"
+        - name: "Create frontend env file"
           env:
             TWITCH_ID: ${{ secrets.TWITCH_CLIENT_ID }}
             TWITCH_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
@@ -24,14 +24,39 @@ jobs:
             sed -i "s|YOUR_CLIENT_ID_HERE|$TWITCH_ID|g" environment.ts
             sed -i "s|YOUR_CLIENT_SECRET_HERE|$TWITCH_SECRET|g" environment.ts
 
+        - name: "Create backend file"
+          env:
+            PORT: 4000
+            DB_HOST: ${{ secrets.DB_HOST }}
+            DB_NAME: ${{ secrets.DB_NAME }}
+            DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+            DB_PORT: ${{ secrets.DB_PORT }}
+            DB_USER: ${{ secrets.DB_USER }}
+            FFMPEG_PATH: ${{ secrets.FFMPEG_PATH }}
+            MEDIA_ROOT: ${{ secrets.MEDIA_ROOT }}
+          run: |
+            cd backend
+            touch .env
+            echo "PORT=${PORT}" >> .env
+            echo "DB_HOST=${DB_HOST}" >> .env
+            echo "DB_PORT=${DB_PORT}" >> .env
+            echo "DB_USER=${DB_USER}" >> .env
+            echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
+            echo "DB_NAME=${DB_NAME}" >> .env
+            echo "FFMPEG_PATH=${FFMPEG_PATH}" >> .env
+            echo "MEDIA_ROOT=${MEDIA_ROOT}" >> .env
+            ls -a
+
         - name: "Stop previous container"
           run: cd /home/deploy/web-deploy/dev/ && docker-compose down
+          continue-on-error: true
 
         - name: "Clean docker images"
-          run: cd /home/deploy/web-deploy/dev/ && docker system prune -f 
+          run: cd /home/deploy/web-deploy/dev/ && docker system prune -f
 
         - name: "Remove folder content"
           run: rm -rf /home/deploy/web-deploy/dev/
+          continue-on-error: true
 
         - name: "Copy repository"
           run: mkdir -p /home/deploy/web-deploy/dev/ && cp -r . /home/deploy/web-deploy/dev/
