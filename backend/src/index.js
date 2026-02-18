@@ -18,7 +18,7 @@ app.use(cors());
 app.use(express.json());
 import path from 'path';
 
-const mediaRoot = process.env.MEDIA_ROOT || path.join(__dirname, '..', 'media');
+const mediaRoot = process.env.MEDIA_ROOT; //|| path.join(__dirname, '..', 'media');
 app.use('/hls', express.static(mediaRoot));
 
 app.get('/', (req, res) => res.json({ ok: true, message: 'FOV backend running' }));

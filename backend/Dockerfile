@@ -9,6 +9,9 @@ WORKDIR /usr/src/app
 
 # copy package files first to leverage Docker cache
 COPY package*.json ./
+
+RUN npm i --package-lock-only
+
 RUN npm ci --only=production
 
 # copy source
