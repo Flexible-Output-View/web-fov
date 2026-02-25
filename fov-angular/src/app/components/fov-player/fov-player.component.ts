@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, AfterViewInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, Input, AfterViewInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import Hls from 'hls.js';
@@ -8,7 +8,6 @@ export interface Track {
   index: number;
   name: string;
   videoUrl: string;
-  segments?: number;
 }
 
 export interface VideoWrapper {
@@ -28,7 +27,6 @@ export interface VideoWrapper {
   hasManifest: boolean;
   bufferEnd: number;
   bufferStart: number;
-  isBuffering: boolean;
 }
 
 interface ApiTracksResponse {
@@ -40,6 +38,22 @@ interface ApiTracksResponse {
   message?: string;
 }
 
+interface ApiStreamTrack {
+  trackId: string;
+  videoUrl: string;
+}
+
+interface ApiLiveStream {
+  streamId: string;
+  trackCount: number;
+  tracks: ApiStreamTrack[];
+}
+
+interface ApiAvailableStreamsResponse {
+  streams: ApiLiveStream[];
+  streamCount: number;
+}
+
 @Component({
   selector: 'app-fov-player',
   standalone: true,
@@ -47,21 +61,16 @@ interface ApiTracksResponse {
   templateUrl: './fov-player.component.html',
   styleUrls: ['./fov-player.component.scss']
 })
-export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
+export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   @Input() streamId: string = '';
-  @Input() useLocalFiles: boolean = false;
-  @Input() localBaseUrl: string = 'assets/hls_out/';
-  @Input() localTracks: Track[] = [];
 
   videoWrappers: VideoWrapper[] = [];
   availableTracks: Track[] = [];
   editMode = false;
   isLoading = true;
   errorMessage = '';
-  statusMessage = '';
 
   isBufferingPhase = true;
-  bufferProgress = 0;
 
   activeDragWrapper: VideoWrapper | null = null;
   activeResizeWrapper: VideoWrapper | null = null;
@@ -75,7 +84,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
   syncStats: Map<string, number> = new Map();
   maxDrift = 0;
 
-  initialSyncDone = false;
   playbackStarted = false;
 
   private masterPlayerId: string | null = null;
@@ -87,8 +95,9 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private readonly SYNC_THRESHOLD = 0.1;
   private readonly HARD_SYNC_THRESHOLD = 0.3;
-  private readonly MIN_BUFFER_FOR_START = 10;
-  private readonly SAFE_POSITION_MARGIN = 1;
+  private readonly MIN_BUFFER_FOR_START = 8; 
+  private readonly MIN_FORWARD_BUFFER = 4;
+  private readonly SAFE_POSITION_MARGIN = 0.5;
 
   private readonly MAX_WIDTH_RATIO = 0.8;
   private readonly API_URL = environment.apiUrl;
@@ -100,23 +109,13 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(private http: HttpClient) {}
 
   getLoadingMessage(): string {
-    if (this.errorMessage) {
-      return '';
-    }
-    
-    if (this.isLoading && !this.isBufferingPhase) {
-      return 'Connexion au serveur...';
-    }
-    
+    if (this.errorMessage) return '';
+    if (this.isLoading && !this.isBufferingPhase) return 'Connexion au serveur...';
     return 'Chargement du live...';
   }
 
-  ngOnInit() {}
-
   ngAfterViewInit() {
-    setTimeout(() => {
-      this.loadTracks();
-    }, 100);
+    setTimeout(() => this.loadTracks(), 100);
   }
 
   ngOnDestroy() {
@@ -131,65 +130,27 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isBufferingPhase = true;
     this.playbackStarted = false;
     this.errorMessage = '';
-    this.statusMessage = 'Recherche des flux disponibles...';
-
-    if (this.useLocalFiles) {
-      this.availableTracks = this.localTracks.length > 0
-        ? this.localTracks
-        : [
-            { index: 0, name: 'first', videoUrl: 'first.m3u8' },
-            { index: 1, name: 'second', videoUrl: 'second.m3u8' }
-          ];
-      this.initializeAllTracks();
-      this.isLoading = false;
-    } else {
-      this.fetchAvailableTracks();
-    }
+    this.fetchAvailableTracks();
   }
 
   private fetchAvailableTracks() {
-    this.http.get<ApiTracksResponse>(`${this.API_URL}/streams/available`).subscribe({
+    this.http.get<any>(`${this.API_URL}/streams/available`).subscribe({
       next: (response) => {
         console.log('[loadTracks] API response:', response);
-        
-        const totalDirs = response.totalDirs || 0;
-        const readyCount = response.videoCount || 0;
-        const pending = response.pending || 0;
 
-        const allReady = totalDirs > 0 && pending === 0 && readyCount === totalDirs;
-        
-        if (allReady && response.tracks && response.tracks.length > 0) {
-          this.stopPolling();
-          this.availableTracks = response.tracks;
-          this.statusMessage = 'Chargement des flux...';
-          console.log(`[loadTracks] All ${response.tracks.length} tracks ready!`);
-          this.initializeAllTracks();
-          this.isLoading = false;
+        if (response.streams) {
+          this.handleNewApiFormat(response as ApiAvailableStreamsResponse);
+        } else if (response.tracks) {
+          this.handleLegacyApiFormat(response as ApiTracksResponse);
         } else {
-          this.pollAttempts++;
-          
-          if (totalDirs > 0) {
-            this.statusMessage = `Préparation des flux... (${readyCount}/${totalDirs})`;
-          } else {
-            this.statusMessage = 'En attente du stream...';
-          }
-          
-          if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
-            this.startPolling();
-          } else {
-            this.isLoading = false;
-            this.isBufferingPhase = false;
-            this.errorMessage = 'Timeout: les flux ne sont pas disponibles.';
-          }
+          this.handleNoData();
         }
       },
       error: (err) => {
         console.error('Erreur chargement des tracks:', err);
         this.pollAttempts++;
-        
         if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
-          this.statusMessage = `Connexion au serveur... (${this.pollAttempts})`;
-          this.startPolling();
+          this.startPolling(2000);
         } else {
           this.isLoading = false;
           this.isBufferingPhase = false;
@@ -199,11 +160,71 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private startPolling() {
+  private handleNewApiFormat(response: ApiAvailableStreamsResponse) {
+    const stream = response.streams.find(s => s.streamId === this.streamId);
+
+    if (stream && stream.tracks.length > 0) {
+      this.stopPolling();
+      this.availableTracks = stream.tracks.map((t, i) => ({
+        index: i,
+        name: t.trackId,
+        videoUrl: t.videoUrl
+      }));
+      console.log(`[loadTracks] Stream "${this.streamId}" found with ${this.availableTracks.length} tracks`);
+      this.initializeAllTracks();
+      this.isLoading = false;
+    } else {
+      this.handleNoData();
+    }
+  }
+
+  private handleLegacyApiFormat(response: ApiTracksResponse) {
+    const totalDirs = response.totalDirs || 0;
+    const readyCount = response.videoCount || 0;
+    const pending = response.pending || 0;
+    const allReady = totalDirs > 0 && pending === 0 && readyCount === totalDirs;
+
+    if (allReady && response.tracks && response.tracks.length > 0) {
+      this.stopPolling();
+      this.availableTracks = response.tracks;
+      this.initializeAllTracks();
+      this.isLoading = false;
+    } else {
+      this.pollAttempts++;
+      if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
+        let pollDelay: number;
+        if (pending > 0 && readyCount > 0) {
+          pollDelay = 500;
+        } else if (totalDirs > 0) {
+          pollDelay = 1000;
+        } else {
+          pollDelay = 2000;
+        }
+        this.startPolling(pollDelay);
+      } else {
+        this.isLoading = false;
+        this.isBufferingPhase = false;
+        this.errorMessage = 'Timeout.';
+      }
+    }
+  }
+
+  private handleNoData() {
+    this.pollAttempts++;
+    if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
+      this.startPolling(2000);
+    } else {
+      this.isLoading = false;
+      this.isBufferingPhase = false;
+      this.errorMessage = 'Timeout: les flux ne sont pas disponibles.';
+    }
+  }
+
+  private startPolling(delay: number = 2000) {
     this.stopPolling();
     this.pollingInterval = setTimeout(() => {
       this.fetchAvailableTracks();
-    }, 2000);
+    }, delay);
   }
 
   private stopPolling() {
@@ -215,21 +236,14 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private initializeAllTracks() {
     this.originalTrackOrder = this.availableTracks.map(t => t.name);
-    this.initialSyncDone = false;
     this.playbackStarted = false;
     this.isBufferingPhase = true;
-    this.bufferProgress = 0;
-    this.statusMessage = 'Préparation des buffers...';
 
     this.availableTracks.forEach((track, index) => {
-      setTimeout(() => {
-        this.addTrack(track);
-      }, index * 200);
+      setTimeout(() => this.addTrack(track), index * 200);
     });
 
-    setTimeout(() => {
-      this.startBufferCheck();
-    }, 500);
+    setTimeout(() => this.startBufferCheck(), 500);
   }
 
   private getStageElement(): HTMLElement | null {
@@ -264,11 +278,9 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
       hasManifest: false,
       bufferEnd: 0,
       bufferStart: 0,
-      isBuffering: true
     };
 
     this.videoWrappers.push(newWrapper);
-
     setTimeout(() => this.initHlsForWrapper(newWrapper, track.videoUrl), 100);
     setTimeout(() => this.refreshLayoutState(), 100);
   }
@@ -309,7 +321,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     wrapper.videoElement = videoEl;
     wrapper.isReady = false;
     wrapper.hasManifest = false;
-    wrapper.isBuffering = true;
 
     const isMaster = this.videoWrappers[0] === wrapper;
 
@@ -337,23 +348,19 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     videoEl.volume = wrapper.volume;
     videoEl.muted = true;
 
-    const fullUrl = this.useLocalFiles
-      ? this.localBaseUrl + videoUrl
-      : videoUrl;
-
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
 
-        liveSyncDuration: 6,
-        liveMaxLatencyDuration: 30,
+        liveSyncDuration: 18,
+        liveMaxLatencyDuration: 60,
         liveDurationInfinity: true,
-        liveBackBufferLength: 60,
+        liveBackBufferLength: 120,
 
-        maxBufferLength: 60,
-        maxMaxBufferLength: 120,
-        maxBufferSize: 200 * 1000 * 1000,
+        maxBufferLength: 180,
+        maxMaxBufferLength: 200,
+        maxBufferSize: 400 * 1000 * 1000,
         maxBufferHole: 0.5,
 
         fragLoadingMaxRetry: 10,
@@ -386,10 +393,9 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
       hls.on(Hls.Events.ERROR, (event, data) => {
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
           if (this.isBufferingPhase) {
-            console.log(`[${wrapper.track.name}] Buffer stall during buffering phase (normal)`);
             return;
           }
-          console.warn(`[HLS ${wrapper.track.name}] bufferStalledError`);
+          console.warn(`[HLS ${wrapper.track.name}] bufferStalledError — forward buffer: ${this.getForwardBuffer(wrapper).toFixed(1)}s`);
           return;
         }
 
@@ -413,7 +419,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
         this.updateBufferInfo(wrapper);
-        
         if (!wrapper.isReady) {
           wrapper.isReady = true;
           console.log(`[${wrapper.track.name}] Ready (buffering...)`);
@@ -423,15 +428,14 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         console.log(`[${wrapper.track.name}] Manifest parsed, ${data.levels.length} levels`);
         wrapper.hasManifest = true;
-        
         videoEl.pause();
       });
 
-      hls.loadSource(fullUrl);
+      hls.loadSource(videoUrl);
       hls.attachMedia(videoEl);
 
     } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-      videoEl.src = fullUrl;
+      videoEl.src = videoUrl;
       wrapper.isReady = true;
       wrapper.hasManifest = true;
     }
@@ -442,9 +446,14 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private getForwardBuffer(wrapper: VideoWrapper): number {
+    if (!wrapper.videoElement) return 0;
+    const currentTime = wrapper.videoElement.currentTime;
+    return wrapper.bufferEnd - currentTime;
+  }
+
   private updateBufferInfo(wrapper: VideoWrapper) {
     if (!wrapper.videoElement) return;
-    
     const videoEl = wrapper.videoElement;
     if (videoEl.buffered.length > 0) {
       wrapper.bufferStart = videoEl.buffered.start(0);
@@ -472,7 +481,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const allHaveManifest = this.videoWrappers.every(w => w.hasManifest);
     if (!allHaveManifest) {
-      this.statusMessage = 'Chargement des manifests...';
       return;
     }
 
@@ -480,14 +488,10 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const bufferLengths = this.videoWrappers.map(w => w.bufferEnd - w.bufferStart);
     const minBuffer = Math.min(...bufferLengths);
-    
-    this.bufferProgress = Math.min(100, (minBuffer / this.MIN_BUFFER_FOR_START) * 100);
-    this.statusMessage = `Buffering... ${Math.round(this.bufferProgress)}%`;
-
-    const bufferStatus = this.videoWrappers.map(w => 
-      `${w.track.name}: ${(w.bufferEnd - w.bufferStart).toFixed(1)}s`
+    const bufferStatus = this.videoWrappers.map(w =>
+      `${w.track.name}: ${(w.bufferEnd - w.bufferStart).toFixed(1)}s [${w.bufferStart.toFixed(1)}-${w.bufferEnd.toFixed(1)}]`
     ).join(', ');
-    console.log(`[Buffer] ${bufferStatus} (need ${this.MIN_BUFFER_FOR_START}s)`);
+    console.log(`[Buffer] ${bufferStatus} (need ${this.MIN_BUFFER_FOR_START}s total, ${this.MIN_FORWARD_BUFFER}s forward)`);
 
     if (minBuffer < this.MIN_BUFFER_FOR_START) {
       return;
@@ -504,18 +508,24 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     const commonRange = commonEnd - commonStart;
     if (commonRange < this.MIN_BUFFER_FOR_START) {
       console.log(`[Buffer] Common range too small: ${commonRange.toFixed(1)}s`);
-      this.statusMessage = 'Synchronisation des buffers...';
       return;
     }
 
     const startPosition = commonStart + this.SAFE_POSITION_MARGIN;
+    const forwardBuffer = commonEnd - startPosition;
 
-    console.log(`[Buffer] Ready! Common range: ${commonStart.toFixed(1)}s - ${commonEnd.toFixed(1)}s`);
-    console.log(`[Buffer] Start position: ${startPosition.toFixed(2)}s`);
+    if (forwardBuffer < this.MIN_FORWARD_BUFFER) {
+      const progress = Math.min(100, (forwardBuffer / this.MIN_FORWARD_BUFFER) * 100);
+      console.log(`[Buffer] Forward buffer: ${forwardBuffer.toFixed(1)}s / ${this.MIN_FORWARD_BUFFER}s (${progress.toFixed(0)}%)`);
+      return;
+    }
+
+    console.log(`[Buffer] ✅ Ready!`);
+    console.log(`[Buffer]   Common range: ${commonStart.toFixed(1)}s - ${commonEnd.toFixed(1)}s (${commonRange.toFixed(1)}s)`);
+    console.log(`[Buffer]   Start position: ${startPosition.toFixed(2)}s`);
+    console.log(`[Buffer]   Forward buffer: ${forwardBuffer.toFixed(1)}s`);
 
     this.stopBufferCheck();
-    this.statusMessage = 'Synchronisation...';
-
     this.startSynchronizedPlayback(startPosition);
   }
 
@@ -523,21 +533,16 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     console.log(`[Sync] Starting synchronized playback at ${startPosition.toFixed(2)}s`);
 
     for (const w of this.videoWrappers) {
-      if (w.videoElement) {
-        w.videoElement.pause();
-      }
+      if (w.videoElement) w.videoElement.pause();
     }
 
     const seekPromises = this.videoWrappers.map(w => {
       return new Promise<void>((resolve) => {
-        if (!w.videoElement) {
-          resolve();
-          return;
-        }
+        if (!w.videoElement) { resolve(); return; }
 
         const onSeeked = () => {
           w.videoElement!.removeEventListener('seeked', onSeeked);
-          console.log(`[${w.track.name}] Seeked to ${startPosition.toFixed(2)}s`);
+          console.log(`[${w.track.name}] Seeked to ${startPosition.toFixed(2)}s, forward buffer: ${(w.bufferEnd - startPosition).toFixed(1)}s`);
           resolve();
         };
 
@@ -561,7 +566,7 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
 
     requestAnimationFrame(() => {
       console.log('[Sync] Starting playback NOW');
-      
+
       for (const w of this.videoWrappers) {
         if (w.videoElement) {
           w.videoElement.playbackRate = 1;
@@ -575,11 +580,14 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
 
       this.playbackStarted = true;
       this.isBufferingPhase = false;
-      this.initialSyncDone = true;
-      this.statusMessage = '';
 
-      console.log('[Sync] Playback started!');
+      for (const w of this.videoWrappers) {
+        this.updateBufferInfo(w);
+        const fwd = this.getForwardBuffer(w);
+        console.log(`[Sync] ${w.track.name} forward buffer at play: ${fwd.toFixed(1)}s`);
+      }
 
+      console.log('[Sync] ✅ Playback started!');
       this.startSyncMonitoring();
     });
   }
@@ -587,10 +595,9 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
   private waitForAllReady(): Promise<void> {
     return new Promise((resolve) => {
       const check = () => {
-        const allReady = this.videoWrappers.every(w => 
+        const allReady = this.videoWrappers.every(w =>
           w.videoElement && w.videoElement.readyState >= 3
         );
-
         if (allReady) {
           resolve();
         } else {
@@ -614,6 +621,62 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     setTimeout(() => {
       this.initHlsForWrapper(wrapper, wrapper.track.videoUrl);
     }, 3000);
+  }
+
+  private syncAllToMaster() {
+    if (this.videoWrappers.length < 2) return;
+    if (!this.playbackStarted) return;
+
+    const master = this.videoWrappers[0];
+    if (!master.videoElement) return;
+    if (master.videoElement.paused || master.videoElement.readyState < 3) return;
+
+    const masterTime = master.videoElement.currentTime;
+    this.maxDrift = 0;
+
+    this.videoWrappers.forEach(w => this.updateBufferInfo(w));
+
+    this.videoWrappers.forEach((w, i) => {
+      if (i === 0 || !w.videoElement) return;
+      if (w.videoElement.paused || w.videoElement.seeking) return;
+      if (w.videoElement.readyState < 3) return;
+
+      const drift = w.videoElement.currentTime - masterTime;
+      const absDrift = Math.abs(drift);
+
+      this.syncStats.set(w.track.name, drift * 1000);
+      if (absDrift > this.maxDrift) this.maxDrift = absDrift;
+
+      if (absDrift > this.HARD_SYNC_THRESHOLD) {
+        if (masterTime >= w.bufferStart && masterTime <= w.bufferEnd) {
+          console.warn(`[${w.track.name}] Hard resync: ${(drift * 1000).toFixed(0)}ms`);
+          w.videoElement.currentTime = masterTime;
+          w.videoElement.playbackRate = 1;
+        } else {
+          const correction = drift > 0 ? 0.95 : 1.05;
+          w.videoElement.playbackRate = correction;
+        }
+      } else if (absDrift > this.SYNC_THRESHOLD) {
+        const correction = drift > 0 ? 0.98 : 1.02;
+        w.videoElement.playbackRate = correction;
+      } else {
+        if (w.videoElement.playbackRate !== 1) {
+          w.videoElement.playbackRate = 1;
+        }
+      }
+    });
+  }
+
+  startSyncMonitoring() {
+    this.stopSyncMonitoring();
+    this.syncInterval = setInterval(() => this.syncAllToMaster(), 500);
+  }
+
+  stopSyncMonitoring() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+    }
   }
 
   startDrag(event: PointerEvent, wrapper: VideoWrapper) {
@@ -753,7 +816,7 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
       const wasDifferentMaster = this.masterPlayerId !== newMaster.playerId;
       this.masterPlayerId = newMaster.playerId;
       this.setupMasterListeners();
-      
+
       if (wasDifferentMaster) {
         this.syncStats.clear();
         this.maxDrift = 0;
@@ -784,62 +847,6 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
-  private syncAllToMaster() {
-    if (this.videoWrappers.length < 2) return;
-    if (!this.playbackStarted) return;
-
-    const master = this.videoWrappers[0];
-    if (!master.videoElement) return;
-    if (master.videoElement.paused || master.videoElement.readyState < 3) return;
-
-    const masterTime = master.videoElement.currentTime;
-    this.maxDrift = 0;
-
-    this.videoWrappers.forEach(w => this.updateBufferInfo(w));
-
-    this.videoWrappers.forEach((w, i) => {
-      if (i === 0 || !w.videoElement) return;
-      if (w.videoElement.paused || w.videoElement.seeking) return;
-      if (w.videoElement.readyState < 3) return;
-
-      const drift = w.videoElement.currentTime - masterTime;
-      const absDrift = Math.abs(drift);
-
-      this.syncStats.set(w.track.name, drift * 1000);
-      if (absDrift > this.maxDrift) this.maxDrift = absDrift;
-
-      if (absDrift > this.HARD_SYNC_THRESHOLD) {
-        if (masterTime >= w.bufferStart && masterTime <= w.bufferEnd) {
-          console.warn(`[${w.track.name}] Hard resync: ${(drift * 1000).toFixed(0)}ms`);
-          w.videoElement.currentTime = masterTime;
-          w.videoElement.playbackRate = 1;
-        } else {
-          const correction = drift > 0 ? 0.95 : 1.05;
-          w.videoElement.playbackRate = correction;
-        }
-      } else if (absDrift > this.SYNC_THRESHOLD) {
-        const correction = drift > 0 ? 0.98 : 1.02;
-        w.videoElement.playbackRate = correction;
-      } else {
-        if (w.videoElement.playbackRate !== 1) {
-          w.videoElement.playbackRate = 1;
-        }
-      }
-    });
-  }
-
-  startSyncMonitoring() {
-    this.stopSyncMonitoring();
-    this.syncInterval = setInterval(() => this.syncAllToMaster(), 500);
-  }
-
-  stopSyncMonitoring() {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-      this.syncInterval = null;
-    }
-  }
-
   toggleVisibility(wrapper: VideoWrapper) {
     if (this.editMode) wrapper.visible = !wrapper.visible;
   }
@@ -857,39 +864,18 @@ export class FovPlayerComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  getSyncStatus(): string {
-    if (this.isBufferingPhase) return '⏳ Buffering...';
-    if (!this.playbackStarted) return '⏳ Starting...';
-    if (this.maxDrift < 0.1) return '✅ Synced';
-    if (this.maxDrift < 0.3) return '🔄 Adjusting';
-    return '⚠️ Resyncing';
-  }
-
-  getMaxDriftMs(): number {
-    return Math.round(this.maxDrift * 1000);
-  }
-
-  getSyncStatsArray() {
-    return Array.from(this.syncStats.entries()).map(([name, drift]) => ({ name, drift }));
-  }
-
   refreshStream() {
     this.stopSyncMonitoring();
     this.stopPolling();
     this.stopBufferCheck();
     this.videoWrappers.forEach(w => {
-      if (w.hls) {
-        w.hls.destroy();
-        w.hls = null;
-      }
+      if (w.hls) { w.hls.destroy(); w.hls = null; }
     });
     this.videoWrappers = [];
     this.syncStats.clear();
     this.maxDrift = 0;
-    this.initialSyncDone = false;
     this.playbackStarted = false;
     this.isBufferingPhase = true;
-    this.bufferProgress = 0;
     this.pollAttempts = 0;
     this.loadTracks();
   }

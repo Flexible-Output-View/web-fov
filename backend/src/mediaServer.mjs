@@ -52,7 +52,7 @@ function buildFfmpegArgs(srtURL, videoTrackCount) {
 
         "-f", "hls",
         "-hls_time", "2",
-        "-hls_list_size", "6",
+        "-hls_list_size", "15",
         "-hls_flags", "delete_segments+independent_segments+omit_endlist",
         "-hls_segment_type", "mpegts",
         "-hls_segment_filename", path.join(HLS_DIR, "%v", "seg%05d.ts"),
@@ -93,6 +93,7 @@ function startFFmpegListener(tracks) {
     ffmpegProc.on("exit", (code, signal) => {
         console.log(`ℹ️ FFmpeg exited (code=${code} signal=${signal})`);
         ffmpegProc = null;
+        clearHLSFiles();
         if (!stopping) {
             console.log("🔁 Restarting FFmpeg listener in 2s...");
             setTimeout(() => startFFmpegListener(currentTracks), 2000);
@@ -166,6 +167,7 @@ async function startMediaServer() {
         if (!ffmpegProc) {
             stopping = false;
             currentTracks = null;
+            clearHLSFiles();
             return res.status(200).json({ status: "not_running" });
         }
         try {
@@ -174,7 +176,6 @@ async function startMediaServer() {
             ffmpegProc.kill("SIGINT");
             console.log(`⏹️ FFmpeg stop requested (pid=${pid})`);
             currentTracks = null;
-            setTimeout(() => clearHLSFiles(), 1000);
             return res.status(200).json({ status: "stopping", pid });
         } catch (err) {
             console.error("⚠️ Failed to stop FFmpeg:", err);

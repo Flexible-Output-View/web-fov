@@ -4,6 +4,8 @@ import db from '../db.js';
 import fs from 'fs';
 import path from 'path';
 
+const HLS_DIR = path.join(process.cwd(), "media", "hls");
+
 function isPlaylistReady(playlistPath, minSegments = 2) {
   try {
     if (!fs.existsSync(playlistPath)) {
@@ -41,30 +43,17 @@ function getSegmentCount(playlistPath) {
   }
 }
 
-router.get('/', async (req, res, next) => {
+function getCurrentTracksState(protocol = 'http') {
   try {
-    const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams ORDER BY viewers DESC');
-    res.json(rows[0]);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/available', async (req, res, next) => {
-  try {
-    res.set('Cache-Control', 'no-store');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-
-    const HLS_DIR = path.join(process.cwd(), "media", "hls");
-
     if (!fs.existsSync(HLS_DIR)) {
-      return res.status(200).json({
+      return {
         tracks: [],
         videoCount: 0,
         ready: false,
+        pending: 0,
+        totalDirs: 0,
         message: 'HLS directory does not exist yet'
-      });
+      };
     }
 
     let dirs;
@@ -74,26 +63,28 @@ router.get('/available', async (req, res, next) => {
         .map(dirent => dirent.name)
         .sort((a, b) => parseInt(a) - parseInt(b));
     } catch (err) {
-      return res.status(200).json({
+      return {
         tracks: [],
         videoCount: 0,
         ready: false,
+        pending: 0,
+        totalDirs: 0,
         message: 'Cannot read HLS directory'
-      });
+      };
     }
 
     if (dirs.length === 0) {
-      return res.status(200).json({
+      return {
         tracks: [],
         videoCount: 0,
         ready: false,
+        pending: 0,
+        totalDirs: 0,
         message: 'No track directories found'
-      });
+      };
     }
 
     const httpPort = `localhost:${process.env.MEDIA_HTTP_PORT || 8000}`;
-    const protocol = req.protocol || 'http';
-
     const readyTracks = [];
     const pendingTracks = [];
 
@@ -117,18 +108,49 @@ router.get('/available', async (req, res, next) => {
       }
     }
 
-    if (pendingTracks.length > 0) {
-      console.log(`[/available] ${readyTracks.length} ready, ${pendingTracks.length} pending:`, 
-        pendingTracks.map(t => `${t.name}(${t.segments} segs, exists=${t.exists})`).join(', '));
-    }
-
-    res.status(200).json({
+    return {
       tracks: readyTracks,
       videoCount: readyTracks.length,
-      ready: readyTracks.length > 0,
+      ready: readyTracks.length > 0 && pendingTracks.length === 0 && readyTracks.length === dirs.length,
       pending: pendingTracks.length,
       totalDirs: dirs.length
-    });
+    };
+  } catch (err) {
+    console.error('[getCurrentTracksState] Error:', err);
+    return {
+      tracks: [],
+      videoCount: 0,
+      ready: false,
+      pending: 0,
+      totalDirs: 0,
+      message: 'Error reading tracks'
+    };
+  }
+}
+
+router.get('/', async (req, res, next) => {
+  try {
+    const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams ORDER BY viewers DESC');
+    res.json(rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/available', async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
+    const protocol = req.protocol || 'http';
+    const state = getCurrentTracksState(protocol);
+    
+    if (state.pending > 0) {
+      console.log(`[/available] ${state.videoCount} ready, ${state.pending} pending`);
+    }
+
+    res.status(200).json(state);
   } catch (err) {
     console.error('[/available] Error:', err);
     next(err);

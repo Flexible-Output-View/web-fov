@@ -61,8 +61,8 @@
       </ng-container>
     </div>
 
-    <div class="fov-sidebar" *ngIf="editMode && playbackStarted">
-      <div class="panel-section">
+    <div class="fov-sidebar" *ngIf="playbackStarted">
+      <div class="panel-section" *ngIf="editMode">
         <h4>Sources</h4>
         <ul class="source-list">
           <li *ngFor="let wrapper of videoWrappers; let i = index" class="source-item">
