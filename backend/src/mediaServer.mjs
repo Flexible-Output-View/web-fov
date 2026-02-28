@@ -179,7 +179,7 @@ async function startMediaServer() {
                 srtPort++;
             }
 
-            const srtUrl = `srt://127.0.0.1:${srtPort}`;
+            const srtUrl = `srt://0.0.0.0:${srtPort}`;
             const srtUrlExternal = `srt://127.0.0.1:${srtPort}?mode=caller`;
 
             // Start FFmpeg listener immediately with SRT URL
