@@ -7,10 +7,10 @@ services:
     volumes:
       - ./backend/media:/var/media
     ports:
-      - "4000:4000"   # API
+      - "4000:4000" # API
       - "9999:9999"
-      - "9999:9999/udp"   # SRT
-      - "8000:8000"   # media HTTP (node-media-server)
+      - "9999:10010/udp" # SRT
+      - "8000:8000" # media HTTP (node-media-server)
     restart: unless-stopped
 
   frontend:
@@ -20,7 +20,7 @@ services:
       - ./fov-angular:/app
       - /app/node_modules
     ports:
-      - "4200:4200"    # Angular dev server
+      - "4200:4200" # Angular dev server
     environment:
       - CHOKIDAR_USEPOLLING=true
     command: ng serve --host 0.0.0.0 --port 4200
