@@ -138,16 +138,47 @@ router.get('/', async (req, res, next) => {
 });
 
 router.get('/available', async (req, res, next) => {
-  try {
-    res.set('Cache-Control', 'no-store');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    try {
+        res.set('Cache-Control', 'no-store'); // Disable caching
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
 
-    const protocol = req.protocol || 'http';
-    const state = getCurrentTracksState(protocol);
-    
-    if (state.pending > 0) {
-      console.log(`[/available] ${state.videoCount} ready, ${state.pending} pending`);
+        const HLS_DIR = path.join(process.cwd(), "media", "hls");
+        const httpPort = `localhost:${process.env.MEDIA_HTTP_PORT || 8000}`;
+        const protocol = req.protocol || 'http';
+
+        const streams = [];
+
+        // Get all stream directories
+        const streamDirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
+
+        // For each stream, count the number of video tracks
+        for (const streamId of streamDirs) {
+            const streamPath = path.join(HLS_DIR, streamId);
+            const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
+                .filter(dirent => dirent.isDirectory())
+                .map(dirent => dirent.name);
+
+            const tracks = trackDirs.map((trackId) => ({
+                trackId: trackId,
+                videoUrl: `${protocol}://${httpPort}/hls/${streamId}/${trackId}/playlist.m3u8`
+            }));
+
+            streams.push({
+                streamId: streamId,
+                trackCount: tracks.length,
+                tracks: tracks
+            });
+        }
+
+        res.status(200).json({
+            streams: streams,
+            streamCount: streams.length
+        });
+    } catch (err) {
+        next(err);
     }
 
     res.status(200).json(state);
