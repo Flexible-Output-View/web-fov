@@ -182,10 +182,6 @@ router.get('/available', async (req, res, next) => {
     }
 
     res.status(200).json(state);
-  } catch (err) {
-    console.error('[/available] Error:', err);
-    next(err);
-  }
 });
 
 router.get('/:id', async (req, res, next) => {
