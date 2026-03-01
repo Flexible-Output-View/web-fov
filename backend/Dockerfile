@@ -21,6 +21,7 @@ RUN chown -R node:node /usr/src/app
 USER node
 
 ENV PORT=4000
-EXPOSE 4000 9999 8000
+EXPOSE 4000 8000
+EXPOSE 9999-10010/udp
 
 CMD ["npm", "start"]
