@@ -103,6 +103,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private readonly API_URL = environment.apiUrl;
   private readonly MAX_POLL_ATTEMPTS = 60;
   private pollAttempts = 0;
+  private isInitialized = false;
 
   readonly playerId = `fov_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -115,7 +116,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    setTimeout(() => this.loadTracks(), 100);
+    setTimeout(() => {
+      if (!this.isInitialized) {
+        this.isInitialized = true;
+        this.loadTracks();
+      }
+    }, 100);
   }
 
   ngOnDestroy() {
@@ -126,6 +132,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private loadTracks() {
+    if (this.playbackStarted || this.videoWrappers.length > 0) {
+      console.warn('[loadTracks] Already initialized, skipping');
+      return;
+    }
     this.isLoading = true;
     this.isBufferingPhase = true;
     this.playbackStarted = false;
@@ -235,6 +245,14 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private initializeAllTracks() {
+    if (this.videoWrappers.length > 0) {
+      console.warn('[initializeAllTracks] Destroying existing players before reinit');
+      this.videoWrappers.forEach(w => {
+        if (w.hls) { w.hls.destroy(); w.hls = null; }
+      });
+      this.videoWrappers = [];
+    }
+
     this.originalTrackOrder = this.availableTracks.map(t => t.name);
     this.playbackStarted = false;
     this.isBufferingPhase = true;
@@ -877,6 +895,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.playbackStarted = false;
     this.isBufferingPhase = true;
     this.pollAttempts = 0;
+    this.isInitialized = false;
     this.loadTracks();
   }
 }
