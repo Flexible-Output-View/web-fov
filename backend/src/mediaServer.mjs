@@ -3,15 +3,19 @@ import fs from "fs";
 import path from "path";
 import cors from 'cors';
 import { spawn } from "child_process";
+import { randomUUID } from "crypto";
+import net from "net";
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), "media");
 const HLS_DIR = path.join(MEDIA_ROOT, "hls");
 
 await fs.promises.mkdir(HLS_DIR, { recursive: true });
 
-let ffmpegProc = null;
-let stopping = false;
-let currentTracks = null;
+// Map to store multiple FFmpeg processes: streamId -> { process, tracks, socket }
+const ffmpegProcesses = new Map();
+// Map to store registered streams awaiting connection: streamId -> { tracks, srtServer, port }
+const registeredStreams = new Map();
+const baseSrtPort = parseInt(process.env.SRT_PORT || "9999", 10);
 
 function clearHLSFiles() {
     try {
@@ -26,7 +30,21 @@ function clearHLSFiles() {
     }
 }
 
-function buildFfmpegArgs(srtURL, videoTrackCount) {
+// Clear HLS files for a specific stream
+function clearStreamHLSFiles(streamId) {
+    try {
+        const streamHlsDir = path.join(HLS_DIR, streamId);
+        if (fs.existsSync(streamHlsDir)) {
+            fs.rmSync(streamHlsDir, { recursive: true, force: true });
+            console.log(`🧹 HLS directory cleared for stream ${streamId}`);
+        }
+    } catch (err) {
+        console.error(`⚠️ Failed to clear HLS directory for stream ${streamId}:`, err);
+    }
+}
+
+function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
+    const streamHlsDir = path.join(HLS_DIR, streamId);
     const mapArgs = [];
     const audioCodecArgs = [];
     const varStreamEntries = [];
@@ -38,13 +56,17 @@ function buildFfmpegArgs(srtURL, videoTrackCount) {
         varStreamEntries.push(`v:${i},a:${i}`);
     }
 
+    // Use SRT URL or pipe as input
+    const inputSource = srtUrl ? `${srtUrl}?mode=listener` : "pipe:";
+
     const ffmpegArgs = [
+
         "-err_detect", "ignore_err",
         "-fflags", "+genpts+discardcorrupt+igndts",
         "-flags", "low_delay",
         "-strict", "experimental",
 
-        "-i", srtURL,
+        "-i", inputSource,
 
         ...mapArgs,
         "-c:v", "copy",
@@ -52,56 +74,70 @@ function buildFfmpegArgs(srtURL, videoTrackCount) {
 
         "-f", "hls",
         "-hls_time", "2",
+
         "-hls_list_size", "15",
         "-hls_flags", "delete_segments+independent_segments+omit_endlist",
         "-hls_segment_type", "mpegts",
-        "-hls_segment_filename", path.join(HLS_DIR, "%v", "seg%05d.ts"),
+        "-hls_segment_filename", path.join(streamHlsDir, "%v", "seg%05d.ts"),
 
         "-var_stream_map", varStreamEntries.join(" "),
-        path.join(HLS_DIR, "%v", "playlist.m3u8")
+        path.join(streamHlsDir, "%v", "playlist.m3u8")
     ];
 
     return ffmpegArgs;
 }
 
-function startFFmpegListener(tracks) {
-    if (stopping) return;
-    if (!tracks || tracks === 0) return;
+// Start FFmpeg process and pipe socket data to it
+function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
+    if (!tracks || tracks === 0) {
+        if (socket) socket.destroy();
+        return;
+    }
 
-    const srtPort = process.env.SRT_PORT || 9999;
+    const ffmpegArgs = buildFfmpegArgs(tracks, streamId, srtUrl);
 
-    const srtParams = [
-        'mode=listener',
-        'latency=4000000',
-        'rcvbuf=134217728',
-        'sndbuf=134217728',
-        'peerlatency=4000000',
-        'tlpktdrop=0',
-        'nakreport=1',
-        'connect_timeout=5000',
-        'linger=0'
-    ].join('&');
+    console.log(`📀 Spawning FFmpeg for stream ${streamId}:`, "ffmpeg", ffmpegArgs.join(" "));
 
-    const srtURL = `srt://0.0.0.0:${srtPort}?${srtParams}`;
-    const ffmpegArgs = buildFfmpegArgs(srtURL, tracks);
+    const stdio = srtUrl ? ["inherit", "inherit", "inherit"] : ["pipe", "inherit", "inherit"];
+    const ffmpegProc = spawn("ffmpeg", ffmpegArgs, { stdio });
 
-    console.log("📀 Spawning FFmpeg with SRT URL:", srtURL);
-    console.log("📀 FFmpeg args:", ffmpegArgs.join(" "));
-
-    ffmpegProc = spawn("ffmpeg", ffmpegArgs, { stdio: "inherit" });
+    // Pipe socket data to FFmpeg stdin only if socket is provided
+    if (socket) {
+        socket.pipe(ffmpegProc.stdin);
+    }
 
     ffmpegProc.on("exit", (code, signal) => {
-        console.log(`ℹ️ FFmpeg exited (code=${code} signal=${signal})`);
-        ffmpegProc = null;
-        clearHLSFiles();
-        if (!stopping) {
-            console.log("🔁 Restarting FFmpeg listener in 2s...");
-            setTimeout(() => startFFmpegListener(currentTracks), 2000);
-        }
+        console.log(`ℹ️ FFmpeg for stream ${streamId} exited (code=${code} signal=${signal})`);
+        clearStreamHLSFiles(streamId);
+        ffmpegProcesses.delete(streamId);
+        registeredStreams.delete(streamId);
+        console.log(`📊 Active streams: ${ffmpegProcesses.size}`);
+        if (socket) socket.destroy();
     });
 
     ffmpegProc.on("error", (err) => {
-        console.error("⚠️ FFmpeg spawn failed:", err);
+        console.error(`⚠️ FFmpeg spawn failed for stream ${streamId}:`, err);
+        if (socket) socket.destroy();
+    });
+
+    if (socket) {
+        socket.on("error", (err) => {
+            console.error(`⚠️ Socket error for stream ${streamId}:`, err);
+            ffmpegProc.kill("SIGINT");
+        });
+
+        socket.on("end", () => {
+            console.log(`📴 Socket closed for stream ${streamId}`);
+            ffmpegProc.kill("SIGINT");
+        });
+    }
+
+    // Store process and metadata
+    ffmpegProcesses.set(streamId, {
+        process: ffmpegProc,
+        tracks,
+        socket,
+        stopped: false
     });
 }
 
@@ -141,53 +177,141 @@ async function startMediaServer() {
 
     app.use(express.json());
 
-    app.post("/ffmpeg/start", (req, res) => {
-        const { tracks } = req.body ?? {};
+    // POST /ffmpeg/register — register a stream and create a unique SRT listener
+    app.post("/ffmpeg/register", (req, res) => {
+        const { tracks, streamId: providedStreamId } = req.body ?? {};
         const trackNum = Number.parseInt(tracks, 10);
+
         if (!Number.isInteger(trackNum) || trackNum <= 0) {
             return res.status(400).json({ error: "Invalid 'tracks' parameter. Must be a positive integer." });
         }
-        if (ffmpegProc) {
-            return res.status(409).json({ error: "FFmpeg listener already running", pid: ffmpegProc.pid });
+
+        const streamId = providedStreamId || randomUUID();
+
+        if (registeredStreams.has(streamId)) {
+            return res.status(409).json({ error: "StreamId already registered", streamId });
         }
         try {
-            stopping = false;
-            currentTracks = trackNum;
-            clearHLSFiles();
-            startFFmpegListener(trackNum);
-            console.log(`▶️ FFmpeg listener start requested (tracks=${trackNum})`);
-            return res.status(200).json({ status: "started", tracks: trackNum });
+            // Find next available port
+            let srtPort = baseSrtPort;
+            while (Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
+                srtPort++;
+            }
+
+            const srtUrl = `srt://0.0.0.0:${srtPort}`;
+            const srtUrlExternal = `srt://127.0.0.1:${srtPort}?mode=caller`;
+
+            // Start FFmpeg listener immediately with SRT URL
+            startFFmpegListener(streamId, trackNum, null, srtUrl);
+
+            registeredStreams.set(streamId, {
+                tracks: trackNum,
+                port: srtPort,
+                srtUrl
+            });
+
+            console.log(`📝 Stream registered & FFmpeg started: ${streamId} (tracks=${trackNum}, port=${srtPort})`);
+
+            return res.status(200).json({
+                status: "registered",
+                streamId,
+                tracks: trackNum,
+                srtUrl: srtUrlExternal,
+                hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
+                instructions: {
+                    step1: `Send stream to ${srtUrl}`,
+                    step2: `Stream will be available at: http://localhost:${httpPort}${'/hls/' + streamId + '/0/playlist.m3u8'}`
+                }
+            });
         } catch (err) {
-            console.error("⚠️ Failed to start FFmpeg listener:", err);
-            return res.status(500).json({ error: "Failed to start FFmpeg listener" });
+            console.error(`⚠️ Failed to register stream ${streamId}:`, err);
+            return res.status(500).json({ error: "Failed to register stream" });
         }
     });
 
+    // POST /ffmpeg/stop — request FFmpeg to stop for a specific stream
     app.post("/ffmpeg/stop", (req, res) => {
-        if (!ffmpegProc) {
-            stopping = false;
-            currentTracks = null;
-            clearHLSFiles();
-            return res.status(200).json({ status: "not_running" });
+        const { streamId } = req.body ?? {};
+
+        if (!streamId) {
+            return res.status(400).json({ error: "Missing 'streamId' parameter" });
+        }
+
+        const streamData = ffmpegProcesses.get(streamId);
+        const registered = registeredStreams.get(streamId);
+
+        if (!streamData && !registered) {
+            return res.status(200).json({ status: "not_found", streamId });
         }
         try {
-            stopping = true;
-            const pid = ffmpegProc.pid;
-            ffmpegProc.kill("SIGINT");
-            console.log(`⏹️ FFmpeg stop requested (pid=${pid})`);
-            currentTracks = null;
-            return res.status(200).json({ status: "stopping", pid });
+            if (streamData) {
+                if (streamData.process) {
+                    const pid = streamData.process.pid;
+                    streamData.process.kill("SIGINT");
+                    console.log(`⏹️ FFmpeg stop requested for stream ${streamId} (pid=${pid})`);
+                }
+                if (streamData.socket) {
+                    streamData.socket.destroy();
+                }
+                ffmpegProcesses.delete(streamId);
+            }
+
+            if (registered) {
+                registeredStreams.delete(streamId);
+                console.log(`🗑️ Cancelled registration for stream ${streamId}`);
+            }
+
+            clearStreamHLSFiles(streamId);
+            return res.status(200).json({ status: "stopped", streamId });
         } catch (err) {
-            console.error("⚠️ Failed to stop FFmpeg:", err);
-            return res.status(500).json({ error: "Failed to stop FFmpeg" });
+            console.error(`⚠️ Failed to stop stream ${streamId}:`, err);
+            return res.status(500).json({ error: "Failed to stop stream" });
         }
     });
 
+    // GET /ffmpeg/status — get current FFmpeg state for all or a specific stream
     app.get("/ffmpeg/status", (req, res) => {
+        const { streamId } = req.query;
+
+        if (streamId) {
+            const streamData = ffmpegProcesses.get(streamId);
+            const registered = registeredStreams.get(streamId);
+
+            if (streamData) {
+                return res.status(200).json({
+                    streamId,
+                    status: "active",
+                    running: true,
+                    pid: streamData.process?.pid,
+                    tracks: streamData.tracks,
+                    hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
+                    srtUrl: registered ? `srt://localhost:${registered.port}?mode=caller` : null
+                });
+            }
+
+            return res.status(200).json({ streamId, status: "not_found" });
+        }
+
+        // Return all streams
+        const allStreams = {};
+
+        for (const [id, data] of ffmpegProcesses.entries()) {
+            const registered = registeredStreams.get(id);
+            allStreams[id] = {
+                status: "active",
+                running: true,
+                pid: data.process.pid,
+                tracks: data.tracks,
+                hlsUrl: `/hls/${id}/0/playlist.m3u8`,
+                srtUrl: registered ? `srt://localhost:${registered.port}?mode=caller` : null,
+                srtPort: registered ? registered.port : null
+            };
+        }
+
         return res.status(200).json({
-            running: !!ffmpegProc,
-            pid: ffmpegProc ? ffmpegProc.pid : null,
-            tracks: currentTracks
+            totalStreams: ffmpegProcesses.size,
+            activeStreams: ffmpegProcesses.size,
+            streams: allStreams
         });
     });
 
@@ -195,7 +319,10 @@ async function startMediaServer() {
         console.log(`📺 Serving HLS at http://localhost:${httpPort}/hls`);
     });
 
-    console.log("🚀 Media server ready — listening for SRT streams...");
+    console.log("🚀 Media server ready!");
+    console.log(`   📝 Register stream: POST http://localhost:${httpPort}/ffmpeg/register with {"tracks": 2}`);
+    console.log(`   🔗 FFmpeg starts immediately with its own SRT URL`);
+    console.log(`   📊 Check status: GET http://localhost:${httpPort}/ffmpeg/status`);
 }
 
 export { startMediaServer };
