@@ -33,6 +33,7 @@ jobs:
             DB_PORT: ${{ secrets.DB_PORT }}
             DB_USER: ${{ secrets.DB_USER }}
             FFMPEG_PATH: ${{ secrets.FFMPEG_PATH }}
+            SRT_URL: ${{ secrets.SRT_URL }}
             MEDIA_ROOT: ${{ secrets.MEDIA_ROOT }}
           run: |
             cd backend
@@ -44,6 +45,7 @@ jobs:
             echo "DB_PASSWORD=${DB_PASSWORD}" >> .env
             echo "DB_NAME=${DB_NAME}" >> .env
             echo "FFMPEG_PATH=${FFMPEG_PATH}" >> .env
+            echo "SRT_URL=${SRT_URL}" >> .env
             echo "MEDIA_ROOT=${MEDIA_ROOT}" >> .env
             ls -a
 
