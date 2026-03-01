@@ -1,0 +1,34 @@
+<div class="stream-page">
+  <div class="stream-header">
+    <button class="btn-back" (click)="goBack()">
+      <span class="icon">←</span>
+      Retour
+    </button>
+    
+    <div class="stream-title" *ngIf="streamInfo">
+      <span class="live-badge">🔴 LIVE</span>
+      <h1>{{ streamId }}</h1>
+      <span class="track-info">{{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}</span>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="loading-spinner"></div>
+    <p>Chargement du stream <strong>{{ streamId }}</strong>...</p>
+    <span class="loading-hint">En attente de la diffusion...</span>
+  </div>
+
+  <div class="error-state" *ngIf="!isLoading && errorMessage">
+    <div class="error-icon">😕</div>
+    <h2>Stream indisponible</h2>
+    <p>{{ errorMessage }}</p>
+    <div class="error-actions">
+      <button class="btn-retry" (click)="retry()">Réessayer</button>
+      <button class="btn-back-home" (click)="goBack()">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="player-wrapper" *ngIf="!isLoading && !errorMessage && streamInfo">
+    <app-fov-player [streamId]="streamId"></app-fov-player>
+  </div>
+</div>

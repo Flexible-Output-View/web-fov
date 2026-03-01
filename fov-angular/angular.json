@@ -85,6 +85,9 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "allowedHosts": "all"
+          },
           "configurations": {
             "production": {
               "buildTarget": "fov-angular:build:production"

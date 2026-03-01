@@ -9,7 +9,6 @@ import net from "net";
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), "media");
 const HLS_DIR = path.join(MEDIA_ROOT, "hls");
 
-// ensure the directory exists
 await fs.promises.mkdir(HLS_DIR, { recursive: true });
 
 // Map to store multiple FFmpeg processes: streamId -> { process, tracks, socket }
@@ -18,14 +17,14 @@ const ffmpegProcesses = new Map();
 const registeredStreams = new Map();
 const baseSrtPort = parseInt(process.env.SRT_PORT || "9999", 10);
 
-// Clear all HLS files
 function clearHLSFiles() {
-    return;
     try {
-        for (const file of fs.readdirSync(HLS_DIR)) {
-            fs.rm(path.join(HLS_DIR, file), { recursive: true, force: true });
+        if (fs.existsSync(HLS_DIR)) {
+            for (const file of fs.readdirSync(HLS_DIR)) {
+                fs.rmSync(path.join(HLS_DIR, file), { recursive: true, force: true });
+            }
+            console.log("🧹 HLS directory cleared");
         }
-        console.log("🧹 HLS directory cleared");
     } catch (err) {
         console.error("⚠️ Failed to clear HLS directory:", err);
     }
@@ -51,14 +50,9 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
     const varStreamEntries = [];
 
     for (let i = 0; i < videoTrackCount; i++) {
-        // map video + optional audio
         mapArgs.push("-map", `0:v:${i}`);
         mapArgs.push("-map", "0:a?");
-
-        // audio codec copy per output audio stream
         audioCodecArgs.push(`-c:a:${i}`, "copy");
-
-        // HLS variant mapping
         varStreamEntries.push(`v:${i},a:${i}`);
     }
 
@@ -66,24 +60,27 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
     const inputSource = srtUrl ? `${srtUrl}?mode=listener` : "pipe:";
 
     const ffmpegArgs = [
-        "-analyzeduration", "0",
-        "-fflags", "nobuffer",
+
+        "-err_detect", "ignore_err",
+        "-fflags", "+genpts+discardcorrupt+igndts",
+        "-flags", "low_delay",
+        "-strict", "experimental",
+
         "-i", inputSource,
 
         ...mapArgs,
-
         "-c:v", "copy",
         ...audioCodecArgs,
 
         "-f", "hls",
         "-hls_time", "2",
-        "-hls_list_size", "5",
-        "-hls_flags", "delete_segments+independent_segments",
 
-        "-hls_segment_filename", path.join(streamHlsDir, "%v", "seg%03d.ts"),
+        "-hls_list_size", "15",
+        "-hls_flags", "delete_segments+independent_segments+omit_endlist",
+        "-hls_segment_type", "mpegts",
+        "-hls_segment_filename", path.join(streamHlsDir, "%v", "seg%05d.ts"),
 
         "-var_stream_map", varStreamEntries.join(" "),
-
         path.join(streamHlsDir, "%v", "playlist.m3u8")
     ];
 
@@ -145,16 +142,39 @@ function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
 }
 
 async function startMediaServer() {
-    // Static Express server to serve HLS files
     const app = express();
-    app.use(cors());
-    app.use("/hls", express.static(HLS_DIR));
+
+    app.use(cors({
+        origin: '*',
+        methods: ['GET', 'HEAD', 'OPTIONS'],
+        allowedHeaders: ['Range', 'Content-Type', 'Cache-Control'],
+        exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges']
+    }));
 
     const httpPort = process.env.MEDIA_HTTP_PORT || 8000;
 
-    clearHLSFiles();
+    app.use("/hls", (req, res, next) => {
+        if (req.path.endsWith('.m3u8')) {
+            res.set({
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'application/vnd.apple.mpegurl'
+            });
+        } else if (req.path.endsWith('.ts')) {
+            res.set({
+                'Cache-Control': 'public, max-age=30',
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'video/mp2t'
+            });
+        }
+        next();
+    }, express.static(HLS_DIR, {
+        etag: false,
+        lastModified: false
+    }));
 
-    // parse JSON bodies for control routes
     app.use(express.json());
 
     // POST /ffmpeg/register — register a stream and create a unique SRT listener
@@ -171,7 +191,6 @@ async function startMediaServer() {
         if (registeredStreams.has(streamId)) {
             return res.status(409).json({ error: "StreamId already registered", streamId });
         }
-
         try {
             // Find next available port
             let srtPort = baseSrtPort;
@@ -224,7 +243,6 @@ async function startMediaServer() {
         if (!streamData && !registered) {
             return res.status(200).json({ status: "not_found", streamId });
         }
-
         try {
             if (streamData) {
                 if (streamData.process) {
