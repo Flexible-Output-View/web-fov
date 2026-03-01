@@ -20,21 +20,40 @@ router.get('/available', async (req, res, next) => {
         res.set('Cache-Control', 'no-store'); // Disable caching
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
+
         const HLS_DIR = path.join(process.cwd(), "media", "hls");
-        const dirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
-            .filter(dirent => dirent.isDirectory())
-            .map(dirent => dirent.name)
-            .sort((a, b) => parseInt(a) - parseInt(b)); // sort numerically
         const httpPort = `localhost:${process.env.MEDIA_HTTP_PORT || 8000}`;
         const protocol = req.protocol || 'http';
-        const tracks = dirs.map((id, index) => ({
-            index: index,
-            name: id,
-            videoUrl: `${protocol}://${httpPort}/hls/${id}/playlist.m3u8`
-        }));
+
+        const streams = [];
+
+        // Get all stream directories
+        const streamDirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
+
+        // For each stream, count the number of video tracks
+        for (const streamId of streamDirs) {
+            const streamPath = path.join(HLS_DIR, streamId);
+            const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
+                .filter(dirent => dirent.isDirectory())
+                .map(dirent => dirent.name);
+
+            const tracks = trackDirs.map((trackId) => ({
+                trackId: trackId,
+                videoUrl: `${protocol}://${httpPort}/hls/${streamId}/${trackId}/playlist.m3u8`
+            }));
+
+            streams.push({
+                streamId: streamId,
+                trackCount: tracks.length,
+                tracks: tracks
+            });
+        }
+
         res.status(200).json({
-            tracks: tracks,
-            videoCount: tracks.length
+            streams: streams,
+            streamCount: streams.length
         });
     } catch (err) {
         next(err);
