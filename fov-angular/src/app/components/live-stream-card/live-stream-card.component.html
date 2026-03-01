@@ -1,0 +1,20 @@
+<a [routerLink]="['/stream', stream.streamId]" class="live-stream-card">
+  <div class="card-thumbnail">
+    <div class="live-badge">
+      <span class="live-dot"></span>
+      LIVE
+    </div>
+    <div class="track-count">
+      <span class="icon">🎥</span>
+      {{ stream.trackCount }} flux{{ stream.trackCount > 1 ? 's' : '' }}
+    </div>
+    <div class="placeholder-thumbnail">
+      <span class="streamer-initial">{{ stream.streamId.charAt(0).toUpperCase() }}</span>
+    </div>
+  </div>
+  
+  <div class="card-info">
+    <h3 class="streamer-name">{{ stream.streamId }}</h3>
+    <p class="stream-description">Stream multi-flux en direct</p>
+  </div>
+</a>
