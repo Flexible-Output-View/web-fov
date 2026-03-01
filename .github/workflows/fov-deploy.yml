@@ -16,11 +16,13 @@ jobs:
 
         - name: "Create frontend env file"
           env:
+            API_URL: ${{ secrets.DEPLOY_HOSTNAME }}
             TWITCH_ID: ${{ secrets.TWITCH_CLIENT_ID }}
             TWITCH_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
           run: |
             cd fov-angular/src/environments/
             cp environment.example.ts environment.ts
+            sed -i "s|API_URL_HERE|$API_URL|g" environment.ts
             sed -i "s|YOUR_CLIENT_ID_HERE|$TWITCH_ID|g" environment.ts
             sed -i "s|YOUR_CLIENT_SECRET_HERE|$TWITCH_SECRET|g" environment.ts
 
@@ -33,7 +35,7 @@ jobs:
             DB_PORT: ${{ secrets.DB_PORT }}
             DB_USER: ${{ secrets.DB_USER }}
             FFMPEG_PATH: ${{ secrets.FFMPEG_PATH }}
-            SRT_URL: ${{ secrets.SRT_URL }}
+            SRT_URL: ${{ secrets.DEPLOY_HOSTNAME }}
             MEDIA_ROOT: ${{ secrets.MEDIA_ROOT }}
           run: |
             cd backend
