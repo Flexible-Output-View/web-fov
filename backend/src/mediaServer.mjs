@@ -193,13 +193,14 @@ async function startMediaServer() {
         }
         try {
             // Find next available port
+            let url = process.env.SRT_URL || '127.0.0.1';
             let srtPort = baseSrtPort;
             while (Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
                 srtPort++;
             }
 
             const srtUrl = `srt://0.0.0.0:${srtPort}`;
-            const srtUrlExternal = `srt://127.0.0.1:${srtPort}?mode=caller`;
+            const srtUrlExternal = `srt://${url}:${srtPort}?mode=caller`;
 
             // Start FFmpeg listener immediately with SRT URL
             startFFmpegListener(streamId, trackNum, null, srtUrl);
