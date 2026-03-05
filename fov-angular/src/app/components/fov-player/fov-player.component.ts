@@ -95,8 +95,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   private readonly SYNC_THRESHOLD = 0.1;
   private readonly HARD_SYNC_THRESHOLD = 0.3;
-  private readonly MIN_BUFFER_FOR_START = 8; 
-  private readonly MIN_FORWARD_BUFFER = 4;
+  private readonly MIN_BUFFER_FOR_START = 6; 
+  private readonly MIN_FORWARD_BUFFER = 3;
   private readonly SAFE_POSITION_MARGIN = 0.5;
 
   private readonly MAX_WIDTH_RATIO = 0.8;
@@ -245,23 +245,26 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private initializeAllTracks() {
-    if (this.videoWrappers.length > 0) {
-      console.warn('[initializeAllTracks] Destroying existing players before reinit');
-      this.videoWrappers.forEach(w => {
-        if (w.hls) { w.hls.destroy(); w.hls = null; }
+      if (this.videoWrappers.length > 0) {
+        console.warn('[initializeAllTracks] Destroying existing players before reinit');
+        this.videoWrappers.forEach(w => {
+          if (w.hls) { w.hls.destroy(); w.hls = null; }
+        });
+        this.videoWrappers = [];
+      }
+
+      this.originalTrackOrder = this.availableTracks.map(t => t.name);
+      this.playbackStarted = false;
+      this.isBufferingPhase = true;
+
+      const stagger = this.availableTracks.length <= 2 ? 200 : 100;
+
+      this.availableTracks.forEach((track, index) => {
+        setTimeout(() => this.addTrack(track), index * stagger);
       });
-      this.videoWrappers = [];
-    }
 
-    this.originalTrackOrder = this.availableTracks.map(t => t.name);
-    this.playbackStarted = false;
-    this.isBufferingPhase = true;
-
-    this.availableTracks.forEach((track, index) => {
-      setTimeout(() => this.addTrack(track), index * 200);
-    });
-
-    setTimeout(() => this.startBufferCheck(), 500);
+      const totalStagger = this.availableTracks.length * stagger;
+      setTimeout(() => this.startBufferCheck(), totalStagger + 500);
   }
 
   private getStageElement(): HTMLElement | null {
@@ -371,14 +374,14 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         enableWorker: true,
         lowLatencyMode: false,
 
-        liveSyncDuration: 18,
-        liveMaxLatencyDuration: 60,
+        liveSyncDuration: 10,
+        liveMaxLatencyDuration: 30,
         liveDurationInfinity: true,
-        liveBackBufferLength: 120,
+        liveBackBufferLength: 30,
 
-        maxBufferLength: 180,
-        maxMaxBufferLength: 200,
-        maxBufferSize: 400 * 1000 * 1000,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 90,
+        maxBufferSize: 200 * 1000 * 1000,
         maxBufferHole: 0.5,
 
         fragLoadingMaxRetry: 10,
