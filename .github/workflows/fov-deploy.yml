@@ -11,15 +11,18 @@ on:
 jobs:
     Deploy-dev:
         runs-on: [ self-hosted, linux, x64, deploy ]
+        environment:
+          name: Deploy-Dev-Selfhost
+
         steps:
         - name: "Checkout code"
           uses: actions/checkout@v4
 
         - name: "Create frontend env file"
           env:
-            API_URL: ${{ secrets.DEPLOY_HOSTNAME }}
-            TWITCH_ID: ${{ secrets.TWITCH_CLIENT_ID }}
-            TWITCH_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+            API_URL: ${{ vars.API_FULL_URL }}
+            TWITCH_ID: ${{ secrets.TWITCH_ID }}
+            TWITCH_SECRET: ${{ secrets.TWITCH_SECRET }}
           run: |
             cd fov-angular/src/environments/
             cp environment.example.ts environment.ts
@@ -30,14 +33,14 @@ jobs:
         - name: "Create backend file"
           env:
             PORT: 4000
-            DB_HOST: ${{ secrets.DB_HOST }}
+            DB_HOST: ${{ vars.DATABASE_HOST }}
             DB_NAME: ${{ secrets.DB_NAME }}
             DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-            DB_PORT: ${{ secrets.DB_PORT }}
+            DB_PORT: ${{ vars.DATABASE_PORT }}
             DB_USER: ${{ secrets.DB_USER }}
-            FFMPEG_PATH: ${{ secrets.FFMPEG_PATH }}
-            SRT_URL: ${{ secrets.DEPLOY_HOSTNAME }}
-            MEDIA_ROOT: ${{ secrets.MEDIA_ROOT }}
+            FFMPEG_PATH: ${{ vars.API_FFMPEG_PATH }}
+            SRT_URL: ${{ vars.SRT_ENDPOINT_HOSTNAME }}
+            MEDIA_ROOT: ${{ vars.API_MEDIA_ROOT }}
           run: |
             cd backend
             touch .env
