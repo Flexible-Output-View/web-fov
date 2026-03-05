@@ -54,6 +54,7 @@ jobs:
             echo "FFMPEG_PATH=${FFMPEG_PATH}" >> .env
             echo "SRT_URL=${SRT_URL}" >> .env
             echo "MEDIA_ROOT=${MEDIA_ROOT}" >> .env
+            echo "API_HOSTNAME=${API_HOSTNAME}" >> .env
             ls -a
 
         - name: "Stop previous container"
