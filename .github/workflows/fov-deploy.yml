@@ -41,6 +41,7 @@ jobs:
             FFMPEG_PATH: ${{ vars.API_FFMPEG_PATH }}
             SRT_URL: ${{ vars.SRT_ENDPOINT_HOSTNAME }}
             MEDIA_ROOT: ${{ vars.API_MEDIA_ROOT }}
+            API_HOSTNAME: ${{ vars.API_HOSTNAME }}
           run: |
             cd backend
             touch .env

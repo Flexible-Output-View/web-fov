@@ -143,9 +143,10 @@ router.get('/available', async (req, res, next) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
+    const port = process.env.PORT || 4000
+    const url = `${req.protocol}://${process.env.API_HOSTNAME}` || `http://localhost:${port}}`;
+
     const HLS_DIR = path.join(process.cwd(), "media", "hls");
-    const httpPort = `localhost:${process.env.PORT || 4000}`;
-    const protocol = req.protocol || 'http';
 
     const streams = [];
 
@@ -163,7 +164,7 @@ router.get('/available', async (req, res, next) => {
 
       const tracks = trackDirs.map((trackId) => ({
         trackId: trackId,
-        videoUrl: `${protocol}://${httpPort}/hls/${streamId}/${trackId}/playlist.m3u8`
+        videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
       }));
 
       streams.push({
