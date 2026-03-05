@@ -141,19 +141,17 @@ function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
     });
 }
 
-async function startMediaServer() {
-    const app = express();
+function createMediaRoutes() {
+    const router = express.Router();
 
-    app.use(cors({
+    router.use(cors({
         origin: '*',
         methods: ['GET', 'HEAD', 'OPTIONS'],
         allowedHeaders: ['Range', 'Content-Type', 'Cache-Control'],
         exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges']
     }));
 
-    const httpPort = process.env.MEDIA_HTTP_PORT || 8000;
-
-    app.use("/hls", (req, res, next) => {
+    router.use("/hls", (req, res, next) => {
         if (req.path.endsWith('.m3u8')) {
             res.set({
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -175,10 +173,10 @@ async function startMediaServer() {
         lastModified: false
     }));
 
-    app.use(express.json());
+    router.use(express.json());
 
     // POST /ffmpeg/register — register a stream and create a unique SRT listener
-    app.post("/ffmpeg/register", (req, res) => {
+    router.post("/ffmpeg/register", (req, res) => {
         const { tracks, streamId: providedStreamId } = req.body ?? {};
         const trackNum = Number.parseInt(tracks, 10);
 
@@ -221,7 +219,7 @@ async function startMediaServer() {
                 hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
                 instructions: {
                     step1: `Send stream to ${srtUrl}`,
-                    step2: `Stream will be available at: http://localhost:${httpPort}${'/hls/' + streamId + '/0/playlist.m3u8'}`
+                    step2: `Stream will be available at: http://localhost/hls/${streamId}/0/playlist.m3u8`
                 }
             });
         } catch (err) {
@@ -231,7 +229,7 @@ async function startMediaServer() {
     });
 
     // POST /ffmpeg/stop — request FFmpeg to stop for a specific stream
-    app.post("/ffmpeg/stop", (req, res) => {
+    router.post("/ffmpeg/stop", (req, res) => {
         const { streamId } = req.body ?? {};
 
         if (!streamId) {
@@ -271,7 +269,7 @@ async function startMediaServer() {
     });
 
     // GET /ffmpeg/status — get current FFmpeg state for all or a specific stream
-    app.get("/ffmpeg/status", (req, res) => {
+    router.get("/ffmpeg/status", (req, res) => {
         const { streamId } = req.query;
 
         if (streamId) {
@@ -316,14 +314,14 @@ async function startMediaServer() {
         });
     });
 
-    app.listen(httpPort, () => {
-        console.log(`📺 Serving HLS at http://localhost:${httpPort}/hls`);
-    });
-
-    console.log("🚀 Media server ready!");
-    console.log(`   📝 Register stream: POST http://localhost:${httpPort}/ffmpeg/register with {"tracks": 2}`);
-    console.log(`   🔗 FFmpeg starts immediately with its own SRT URL`);
-    console.log(`   📊 Check status: GET http://localhost:${httpPort}/ffmpeg/status`);
+    return router;
 }
 
-export { startMediaServer };
+async function startMediaServer(app) {
+    console.log("🚀 Media server ready!");
+    console.log(`   📝 Register stream: POST http://localhost/ffmpeg/register with {"tracks": 2}`);
+    console.log(`   🔗 FFmpeg starts immediately with its own SRT URL`);
+    console.log(`   📊 Check status: GET http://localhost/ffmpeg/status`);
+}
+
+export { createMediaRoutes, startMediaServer };
