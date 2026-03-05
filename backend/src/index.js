@@ -7,7 +7,7 @@ import cors from 'cors';
 
 import db from './db.js';
 import apiRoutes from './routes/index.js';
-import { startMediaServer } from './mediaServer.mjs';
+import { createMediaRoutes, startMediaServer } from './mediaServer.mjs';
 
 
 const PORT = process.env.PORT || 4000;
@@ -16,10 +16,11 @@ const app = express();
 app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json());
-import path from 'path';
+app.enable('trust proxy');
 
-const mediaRoot = process.env.MEDIA_ROOT; //|| path.join(__dirname, '..', 'media');
-app.use('/hls', express.static(mediaRoot));
+// Mount media routes (HLS and FFmpeg endpoints)
+const mediaRouter = createMediaRoutes();
+app.use(mediaRouter);
 
 app.get('/', (req, res) => res.json({ ok: true, message: 'FOV backend running' }));
 
@@ -39,11 +40,12 @@ async function start() {
         conn.release();
         console.log('✅ Connected to BDD');
 
-        // start media server (RTMP ingest + HLS)
+        // initialize media server
         await startMediaServer();
 
         app.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);
+            console.log(`📺 HLS available at http://localhost:${PORT}/hls`);
         });
     } catch (err) {
         console.error('Unable to connect to DB', err);
