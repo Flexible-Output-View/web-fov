@@ -84,7 +84,7 @@ function getCurrentTracksState(protocol = 'http') {
       };
     }
 
-    const httpPort = `localhost:${process.env.MEDIA_HTTP_PORT || 8000}`;
+    const httpPort = `localhost:${process.env.PORT || 4000}`;
     const readyTracks = [];
     const pendingTracks = [];
 
@@ -144,7 +144,7 @@ router.get('/available', async (req, res, next) => {
     res.setHeader('Expires', '0');
 
     const HLS_DIR = path.join(process.cwd(), "media", "hls");
-    const httpPort = `localhost:${process.env.MEDIA_HTTP_PORT || 8000}`;
+    const httpPort = `localhost:${process.env.PORT || 4000}`;
     const protocol = req.protocol || 'http';
 
     const streams = [];
