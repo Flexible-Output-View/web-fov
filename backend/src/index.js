@@ -16,6 +16,7 @@ const app = express();
 app.use(morgan('dev'));
 app.use(cors());
 app.use(express.json());
+app.enable('trust proxy');
 
 // Mount media routes (HLS and FFmpeg endpoints)
 const mediaRouter = createMediaRoutes();

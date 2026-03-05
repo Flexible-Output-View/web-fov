@@ -143,8 +143,9 @@ router.get('/available', async (req, res, next) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    const port = process.env.PORT || 4000
-    const url = `${req.protocol}://${process.env.API_HOSTNAME}` || `http://localhost:${port}}`;
+    const port = process.env.PORT || 4000;
+    const host = process.env.API_HOSTNAME || `localhost:${port}`;
+    const url = `${req.protocol}://${host}`;
 
     const HLS_DIR = path.join(process.cwd(), "media", "hls");
 
