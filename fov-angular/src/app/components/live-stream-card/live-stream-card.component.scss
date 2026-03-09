@@ -1,0 +1,124 @@
+.live-stream-card {
+  display: block;
+  background: var(--bg-secondary, #1a1a1a);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+    .card-thumbnail {
+      &::after {
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.card-thumbnail {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(145, 71, 255, 0.1);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+}
+
+.placeholder-thumbnail {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.streamer-initial {
+  font-size: 4rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.1);
+  text-transform: uppercase;
+}
+
+.live-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--color-error, #ef4444);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 2;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.track-count {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.75rem;
+  color: white;
+  z-index: 2;
+
+  .icon {
+    font-size: 0.85rem;
+  }
+}
+
+.card-info {
+  padding: 12px 14px;
+}
+
+.streamer-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stream-description {
+  margin: 4px 0 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

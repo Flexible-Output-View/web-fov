@@ -1,0 +1,102 @@
+<div class="fov-player">
+  <div class="fov-toolbar">
+    <div class="toolbar-left">
+      <span class="live-indicator" *ngIf="playbackStarted">🔴 LIVE</span>
+    </div>
+    <div class="toolbar-right">
+      <button (click)="toggleEditMode()" [class.active]="editMode" class="btn-edit" [disabled]="isBufferingPhase">
+        {{ editMode ? 'Sauvegarder' : 'Modifier' }}
+      </button>
+      <button (click)="resetLayout()" *ngIf="editMode" class="btn-reset">Réinitialiser</button>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="loading-spinner"></div>
+    <span>{{ getLoadingMessage() }}</span>
+  </div>
+
+  <div class="error-state" *ngIf="!isLoading && errorMessage">
+    <span>{{ errorMessage }}</span>
+    <button (click)="refreshStream()" class="btn-retry">Réessayer</button>
+  </div>
+
+  <div class="buffering-overlay" *ngIf="!isLoading && !errorMessage && isBufferingPhase">
+    <div class="buffering-content">
+      <div class="loading-spinner large"></div>
+      <div class="buffering-text">Chargement du live...</div>
+    </div>
+  </div>
+
+  <div class="fov-workspace" *ngIf="!isLoading && !errorMessage">
+    <div class="fov-stage" [id]="'stageArea_' + playerId">
+      <ng-container *ngFor="let wrapper of videoWrappers; let i = index">
+        <div
+          [id]="'videoWrapper_' + playerId + '_' + wrapper.track.index"
+          class="video-container"
+          [class.editable]="editMode"
+          [class.is-master]="i === 0"
+          [class.is-ready]="wrapper.isReady"
+          [style.z-index]="wrapper.zIndex"
+          [style.display]="wrapper.visible ? 'flex' : 'none'"
+          [style.left.px]="wrapper.x"
+          [style.top.px]="wrapper.y"
+          [style.width.px]="wrapper.width"
+          [style.height.px]="wrapper.height"
+          (pointerdown)="startDrag($event, wrapper)">
+
+          <div class="drag-bar" *ngIf="editMode">
+            <span class="drag-label">{{ wrapper.track.name }}</span>
+          </div>
+
+          <video
+            [id]="'videoElement_' + playerId + '_' + wrapper.track.index"
+            playsinline muted>
+          </video>
+
+          <div class="resize-handle" *ngIf="editMode"
+            (pointerdown)="startResize($event, wrapper)">
+          </div>
+        </div>
+      </ng-container>
+    </div>
+
+    <div class="fov-sidebar" *ngIf="playbackStarted">
+      <div class="panel-section" *ngIf="editMode">
+        <h4>Sources</h4>
+        <ul class="source-list">
+          <li *ngFor="let wrapper of videoWrappers; let i = index" class="source-item">
+            <div class="source-info">
+              <span class="source-name" [class.is-ref]="i === 0">
+                {{ i === 0 ? '[REF] ' : '' }}{{ wrapper.track.name }}
+              </span>
+            </div>
+            <div class="source-controls">
+              <button class="icon-btn" 
+                [class.hidden]="!wrapper.visible"
+                (click)="toggleVisibility(wrapper)">
+                {{ wrapper.visible ? '👁' : '👁‍🗨' }}
+              </button>
+              <button class="icon-btn" 
+                (click)="moveUp(i)"
+                [disabled]="i === 0">▲</button>
+              <button class="icon-btn" 
+                (click)="moveDown(i)"
+                [disabled]="i === videoWrappers.length - 1">▼</button>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="panel-section">
+        <h4>Audio</h4>
+        <div *ngFor="let wrapper of videoWrappers" class="audio-control">
+          <label>{{ wrapper.track.name }}</label>
+          <input type="range" min="0" max="1" step="0.01"
+            [value]="wrapper.volume"
+            (input)="setVolume(wrapper, $event)">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

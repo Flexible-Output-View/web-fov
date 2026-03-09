@@ -1,0 +1,35 @@
+<div class="carousel">
+  <button class="carousel-btn carousel-btn-prev" (click)="prevSlide()">
+    ‹
+  </button>
+  
+  <div class="carousel-container">
+    <div class="carousel-track" [style.transform]="'translateX(-' + currentSlide * 100 + '%)'">
+      <div class="carousel-slide" *ngFor="let stream of featuredStreams">
+        
+        <div class="featured-stream">
+          <div class="stream-thumbnail">
+            <div class="live-indicator">EN DIRECT</div>
+            <div class="viewer-count">{{ stream.viewers }} spectateurs</div>
+            <img [src]="stream.thumbnail" [alt]="stream.title" class="thumbnail-img">
+          </div>
+          <div class="stream-info">
+            <div class="streamer-avatar">
+              <img [src]="stream.avatar" [alt]="stream.streamer">
+            </div>
+            <div class="stream-details">
+              <h3 class="stream-title">{{ stream.title }}</h3>
+              <p class="streamer-name">{{ stream.streamer }}</p>
+              <p class="stream-category">{{ stream.category }}</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  
+  <button class="carousel-btn carousel-btn-next" (click)="nextSlide()">
+    ›
+  </button>
+</div>

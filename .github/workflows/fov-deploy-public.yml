@@ -6,8 +6,6 @@ on:
   push:
     branches:
       - "main"
-      - "37-deploy-du-site-production-dans-vm-epitech"
-      - "30-cicd-déploiement-web-angular"
 
 jobs:
     Deploy-main:
@@ -16,18 +14,29 @@ jobs:
         - name: "Checkout code"
           uses: actions/checkout@v4
 
+        - name: "Create env file"
+          env:
+            API_URL: ${{ secrets.DEPLOY_HOSTNAME }}
+            TWITCH_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+            TWITCH_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          run: |
+            cd fov-angular/src/environments/
+            cp environment.example.ts environment.ts
+            sed -i "s|API_URL_HERE|$API_URL|g" environment.ts
+            sed -i "s|YOUR_CLIENT_ID_HERE|$TWITCH_ID|g" environment.ts
+            sed -i "s|YOUR_CLIENT_SECRET_HERE|$TWITCH_SECRET|g" environment.ts
+
         - name: "Stop previous container"
           run: cd /home/ubuntu/web-deploy/main/ && docker compose down
 
         - name: "Clean docker images"
-          run: cd /home/ubuntu/web-deploy/main/ && docker system prune
+          run: cd /home/ubuntu/web-deploy/main/ && docker system prune -f
 
         - name: "Remove folder content"
           run: rm -rf /home/ubuntu/web-deploy/main/
 
         - name: "Copy repository"
-          run: cp -r . /home/ubuntu/web-deploy/main/
+          run: mkdir -p /home/ubuntu/web-deploy/main/ && cp -r . /home/ubuntu/web-deploy/main/
 
         - name: "Run the docker compose stack"
           run: cd /home/ubuntu/web-deploy/main/ && docker compose up -d --no-deps --build
-
