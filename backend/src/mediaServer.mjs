@@ -291,7 +291,7 @@ function createMediaRoutes() {
                     tracks: streamData.tracks,
                     hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
                     srtUrl: registered
-                        ? `srt://localhost:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
+                        ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
                         : null
                 });
             }
@@ -310,7 +310,7 @@ function createMediaRoutes() {
                 tracks: data.tracks,
                 hlsUrl: `/hls/${id}/0/playlist.m3u8`,
                 srtUrl: registered
-                    ? `srt://localhost:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
+                    ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
                     : null,
                 srtPort: registered ? registered.port : null
             };
@@ -328,9 +328,9 @@ function createMediaRoutes() {
 
 async function startMediaServer(app) {
     console.log("🚀 Media server ready!");
-    console.log(`   📝 Register stream: POST http://localhost/ffmpeg/register with {"tracks": 2}`);
+    console.log(`   📝 Register stream: POST http://${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/register with {"tracks": 2}`);
     console.log(`   🔗 FFmpeg starts immediately with its own SRT URL`);
-    console.log(`   📊 Check status: GET http://localhost/ffmpeg/status`);
+    console.log(`   📊 Check status: GET http://${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/status`);
 }
 
 export { createMediaRoutes, startMediaServer };
