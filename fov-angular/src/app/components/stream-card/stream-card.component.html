@@ -1,0 +1,17 @@
+<div class="stream-card">
+  <div class="stream-thumbnail">
+    <img [src]="stream.thumbnail" [alt]="stream.title" class="thumbnail-img">
+    <div class="live-indicator">EN DIRECT</div>
+    <div class="viewer-count">{{ stream.viewers }} spectateurs</div>
+  </div>
+  <div class="stream-info">
+    <div class="streamer-avatar">
+      <img [src]="stream.avatar" [alt]="stream.streamer">
+    </div>
+    <div class="stream-details">
+      <h4 class="stream-title">{{ stream.title }}</h4>
+      <p class="streamer-name">{{ stream.streamer }}</p>
+      <p class="stream-category">{{ stream.category }}</p>
+    </div>
+  </div>
+</div>

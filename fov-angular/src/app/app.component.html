@@ -1,4 +1,10 @@
-<div class="container">
-  <h1>{{ title }}</h1>
-  <p>Welcome to your first Angular application!</p>
+<app-navbar></app-navbar>
+<div class="app-layout">
+  <app-sidebar 
+    [isCollapsed]="isSidebarCollapsed" 
+    (toggleCollapse)="onSidebarToggle()">
+  </app-sidebar>
+  <main class="main-content">
+    <router-outlet></router-outlet>
+  </main>
 </div>

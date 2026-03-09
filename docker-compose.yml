@@ -1,8 +1,27 @@
-
 services:
-    fov-stack:
-        build: .
-        ports:
-            - 8080:80       # Port interface web
-            - 1935:1935     # Port RTMP
-        restart: on-failure
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/media:/var/media
+    ports:
+      - "4000:4000" # API
+      - "9999-10010:9999-10010"
+      - "9999-10010:9999-10010/udp" # SRT
+      - "8000:8000" # media HTTP (node-media-server)
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./fov-angular
+    volumes:
+      - ./fov-angular:/app
+      - /app/node_modules
+    ports:
+      - "4200:4200" # Angular dev server
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    command: ng serve --host 0.0.0.0 --port 4200
+    restart: unless-stopped

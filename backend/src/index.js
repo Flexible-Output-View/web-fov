@@ -1,0 +1,56 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
+import morgan from 'morgan';
+import cors from 'cors';
+
+import db from './db.js';
+import apiRoutes from './routes/index.js';
+import { createMediaRoutes, startMediaServer } from './mediaServer.mjs';
+
+
+const PORT = process.env.PORT || 4000;
+
+const app = express();
+app.use(morgan('dev'));
+app.use(cors());
+app.use(express.json());
+app.enable('trust proxy');
+
+// Mount media routes (HLS and FFmpeg endpoints)
+const mediaRouter = createMediaRoutes();
+app.use(mediaRouter);
+
+app.get('/', (req, res) => res.json({ ok: true, message: 'FOV backend running' }));
+
+// Mount API routes under /api
+app.use('/api', apiRoutes);
+
+app.use((err, req, res, next) => {
+    console.error(err);
+    res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+});
+
+async function start() {
+    try {
+        // verify connection
+        const conn = await db.getConnection();
+        await conn.ping();
+        conn.release();
+        console.log('✅ Connected to BDD');
+
+        // initialize media server
+        await startMediaServer();
+
+        app.listen(PORT, () => {
+            console.log(`🚀 Server listening on http://localhost:${PORT}`);
+            console.log(`📺 HLS available at http://localhost:${PORT}/hls`);
+        });
+    } catch (err) {
+        console.error('Unable to connect to DB', err);
+        process.exit(1);
+    }
+}
+
+start();
