@@ -175,12 +175,8 @@ function createMediaRoutes() {
 
     router.use(express.json());
 
-<<<<<<< Modification-player-nouvelles-keyframes
-    app.post("/ffmpeg/register", (req, res) => {
-=======
     // POST /ffmpeg/register — register a stream and create a unique SRT listener
     router.post("/ffmpeg/register", (req, res) => {
->>>>>>> dev
         const { tracks, streamId: providedStreamId } = req.body ?? {};
         const trackNum = Number.parseInt(tracks, 10);
 
@@ -229,15 +225,7 @@ function createMediaRoutes() {
                 streamId,
                 tracks: trackNum,
                 srtUrl: srtUrlExternal,
-<<<<<<< Modification-player-nouvelles-keyframes
                 hlsUrl: `/hls/${streamId}/0/playlist.m3u8`
-=======
-                hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
-                instructions: {
-                    step1: `Send stream to ${srtUrl}`,
-                    step2: `Stream will be available at: http://localhost/hls/${streamId}/0/playlist.m3u8`
-                }
->>>>>>> dev
             });
         } catch (err) {
             console.error(`⚠️ Failed to register stream ${streamId}:`, err);
@@ -245,12 +233,8 @@ function createMediaRoutes() {
         }
     });
 
-<<<<<<< Modification-player-nouvelles-keyframes
-    app.post("/ffmpeg/stop", (req, res) => {
-=======
     // POST /ffmpeg/stop — request FFmpeg to stop for a specific stream
     router.post("/ffmpeg/stop", (req, res) => {
->>>>>>> dev
         const { streamId } = req.body ?? {};
 
         if (!streamId) {
@@ -290,12 +274,8 @@ function createMediaRoutes() {
         }
     });
 
-<<<<<<< Modification-player-nouvelles-keyframes
-    app.get("/ffmpeg/status", (req, res) => {
-=======
     // GET /ffmpeg/status — get current FFmpeg state for all or a specific stream
     router.get("/ffmpeg/status", (req, res) => {
->>>>>>> dev
         const { streamId } = req.query;
 
         if (streamId) {
