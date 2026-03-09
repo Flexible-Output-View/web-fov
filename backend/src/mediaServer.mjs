@@ -4,16 +4,13 @@ import path from "path";
 import cors from 'cors';
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
-import net from "net";
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), "media");
 const HLS_DIR = path.join(MEDIA_ROOT, "hls");
 
 await fs.promises.mkdir(HLS_DIR, { recursive: true });
 
-// Map to store multiple FFmpeg processes: streamId -> { process, tracks, socket }
 const ffmpegProcesses = new Map();
-// Map to store registered streams awaiting connection: streamId -> { tracks, srtServer, port }
 const registeredStreams = new Map();
 const baseSrtPort = parseInt(process.env.SRT_PORT || "9999", 10);
 
@@ -30,7 +27,6 @@ function clearHLSFiles() {
     }
 }
 
-// Clear HLS files for a specific stream
 function clearStreamHLSFiles(streamId) {
     try {
         const streamHlsDir = path.join(HLS_DIR, streamId);
@@ -56,30 +52,37 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
         varStreamEntries.push(`v:${i},a:${i}`);
     }
 
-    // Use SRT URL or pipe as input
-    const inputSource = srtUrl ? `${srtUrl}?mode=listener` : "pipe:";
+    const srtParams = [
+        'mode=listener',
+        'latency=4000000',
+        'rcvbuf=134217728',
+        'sndbuf=134217728',
+        'peerlatency=4000000',
+        'tlpktdrop=0',
+        'nakreport=1',
+        'connect_timeout=5000',
+        'linger=0'
+    ].join('&');
+
+    const inputSource = srtUrl
+        ? `${srtUrl}?${srtParams}`
+        : "pipe:";
 
     const ffmpegArgs = [
-
         "-err_detect", "ignore_err",
         "-fflags", "+genpts+discardcorrupt+igndts",
         "-flags", "low_delay",
         "-strict", "experimental",
-
         "-i", inputSource,
-
         ...mapArgs,
         "-c:v", "copy",
         ...audioCodecArgs,
-
         "-f", "hls",
         "-hls_time", "2",
-
         "-hls_list_size", "15",
         "-hls_flags", "delete_segments+independent_segments+omit_endlist",
         "-hls_segment_type", "mpegts",
         "-hls_segment_filename", path.join(streamHlsDir, "%v", "seg%05d.ts"),
-
         "-var_stream_map", varStreamEntries.join(" "),
         path.join(streamHlsDir, "%v", "playlist.m3u8")
     ];
@@ -87,7 +90,6 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
     return ffmpegArgs;
 }
 
-// Start FFmpeg process and pipe socket data to it
 function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
     if (!tracks || tracks === 0) {
         if (socket) socket.destroy();
@@ -101,7 +103,6 @@ function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
     const stdio = srtUrl ? ["inherit", "inherit", "inherit"] : ["pipe", "inherit", "inherit"];
     const ffmpegProc = spawn("ffmpeg", ffmpegArgs, { stdio });
 
-    // Pipe socket data to FFmpeg stdin only if socket is provided
     if (socket) {
         socket.pipe(ffmpegProc.stdin);
     }
@@ -132,7 +133,6 @@ function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
         });
     }
 
-    // Store process and metadata
     ffmpegProcesses.set(streamId, {
         process: ffmpegProc,
         tracks,
@@ -181,7 +181,7 @@ function createMediaRoutes() {
         const trackNum = Number.parseInt(tracks, 10);
 
         if (!Number.isInteger(trackNum) || trackNum <= 0) {
-            return res.status(400).json({ error: "Invalid 'tracks' parameter. Must be a positive integer." });
+            return res.status(400).json({ error: "Invalid 'tracks' parameter." });
         }
 
         const streamId = providedStreamId || randomUUID();
@@ -189,8 +189,8 @@ function createMediaRoutes() {
         if (registeredStreams.has(streamId)) {
             return res.status(409).json({ error: "StreamId already registered", streamId });
         }
+
         try {
-            // Find next available port
             let url = process.env.SRT_URL || '127.0.0.1';
             let srtPort = baseSrtPort;
             while (Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
@@ -198,9 +198,18 @@ function createMediaRoutes() {
             }
 
             const srtUrl = `srt://0.0.0.0:${srtPort}`;
-            const srtUrlExternal = `srt://${url}:${srtPort}?mode=caller`;
 
-            // Start FFmpeg listener immediately with SRT URL
+            const srtUrlExternal = [
+                `srt://${url}:${srtPort}`,
+                '?mode=caller',
+                '&latency=4000000',
+                '&rcvbuf=134217728',
+                '&sndbuf=134217728',
+                '&peerlatency=4000000',
+                '&tlpktdrop=0',
+                '&nakreport=1'
+            ].join('');
+
             startFFmpegListener(streamId, trackNum, null, srtUrl);
 
             registeredStreams.set(streamId, {
@@ -209,18 +218,14 @@ function createMediaRoutes() {
                 srtUrl
             });
 
-            console.log(`📝 Stream registered & FFmpeg started: ${streamId} (tracks=${trackNum}, port=${srtPort})`);
+            console.log(`📝 Stream registered: ${streamId} (tracks=${trackNum}, port=${srtPort})`);
 
             return res.status(200).json({
                 status: "registered",
                 streamId,
                 tracks: trackNum,
                 srtUrl: srtUrlExternal,
-                hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
-                instructions: {
-                    step1: `Send stream to ${srtUrl}`,
-                    step2: `Stream will be available at: http://localhost/hls/${streamId}/0/playlist.m3u8`
-                }
+                hlsUrl: `/hls/${streamId}/0/playlist.m3u8`
             });
         } catch (err) {
             console.error(`⚠️ Failed to register stream ${streamId}:`, err);
@@ -242,6 +247,7 @@ function createMediaRoutes() {
         if (!streamData && !registered) {
             return res.status(200).json({ status: "not_found", streamId });
         }
+
         try {
             if (streamData) {
                 if (streamData.process) {
@@ -284,14 +290,15 @@ function createMediaRoutes() {
                     pid: streamData.process?.pid,
                     tracks: streamData.tracks,
                     hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
-                    srtUrl: registered ? `srt://localhost:${registered.port}?mode=caller` : null
+                    srtUrl: registered
+                        ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
+                        : null
                 });
             }
 
             return res.status(200).json({ streamId, status: "not_found" });
         }
 
-        // Return all streams
         const allStreams = {};
 
         for (const [id, data] of ffmpegProcesses.entries()) {
@@ -302,7 +309,9 @@ function createMediaRoutes() {
                 pid: data.process.pid,
                 tracks: data.tracks,
                 hlsUrl: `/hls/${id}/0/playlist.m3u8`,
-                srtUrl: registered ? `srt://localhost:${registered.port}?mode=caller` : null,
+                srtUrl: registered
+                    ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
+                    : null,
                 srtPort: registered ? registered.port : null
             };
         }
@@ -319,9 +328,9 @@ function createMediaRoutes() {
 
 async function startMediaServer(app) {
     console.log("🚀 Media server ready!");
-    console.log(`   📝 Register stream: POST http://localhost/ffmpeg/register with {"tracks": 2}`);
+    console.log(`   📝 Register stream: POST http://${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/register with {"tracks": 2}`);
     console.log(`   🔗 FFmpeg starts immediately with its own SRT URL`);
-    console.log(`   📊 Check status: GET http://localhost/ffmpeg/status`);
+    console.log(`   📊 Check status: GET http://${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/status`);
 }
 
 export { createMediaRoutes, startMediaServer };
