@@ -1,0 +1,8 @@
+logLevel: info
+srtAddress: :9999
+rtmpAddress: :1935
+
+# Accept any stream path
+paths:
+  all:
+

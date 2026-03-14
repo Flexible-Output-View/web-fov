@@ -4,33 +4,23 @@ import path from "path";
 import cors from 'cors';
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
-import net from "net";
+import http from "http";
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), "media");
 const HLS_DIR = path.join(MEDIA_ROOT, "hls");
 
+// MediaMTX configuration
+const MEDIAMTX_HOST = process.env.MEDIAMTX_HOST || "localhost";
+const MEDIAMTX_RTMP_PORT = process.env.MEDIAMTX_RTMP_PORT || "1935";
+const SRT_URL = process.env.SRT_URL || "127.0.0.1";
+
 await fs.promises.mkdir(HLS_DIR, { recursive: true });
 
-// Map to store multiple FFmpeg processes: streamId -> { process, tracks, socket }
+// Map to store FFmpeg processes: streamId -> { process, tracks, startedAt }
 const ffmpegProcesses = new Map();
-// Map to store registered streams awaiting connection: streamId -> { tracks, srtServer, port }
+// Map to track registered streams: streamId -> { tracks, registeredAt }
 const registeredStreams = new Map();
-const baseSrtPort = parseInt(process.env.SRT_PORT || "9999", 10);
 
-function clearHLSFiles() {
-    try {
-        if (fs.existsSync(HLS_DIR)) {
-            for (const file of fs.readdirSync(HLS_DIR)) {
-                fs.rmSync(path.join(HLS_DIR, file), { recursive: true, force: true });
-            }
-            console.log("🧹 HLS directory cleared");
-        }
-    } catch (err) {
-        console.error("⚠️ Failed to clear HLS directory:", err);
-    }
-}
-
-// Clear HLS files for a specific stream
 function clearStreamHLSFiles(streamId) {
     try {
         const streamHlsDir = path.join(HLS_DIR, streamId);
@@ -43,7 +33,7 @@ function clearStreamHLSFiles(streamId) {
     }
 }
 
-function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
+function buildFfmpegArgs(videoTrackCount, streamId, rtmpUrl) {
     const streamHlsDir = path.join(HLS_DIR, streamId);
     const mapArgs = [];
     const audioCodecArgs = [];
@@ -56,30 +46,21 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
         varStreamEntries.push(`v:${i},a:${i}`);
     }
 
-    // Use SRT URL or pipe as input
-    const inputSource = srtUrl ? `${srtUrl}?mode=listener` : "pipe:";
-
     const ffmpegArgs = [
-
         "-err_detect", "ignore_err",
         "-fflags", "+genpts+discardcorrupt+igndts",
         "-flags", "low_delay",
         "-strict", "experimental",
-
-        "-i", inputSource,
-
+        "-i", rtmpUrl,
         ...mapArgs,
         "-c:v", "copy",
         ...audioCodecArgs,
-
         "-f", "hls",
         "-hls_time", "2",
-
         "-hls_list_size", "15",
         "-hls_flags", "delete_segments+independent_segments+omit_endlist",
         "-hls_segment_type", "mpegts",
         "-hls_segment_filename", path.join(streamHlsDir, "%v", "seg%05d.ts"),
-
         "-var_stream_map", varStreamEntries.join(" "),
         path.join(streamHlsDir, "%v", "playlist.m3u8")
     ];
@@ -87,57 +68,31 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
     return ffmpegArgs;
 }
 
-// Start FFmpeg process and pipe socket data to it
-function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
+function startFFmpegListener(streamId, tracks, rtmpUrl) {
     if (!tracks || tracks === 0) {
-        if (socket) socket.destroy();
         return;
     }
 
-    const ffmpegArgs = buildFfmpegArgs(tracks, streamId, srtUrl);
-
+    const ffmpegArgs = buildFfmpegArgs(tracks, streamId, rtmpUrl);
     console.log(`📀 Spawning FFmpeg for stream ${streamId}:`, "ffmpeg", ffmpegArgs.join(" "));
 
-    const stdio = srtUrl ? ["inherit", "inherit", "inherit"] : ["pipe", "inherit", "inherit"];
-    const ffmpegProc = spawn("ffmpeg", ffmpegArgs, { stdio });
-
-    // Pipe socket data to FFmpeg stdin only if socket is provided
-    if (socket) {
-        socket.pipe(ffmpegProc.stdin);
-    }
+    const ffmpegProc = spawn("ffmpeg", ffmpegArgs, { stdio: ["ignore", "inherit", "inherit"] });
 
     ffmpegProc.on("exit", (code, signal) => {
         console.log(`ℹ️ FFmpeg for stream ${streamId} exited (code=${code} signal=${signal})`);
         clearStreamHLSFiles(streamId);
         ffmpegProcesses.delete(streamId);
-        registeredStreams.delete(streamId);
         console.log(`📊 Active streams: ${ffmpegProcesses.size}`);
-        if (socket) socket.destroy();
     });
 
     ffmpegProc.on("error", (err) => {
         console.error(`⚠️ FFmpeg spawn failed for stream ${streamId}:`, err);
-        if (socket) socket.destroy();
     });
 
-    if (socket) {
-        socket.on("error", (err) => {
-            console.error(`⚠️ Socket error for stream ${streamId}:`, err);
-            ffmpegProc.kill("SIGINT");
-        });
-
-        socket.on("end", () => {
-            console.log(`📴 Socket closed for stream ${streamId}`);
-            ffmpegProc.kill("SIGINT");
-        });
-    }
-
-    // Store process and metadata
     ffmpegProcesses.set(streamId, {
         process: ffmpegProc,
         tracks,
-        socket,
-        stopped: false
+        startedAt: new Date().toISOString()
     });
 }
 
@@ -175,7 +130,7 @@ function createMediaRoutes() {
 
     router.use(express.json());
 
-    // POST /ffmpeg/register — register a stream and create a unique SRT listener
+    // POST /ffmpeg/register — register a stream and spawn FFmpeg
     router.post("/ffmpeg/register", (req, res) => {
         const { tracks, streamId: providedStreamId } = req.body ?? {};
         const trackNum = Number.parseInt(tracks, 10);
@@ -189,37 +144,38 @@ function createMediaRoutes() {
         if (registeredStreams.has(streamId)) {
             return res.status(409).json({ error: "StreamId already registered", streamId });
         }
+
         try {
-            // Find next available port
-            let url = process.env.SRT_URL || '127.0.0.1';
-            let srtPort = baseSrtPort;
-            while (Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
-                srtPort++;
-            }
+            const mediamtxStreamId = `publish:${streamId}`;
+            const srtUrlExternal = `srt://${SRT_URL}:9999?mode=caller&streamid=${mediamtxStreamId}`;
+            const rtmpUrl = `rtmp://${MEDIAMTX_HOST}:${MEDIAMTX_RTMP_PORT}/${streamId}`;
 
-            const srtUrl = `srt://0.0.0.0:${srtPort}`;
-            const srtUrlExternal = `srt://${url}:${srtPort}?mode=caller`;
-
-            // Start FFmpeg listener immediately with SRT URL
-            startFFmpegListener(streamId, trackNum, null, srtUrl);
+            // Start FFmpeg listener to pull from MediaMTX RTMP
+            startFFmpegListener(streamId, trackNum, rtmpUrl);
 
             registeredStreams.set(streamId, {
                 tracks: trackNum,
-                port: srtPort,
-                srtUrl
+                registeredAt: new Date().toISOString()
             });
 
-            console.log(`📝 Stream registered & FFmpeg started: ${streamId} (tracks=${trackNum}, port=${srtPort})`);
+            console.log(`📝 Stream registered: ${streamId} (tracks=${trackNum})`);
+
+            const hlsUrls = {};
+            for (let i = 0; i < trackNum; i++) {
+                hlsUrls[`track_${i}`] = `/hls/${streamId}/${i}/playlist.m3u8`;
+            }
 
             return res.status(200).json({
                 status: "registered",
                 streamId,
                 tracks: trackNum,
                 srtUrl: srtUrlExternal,
-                hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
+                hlsUrls,
                 instructions: {
-                    step1: `Send stream to ${srtUrl}`,
-                    step2: `Stream will be available at: http://localhost/hls/${streamId}/0/playlist.m3u8`
+                    step1: `Send SRT stream with ${trackNum} video track(s) to:`,
+                    step2: `${srtUrlExternal}`,
+                    step3: `FFmpeg will split tracks into separate HLS playlists`,
+                    tracks: hlsUrls
                 }
             });
         } catch (err) {
@@ -228,7 +184,7 @@ function createMediaRoutes() {
         }
     });
 
-    // POST /ffmpeg/stop — request FFmpeg to stop for a specific stream
+    // POST /ffmpeg/stop — stop FFmpeg for a stream
     router.post("/ffmpeg/stop", (req, res) => {
         const { streamId } = req.body ?? {};
 
@@ -242,6 +198,7 @@ function createMediaRoutes() {
         if (!streamData && !registered) {
             return res.status(200).json({ status: "not_found", streamId });
         }
+
         try {
             if (streamData) {
                 if (streamData.process) {
@@ -249,15 +206,12 @@ function createMediaRoutes() {
                     streamData.process.kill("SIGINT");
                     console.log(`⏹️ FFmpeg stop requested for stream ${streamId} (pid=${pid})`);
                 }
-                if (streamData.socket) {
-                    streamData.socket.destroy();
-                }
                 ffmpegProcesses.delete(streamId);
             }
 
             if (registered) {
                 registeredStreams.delete(streamId);
-                console.log(`🗑️ Cancelled registration for stream ${streamId}`);
+                console.log(`🗑️ Stream unregistered: ${streamId}`);
             }
 
             clearStreamHLSFiles(streamId);
@@ -268,7 +222,7 @@ function createMediaRoutes() {
         }
     });
 
-    // GET /ffmpeg/status — get current FFmpeg state for all or a specific stream
+    // GET /ffmpeg/status — get stream status
     router.get("/ffmpeg/status", (req, res) => {
         const { streamId } = req.query;
 
@@ -276,15 +230,22 @@ function createMediaRoutes() {
             const streamData = ffmpegProcesses.get(streamId);
             const registered = registeredStreams.get(streamId);
 
-            if (streamData) {
+            if (streamData || registered) {
+                const trackCount = registered?.tracks || streamData?.tracks || 0;
+                const hlsUrls = {};
+                for (let i = 0; i < trackCount; i++) {
+                    hlsUrls[`track_${i}`] = `/hls/${streamId}/${i}/playlist.m3u8`;
+                }
+
                 return res.status(200).json({
                     streamId,
-                    status: "active",
-                    running: true,
-                    pid: streamData.process?.pid,
-                    tracks: streamData.tracks,
-                    hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
-                    srtUrl: registered ? `srt://localhost:${registered.port}?mode=caller` : null
+                    status: streamData ? "active" : "registered",
+                    running: !!streamData,
+                    pid: streamData?.process?.pid,
+                    tracks: trackCount,
+                    hlsUrls,
+                    startedAt: streamData?.startedAt,
+                    registeredAt: registered?.registeredAt
                 });
             }
 
@@ -293,17 +254,20 @@ function createMediaRoutes() {
 
         // Return all streams
         const allStreams = {};
-
         for (const [id, data] of ffmpegProcesses.entries()) {
             const registered = registeredStreams.get(id);
+            const trackCount = data.tracks;
+            const hlsUrls = {};
+            for (let i = 0; i < trackCount; i++) {
+                hlsUrls[`track_${i}`] = `/hls/${id}/${i}/playlist.m3u8`;
+            }
             allStreams[id] = {
                 status: "active",
                 running: true,
-                pid: data.process.pid,
-                tracks: data.tracks,
-                hlsUrl: `/hls/${id}/0/playlist.m3u8`,
-                srtUrl: registered ? `srt://localhost:${registered.port}?mode=caller` : null,
-                srtPort: registered ? registered.port : null
+                pid: data.process?.pid,
+                tracks: trackCount,
+                hlsUrls,
+                startedAt: data.startedAt
             };
         }
 
@@ -317,11 +281,13 @@ function createMediaRoutes() {
     return router;
 }
 
-async function startMediaServer(app) {
-    console.log("🚀 Media server ready!");
-    console.log(`   📝 Register stream: POST http://localhost/ffmpeg/register with {"tracks": 2}`);
-    console.log(`   🔗 FFmpeg starts immediately with its own SRT URL`);
-    console.log(`   📊 Check status: GET http://localhost/ffmpeg/status`);
+async function startMediaServer() {
+    console.log("🚀 Media server ready with MediaMTX + FFmpeg!");
+    console.log(`   📡 MediaMTX SRT listener: srt://0.0.0.0:9999`);
+    console.log(`   🎬 FFmpeg converts multi-track streams to separate HLS tracks`);
+    console.log(`   📝 Register stream: POST http://localhost:4000/ffmpeg/register with {"tracks": 2}`);
+    console.log(`   📊 Check status: GET http://localhost:4000/ffmpeg/status`);
+    console.log(`   🎥 Access tracks: /hls/{streamId}/0/playlist.m3u8, /hls/{streamId}/1/playlist.m3u8, etc`);
 }
 
 export { createMediaRoutes, startMediaServer };
