@@ -6,7 +6,13 @@
     "main": "src/index.js",
     "scripts": {
         "start": "node src/index.js",
-        "dev": "nodemon src/index.js"
+        "dev": "nodemon src/index.js",
+        "lint": "eslint src/",
+        "lint:fix": "eslint src/ --fix",
+        "test": "node --test tests/**/*.test.js",
+        "test:db": "node tests/db.test.js",
+        "test:api": "node tests/api.test.js",
+        "test:media": "node tests/mediaServer.test.js"
     },
     "dependencies": {
         "cors": "^2.8.5",
@@ -19,6 +25,7 @@
         "srt": "^0.0.3"
     },
     "devDependencies": {
+        "eslint": "^8.56.0",
         "nodemon": "^3.1.11"
     }
 }
