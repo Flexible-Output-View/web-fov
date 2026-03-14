@@ -1,4 +1,15 @@
 services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: fov-mediamtx
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml
+    ports:
+      - "9999:9999/udp" # SRT listener
+      - "8888:8888" # HLS
+    restart: unless-stopped
+    command: /mediamtx
+
   backend:
     build:
       context: ./backend
@@ -8,10 +19,12 @@ services:
       - ./backend/media:/var/media
     ports:
       - "4000:4000" # API
-      - "9999-10010:9999-10010"
-      - "9999-10010:9999-10010/udp" # SRT
-      - "8000:8000" # media HTTP (node-media-server)
+    depends_on:
+      - mediamtx
     restart: unless-stopped
+    environment:
+      - MEDIAMTX_HOST=mediamtx
+      - MEDIAMTX_HLS_PORT=8888
 
   frontend:
     build:
