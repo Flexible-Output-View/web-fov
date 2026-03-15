@@ -22,7 +22,7 @@
 
 ## 🎯 Project Overview
 
-**FOV (Field of View)** is a modern live streaming platform backend that enables:
+**FOV (Flexible Output View)** is a modern live streaming platform backend that enables:
 
 - **Live streaming ingestion** via SRT (Secure Reliable Transport) protocol
 - **Adaptive bitrate streaming** using HLS (HTTP Live Streaming)
