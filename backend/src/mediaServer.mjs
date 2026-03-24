@@ -14,6 +14,10 @@ const ffmpegProcesses = new Map();
 const registeredStreams = new Map();
 const baseSrtPort = parseInt(process.env.SRT_PORT || "9999", 10);
 
+// Configuration for process termination
+const PROCESS_GRACE_PERIOD = 5000; // 5 seconds to gracefully shut down
+const PROCESS_CHECK_INTERVAL = 30000; // Check every 30 seconds for zombie processes
+
 function clearHLSFiles() {
     try {
         if (fs.existsSync(HLS_DIR)) {
@@ -37,6 +41,42 @@ function clearStreamHLSFiles(streamId) {
     } catch (err) {
         console.error(`⚠️ Failed to clear HLS directory for stream ${streamId}:`, err);
     }
+}
+
+// Safely kill a process with grace period - try SIGINT first, then SIGKILL
+function killFFmpegProcess(streamId, process, timeout = PROCESS_GRACE_PERIOD) {
+    return new Promise((resolve) => {
+        if (!process || process.killed) {
+            resolve(true);
+            return;
+        }
+
+        const killTimer = setTimeout(() => {
+            if (!process.killed) {
+                console.log(`⚠️ FFmpeg for stream ${streamId} did not exit gracefully, force killing (SIGKILL)...`);
+                try {
+                    process.kill("SIGKILL");
+                } catch (err) {
+                    console.error(`⚠️ Failed to SIGKILL ffmpeg for stream ${streamId}:`, err);
+                }
+            }
+            resolve(true);
+        }, timeout);
+
+        process.once("exit", () => {
+            clearTimeout(killTimer);
+            resolve(true);
+        });
+
+        // Try graceful shutdown first
+        try {
+            process.kill("SIGINT");
+        } catch (err) {
+            console.error(`⚠️ Failed to SIGINT ffmpeg for stream ${streamId}:`, err);
+            clearTimeout(killTimer);
+            resolve(false);
+        }
+    });
 }
 
 function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
@@ -113,23 +153,44 @@ function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
         ffmpegProcesses.delete(streamId);
         registeredStreams.delete(streamId);
         console.log(`📊 Active streams: ${ffmpegProcesses.size}`);
-        if (socket) socket.destroy();
+        if (socket) {
+            try {
+                socket.destroy();
+            } catch (err) {
+                console.error(`⚠️ Error destroying socket for stream ${streamId}:`, err);
+            }
+        }
     });
 
     ffmpegProc.on("error", (err) => {
         console.error(`⚠️ FFmpeg spawn failed for stream ${streamId}:`, err);
-        if (socket) socket.destroy();
+        if (socket) {
+            try {
+                socket.destroy();
+            } catch (err) {
+                console.error(`⚠️ Error destroying socket for stream ${streamId}:`, err);
+            }
+        }
     });
 
     if (socket) {
         socket.on("error", (err) => {
             console.error(`⚠️ Socket error for stream ${streamId}:`, err);
-            ffmpegProc.kill("SIGINT");
+            // Use the new kill function with grace period
+            killFFmpegProcess(streamId, ffmpegProc).catch(err => {
+                console.error(`⚠️ Error killing ffmpeg for stream ${streamId}:`, err);
+            });
         });
 
         socket.on("end", () => {
             console.log(`📴 Socket closed for stream ${streamId}`);
-            ffmpegProc.kill("SIGINT");
+            killFFmpegProcess(streamId, ffmpegProc).catch(err => {
+                console.error(`⚠️ Error killing ffmpeg for stream ${streamId}:`, err);
+            });
+        });
+
+        socket.on("close", () => {
+            console.log(`🔌 Socket fully closed for stream ${streamId}`);
         });
     }
 
@@ -137,7 +198,8 @@ function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
         process: ffmpegProc,
         tracks,
         socket,
-        stopped: false
+        stopped: false,
+        createdAt: Date.now()
     });
 }
 
@@ -234,7 +296,7 @@ function createMediaRoutes() {
     });
 
     // POST /ffmpeg/stop — request FFmpeg to stop for a specific stream
-    router.post("/ffmpeg/stop", (req, res) => {
+    router.post("/ffmpeg/stop", async (req, res) => {
         const { streamId } = req.body ?? {};
 
         if (!streamId) {
@@ -252,8 +314,8 @@ function createMediaRoutes() {
             if (streamData) {
                 if (streamData.process) {
                     const pid = streamData.process.pid;
-                    streamData.process.kill("SIGINT");
                     console.log(`⏹️ FFmpeg stop requested for stream ${streamId} (pid=${pid})`);
+                    await killFFmpegProcess(streamId, streamData.process);
                 }
                 if (streamData.socket) {
                     streamData.socket.destroy();
@@ -331,6 +393,55 @@ async function startMediaServer(app) {
     console.log(`   📝 Register stream: POST http://${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/register with {"tracks": 2}`);
     console.log(`   🔗 FFmpeg starts immediately with its own SRT URL`);
     console.log(`   📊 Check status: GET http://${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/status`);
+
+    // Periodic check for zombie processes (every 30 seconds)
+    const healthCheckInterval = setInterval(async () => {
+        const deadStreams = [];
+        for (const [streamId, streamData] of ffmpegProcesses.entries()) {
+            if (streamData.process && streamData.process.killed) {
+                console.log(`🧟 Detected killed ffmpeg for stream ${streamId}, cleaning up...`);
+                deadStreams.push(streamId);
+            }
+        }
+        // Clean up dead processes
+        for (const streamId of deadStreams) {
+            clearStreamHLSFiles(streamId);
+            ffmpegProcesses.delete(streamId);
+            registeredStreams.delete(streamId);
+        }
+    }, PROCESS_CHECK_INTERVAL);
+
+    // Graceful shutdown handler
+    async function gracefulShutdown(signal) {
+        console.log(`\n⏳ ${signal} received, gracefully shutting down ffmpeg processes...`);
+
+        const shutdownPromises = [];
+        for (const [streamId, streamData] of ffmpegProcesses.entries()) {
+            console.log(`   Stopping stream ${streamId}...`);
+            shutdownPromises.push(killFFmpegProcess(streamId, streamData.process));
+        }
+
+        await Promise.all(shutdownPromises);
+
+        // Clear HLS files
+        clearHLSFiles();
+
+        // Clean up health check interval
+        clearInterval(healthCheckInterval);
+
+        console.log("✅ All ffmpeg processes stopped");
+        process.exit(0);
+    }
+
+    // Register shutdown handlers
+    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+    // Handle uncaught exceptions
+    process.on("uncaughtException", async (err) => {
+        console.error("💥 Uncaught exception:", err);
+        await gracefulShutdown("uncaughtException");
+    });
 }
 
-export { createMediaRoutes, startMediaServer };
+export { createMediaRoutes, startMediaServer, ffmpegProcesses, killFFmpegProcess };
