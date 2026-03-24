@@ -122,3 +122,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+@media (max-width: 768px) {
+  .live-stream-card {
+    border-radius: var(--radius-md, 8px);
+
+    &:hover {
+      transform: none;
+    }
+  }
+
+  .streamer-initial {
+    font-size: 2.5rem;
+  }
+
+  .card-info {
+    padding: 10px 12px;
+  }
+
+  .streamer-name {
+    font-size: 0.9rem;
+  }
+}
