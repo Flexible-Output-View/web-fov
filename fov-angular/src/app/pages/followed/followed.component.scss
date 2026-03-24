@@ -101,7 +101,6 @@
   gap: var(--spacing-md);
 }
 
-// Login required state
 .login-required-state {
   display: flex;
   flex-direction: column;
@@ -141,7 +140,6 @@
   }
 }
 
-// ── Responsive ──
 @media (max-width: 1024px) {
   .followed-page {
     padding: var(--spacing-md);
