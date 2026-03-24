@@ -18,7 +18,7 @@
     <div class="tab-content">
       <div *ngIf="activeTab === 'categories'">
         <div *ngIf="isLoadingCategories" class="loading-state">
-          Chargement des catégories depuis Twitch...
+          Chargement des catégories...
         </div>
         <div *ngIf="!isLoadingCategories" class="categories-grid">
           <app-category-card 
@@ -28,11 +28,23 @@
         </div>
       </div>
       
-      <div *ngIf="activeTab === 'channels'" class="streams-grid">
-        <app-stream-card 
-          *ngFor="let stream of liveStreams" 
-          [stream]="stream">
-        </app-stream-card>
+      <div *ngIf="activeTab === 'channels'">
+        <div *ngIf="isLoadingStreams" class="loading-state">
+          <div class="loading-spinner"></div>
+          <span>Recherche des streams en direct...</span>
+        </div>
+        
+        <div *ngIf="!isLoadingStreams && liveStreams.length === 0" class="empty-state">
+          <div class="empty-icon">📡</div>
+          <p>Aucun stream en direct</p>
+        </div>
+        
+        <div *ngIf="!isLoadingStreams && liveStreams.length > 0" class="live-streams-grid">
+          <app-live-stream-card 
+            *ngFor="let stream of liveStreams" 
+            [stream]="stream">
+          </app-live-stream-card>
+        </div>
       </div>
     </div>
   </div>
@@ -42,20 +54,8 @@
 <ng-template #categoryView>
   <div class="category-page">
     <h1>{{ categoryName }}</h1>
-
-    <div *ngIf="streams.length > 0; else noStreams">
-      <div class="streams-grid">
-        <app-stream-card 
-          *ngFor="let stream of streams" 
-          [stream]="stream">
-        </app-stream-card>
-      </div>
-    </div>
-
-    <ng-template #noStreams>
-      <p class="no-streams-msg">
-        Il n'y a aucun stream en direct dans la catégorie "{{ categoryName }}" pour le moment.
-      </p>
-    </ng-template>
+    <p class="no-streams-msg">
+      Les streams par catégorie seront disponibles prochainement.
+    </p>
   </div>
 </ng-template>

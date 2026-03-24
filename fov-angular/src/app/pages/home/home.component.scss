@@ -1,47 +1,3 @@
-.player-container {
-  height: 700px;
-  overflow: hidden;
-}
-
-.home-page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: var(--spacing-lg);
-
-  .section {
-    margin-bottom: var(--spacing-xl);
-
-    .section-header {
-      margin-bottom: var(--spacing-md);
-
-      h2 {
-        font-size: 1.5rem;
-        color: var(--text-primary);
-        font-weight: 600;
-      }
-    }
-  }
-
-  .categories-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--spacing-md);
-  }
-
-  .streams-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--spacing-md);
-  }
-}
-
-.loading-state {
-  padding: 40px;
-  text-align: center;
-  color: #888;
-  font-size: 1rem;
-}
-
 .home-page {
   max-width: 1400px;
   margin: 0 auto;
@@ -171,5 +127,70 @@
     margin-top: 8px;
     font-size: 0.9rem;
     color: var(--text-secondary, #888);
+  }
+}
+
+// ── Responsive ──
+@media (max-width: 1024px) {
+  .home-page {
+    padding: var(--spacing-md);
+
+    .live-streams-grid {
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+
+    .categories-grid {
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .home-page {
+    padding: var(--spacing-sm);
+
+    .section .section-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+
+      h2 {
+        font-size: 1.2rem;
+      }
+    }
+
+    .live-section {
+      padding: var(--spacing-md);
+      border-radius: var(--radius-md, 8px);
+    }
+
+    .live-streams-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .categories-grid {
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: var(--spacing-sm);
+    }
+
+    .streams-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .loading-state {
+    padding: 40px 20px;
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+
+    .empty-icon {
+      font-size: 2rem;
+    }
+
+    p {
+      font-size: 1rem;
+    }
   }
 }

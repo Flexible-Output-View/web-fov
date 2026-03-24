@@ -118,3 +118,19 @@
     }
   }
 }
+
+@media (max-width: 768px) {
+  .auth-page {
+    padding: var(--spacing-md);
+    align-items: flex-start;
+    padding-top: 60px;
+  }
+
+  .auth-container {
+    padding: var(--spacing-lg);
+  }
+
+  .auth-header h1 {
+    font-size: 1.4rem;
+  }
+}

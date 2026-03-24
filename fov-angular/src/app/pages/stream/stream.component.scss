@@ -72,7 +72,9 @@
 }
 
 .loading-state,
-.error-state {
+.error-state,
+.offline-state,
+.ended-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -107,8 +109,8 @@
   to { transform: rotate(360deg); }
 }
 
-.error-state {
-  .error-icon {
+.error-state, .offline-state, .ended-state {
+  .error-icon, .offline-icon, .ended-icon {
     font-size: 4rem;
     margin-bottom: var(--spacing-md, 16px);
   }
@@ -124,7 +126,7 @@
   }
 }
 
-.error-actions {
+.error-actions, .offline-actions {
   display: flex;
   gap: var(--spacing-md, 16px);
 }
@@ -158,5 +160,58 @@
   &:hover {
     border-color: var(--text-secondary, #888);
     color: var(--text-primary, #fff);
+  }
+}
+
+// ── Responsive ──
+@media (max-width: 768px) {
+  .stream-header {
+    padding: var(--spacing-sm, 8px) var(--spacing-md, 16px);
+    gap: var(--spacing-sm, 8px);
+  }
+
+  .btn-back {
+    padding: 6px 10px;
+    font-size: 0;
+
+    .icon {
+      font-size: 1.2rem;
+    }
+  }
+
+  .stream-title {
+    gap: var(--spacing-sm, 8px);
+    flex-wrap: wrap;
+
+    h1 {
+      font-size: 1.1rem;
+    }
+
+    .track-info {
+      font-size: 0.7rem;
+    }
+  }
+
+  .player-wrapper {
+    height: calc(100vh - 56px);
+  }
+
+  .loading-state, .error-state, .offline-state, .ended-state {
+    padding: var(--spacing-lg, 24px);
+    min-height: calc(100vh - 56px);
+
+    h2 {
+      font-size: 1.2rem;
+    }
+  }
+
+  .error-actions, .offline-actions {
+    flex-direction: column;
+    width: 100%;
+
+    .btn-retry, .btn-back-home {
+      width: 100%;
+      text-align: center;
+    }
   }
 }
