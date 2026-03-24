@@ -140,7 +140,6 @@
   }
 }
 
-// Placeholders (pour les streams live sans thumbnail)
 .thumbnail-placeholder {
   width: 100%;
   height: 100%;
@@ -206,7 +205,6 @@
   justify-content: center;
 }
 
-// ── Responsive ──
 @media (max-width: 1024px) {
   .carousel {
     .featured-stream .stream-thumbnail {
