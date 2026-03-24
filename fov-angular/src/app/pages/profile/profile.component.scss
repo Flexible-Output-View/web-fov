@@ -91,3 +91,32 @@
     color: white;
   }
 }
+
+@media (max-width: 768px) {
+  .profile-page {
+    padding: var(--spacing-md);
+  }
+
+  .profile-header {
+    padding: var(--spacing-lg);
+
+    .avatar {
+      width: 60px;
+      height: 60px;
+      font-size: 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.2rem;
+    }
+  }
+
+  .profile-content {
+    padding: var(--spacing-md);
+  }
+
+  .info-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

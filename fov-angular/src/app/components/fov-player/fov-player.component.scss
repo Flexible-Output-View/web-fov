@@ -373,3 +373,61 @@
   font-weight: 500;
   letter-spacing: 0.5px;
 }
+
+@media (max-width: 1024px) {
+  .fov-sidebar {
+    width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .fov-toolbar {
+    padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+
+    .toolbar-right {
+      gap: 4px;
+    }
+  }
+
+  .btn-edit, .btn-reset {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+  }
+
+  .fov-workspace {
+    flex-direction: column;
+  }
+
+  .fov-sidebar {
+    width: 100%;
+    max-height: 200px;
+    border-left: none;
+    border-top: 1px solid var(--border-color, #2a2a2a);
+  }
+
+  .panel-section {
+    padding: var(--spacing-sm, 8px);
+  }
+
+  .audio-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+
+    label {
+      margin-bottom: 0;
+      white-space: nowrap;
+      min-width: 40px;
+    }
+  }
+
+  .buffering-text {
+    font-size: 0.9rem;
+  }
+
+  .loading-spinner.large {
+    width: 40px;
+    height: 40px;
+  }
+}
