@@ -12,9 +12,9 @@
 }
 
 .streams-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--spacing-md);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-md);
 }
 
 .tabs {
@@ -70,4 +70,54 @@
   text-align: center;
   color: #888;
   font-size: 1rem;
+}
+
+// ── Responsive ──
+@media (max-width: 1024px) {
+  .discover-page {
+    padding: var(--spacing-md);
+  }
+
+  .categories-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .discover-page {
+    padding: var(--spacing-sm);
+
+    h1 {
+      font-size: 1.5rem;
+    }
+  }
+
+  .tabs .tab-btn {
+    font-size: 0.95rem;
+  }
+
+  .streams-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .categories-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .category-page {
+    padding: var(--spacing-sm);
+
+    h1 {
+      font-size: 1.3rem;
+    }
+  }
+
+  .live-streams-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .empty-state {
+    padding: 40px 16px;
+  }
 }
