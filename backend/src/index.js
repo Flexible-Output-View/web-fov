@@ -41,11 +41,17 @@ async function start() {
         console.log('✅ Connected to BDD');
 
         // initialize media server
-        await startMediaServer();
+        await startMediaServer(app);
 
-        app.listen(PORT, () => {
+        const server = app.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);
             console.log(`📺 HLS available at http://localhost:${PORT}/hls`);
+        });
+
+        // Handle server errors
+        server.on('error', (err) => {
+            console.error('Server error:', err);
+            process.exit(1);
         });
     } catch (err) {
         console.error('Unable to connect to DB', err);
