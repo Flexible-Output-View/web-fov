@@ -9,7 +9,7 @@ on:
       - "87-fix-déploiement-master-site-fov"
 
 jobs:
-    Deploy-dev:
+    Deploy-public:
         runs-on: [ self-hosted, linux, x64, public, master ]
         environment:
           name: Deploy-Main-EPITECH
