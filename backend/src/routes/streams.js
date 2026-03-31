@@ -156,29 +156,64 @@ router.get('/available', async (req, res, next) => {
       .filter(dirent => dirent.isDirectory())
       .map(dirent => dirent.name);
 
-    // For each stream, count the number of video tracks
+    // For each stream, get database info and HLS tracks
     for (const streamId of streamDirs) {
-      const streamPath = path.join(HLS_DIR, streamId);
-      const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name);
+      try {
+        // Get stream info from database
+        const dbRows = await db.query(
+          'SELECT s.id, s.title, s.viewers, s.avatar_url, s.thumbnail_url, c.name as category FROM streams s LEFT JOIN categories c ON s.category_id = c.id WHERE s.id = ?',
+          [streamId]
+        );
 
-      const tracks = trackDirs.map((trackId) => ({
-        trackId: trackId,
-        videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
-      }));
+        const streamInfo = dbRows[0] && dbRows[0].length > 0 ? dbRows[0][0] : null;
 
-      streams.push({
-        streamId: streamId,
-        trackCount: tracks.length,
-        tracks: tracks
-      });
+        const streamPath = path.join(HLS_DIR, streamId);
+        const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
+          .filter(dirent => dirent.isDirectory())
+          .map(dirent => dirent.name);
+
+        const tracks = trackDirs.map((trackId) => ({
+          trackId: trackId,
+          videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
+        }));
+
+        streams.push({
+          streamId: streamId,
+          trackCount: tracks.length,
+          tracks: tracks,
+          title: streamInfo?.title || '',
+          category: streamInfo?.category || '',
+          viewers: streamInfo?.viewers || 0,
+          avatarUrl: streamInfo?.avatar_url || '',
+          thumbnailUrl: streamInfo?.thumbnail_url || ''
+        });
+      } catch (err) {
+        console.error(`Error processing stream ${streamId}:`, err);
+        // Still include the stream with empty fields if DB query fails
+        const streamPath = path.join(HLS_DIR, streamId);
+        const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
+          .filter(dirent => dirent.isDirectory())
+          .map(dirent => dirent.name);
+
+        const tracks = trackDirs.map((trackId) => ({
+          trackId: trackId,
+          videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
+        }));
+
+        streams.push({
+          streamId: streamId,
+          trackCount: tracks.length,
+          tracks: tracks,
+          title: '',
+          category: '',
+          viewers: 0,
+          avatarUrl: '',
+          thumbnailUrl: ''
+        });
+      }
     }
 
-    res.status(200).json({
-      streams: streams,
-      streamCount: streams.length
-    });
+    res.status(200).json(streams);
   } catch (err) {
     console.error('[/available] Error:', err);
     next(err);
