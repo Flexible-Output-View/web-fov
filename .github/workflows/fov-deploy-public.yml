@@ -46,4 +46,5 @@ jobs:
           run: mkdir -p /home/debian/deploy/master/ && cp -r . /home/debian/deploy/master
 
         - name: "Run the docker compose stack"
-          run: cd /home/debian/deploy/master && docker compose up -d --no-deps --build --force-recreate
+          run: docker network inspect nginx-proxy-network >/dev/null 2>&1 || docker network create nginx-proxy-network
+               cd /home/debian/deploy/master && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --force-recreate
