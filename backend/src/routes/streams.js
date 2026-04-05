@@ -4,7 +4,8 @@ import db from '../db.js';
 import fs from 'fs';
 import path from 'path';
 
-const HLS_DIR = path.join(process.cwd(), "media", "hls");
+const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), "media");
+const HLS_DIR = path.join(MEDIA_ROOT, "hls");
 
 function isPlaylistReady(playlistPath, minSegments = 2) {
   try {
@@ -146,9 +147,6 @@ router.get('/available', async (req, res, next) => {
     const port = process.env.PORT || 4000;
     const host = process.env.API_HOSTNAME || `localhost:${port}`;
     const url = `${req.protocol}://${host}`;
-
-    const HLS_DIR = path.join(process.cwd(), "media", "hls");
-
     const streams = [];
 
     // Get all stream directories

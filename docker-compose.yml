@@ -2,26 +2,80 @@ services:
   backend:
     build:
       context: ./backend
-    env_file:
-      - ./backend/.env
+    restart: unless-stopped
     volumes:
       - ./backend/media:/var/media
     ports:
       - "4000:4000" # API
       - "9999-10010:9999-10010"
       - "9999-10010:9999-10010/udp" # SRT
-      - "8000:8000" # media HTTP (node-media-server)
-    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      fov-db:
+        condition: service_healthy
+
+    environment:
+      - PORT=4000
+      - DB_HOST=fov-db
+      - DB_PORT=3306
+      - DB_USER=root
+      - SRT_PORT=9999
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=fovwebdb
+      - FFMPEG_PATH=/usr/local/bin/ffmpeg
+      - MEDIA_ROOT=/var/media
+      - SRT_URL=${SRT_URL}
+      - API_HOSTNAME=${API_HOSTNAME}
 
   frontend:
     build:
       context: ./fov-angular
-    volumes:
-      - ./fov-angular:/app
-      - /app/node_modules
-    ports:
-      - "4200:4200" # Angular dev server
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-    command: ng serve --host 0.0.0.0 --port 4200
+      args:
+        - API_URL=${API_URL}
+        - TWITCH_ID=${TWITCH_ID}
+        - TWITCH_SECRET=${TWITCH_SECRET} # TODO: move this to backend - security issue
+
     restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    # volumes: #DEV ONLY
+    #  - ./fov-angular:/app
+    #  - /app/node_modules
+    ports:
+      - "4200:80"
+    networks:
+      - frontend
+
+  fov-db:
+    image: mysql:lts
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    volumes:
+      - fov-db:/var/lib/mysql
+      - ./fovwebdb.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - backend
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+    environment:
+      MYSQL_DATABASE: fovwebdb
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+
+volumes:
+  fov-db:

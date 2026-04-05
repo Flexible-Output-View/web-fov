@@ -13,8 +13,8 @@ import { createMediaRoutes, startMediaServer } from './mediaServer.mjs';
 const PORT = process.env.PORT || 4000;
 
 const app = express();
-app.use(morgan('dev'));
 app.use(cors());
+app.use(morgan('dev'));
 app.use(express.json());
 app.enable('trust proxy');
 
