@@ -180,3 +180,26 @@
     display: none;
   }
 }
+
+.avatar-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #9147ff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.sidebar-empty {
+  padding: 12px 8px;
+
+  .empty-text {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+  }
+}
