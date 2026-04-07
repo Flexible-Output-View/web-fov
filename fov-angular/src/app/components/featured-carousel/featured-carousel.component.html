@@ -10,19 +10,28 @@
         <a [routerLink]="['/stream', stream.streamId]" class="featured-stream">
           <div class="stream-thumbnail">
             <div class="live-indicator">🔴 EN DIRECT</div>
-            <div class="viewer-count">{{ stream.trackCount }} flux</div>
-            <div class="thumbnail-placeholder">
+            <div class="viewer-count" *ngIf="stream.viewers > 0">{{ stream.viewers }} spectateurs</div>
+            <div class="viewer-count" *ngIf="stream.viewers === 0">{{ stream.trackCount }} flux</div>
+            
+            <img *ngIf="stream.thumbnailUrl" 
+                 [src]="stream.thumbnailUrl" 
+                 [alt]="stream.title || stream.streamId" 
+                 class="thumbnail-img">
+            
+            <div class="thumbnail-placeholder" *ngIf="!stream.thumbnailUrl">
               <span class="placeholder-icon">🎮</span>
               <span class="placeholder-text">{{ stream.streamId }}</span>
             </div>
           </div>
           <div class="stream-info">
             <div class="streamer-avatar">
-              <div class="avatar-placeholder">{{ stream.streamId.charAt(0).toUpperCase() }}</div>
+              <img *ngIf="stream.avatarUrl" [src]="stream.avatarUrl" [alt]="stream.streamId">
+              <div class="avatar-placeholder" *ngIf="!stream.avatarUrl">{{ stream.streamId.charAt(0).toUpperCase() }}</div>
             </div>
             <div class="stream-details">
-              <h3 class="stream-title">{{ stream.streamId }}</h3>
-              <p class="streamer-name">{{ stream.trackCount }} flux vidéo</p>
+              <h3 class="stream-title">{{ stream.title || stream.streamId }}</h3>
+              <p class="streamer-name">{{ stream.streamId }}</p>
+              <p class="stream-category" *ngIf="stream.category">{{ stream.category }}</p>
             </div>
           </div>
         </a>

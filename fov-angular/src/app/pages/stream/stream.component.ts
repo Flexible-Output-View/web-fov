@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, takeUntil, switchMap, interval, startWith } from 'rxjs';
+import { Subject, takeUntil } from 'rxjs';
 import { FovPlayerComponent } from '../../components/fov-player/fov-player.component';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { LiveStreamInfo } from '../../models/live-stream.model';
@@ -17,10 +17,14 @@ export class StreamComponent implements OnInit, OnDestroy {
   streamId: string = '';
   streamInfo: LiveStreamInfo | null = null;
   isLoading = true;
+  isLive = false;
   errorMessage = '';
-  
+
+  streamEndedMessage = '';
+  redirectCountdown = 5;
+  private redirectInterval: any = null;
+
   private destroy$ = new Subject<void>();
-  private pollInterval = 3000;
 
   constructor(
     private route: ActivatedRoute,
@@ -33,53 +37,85 @@ export class StreamComponent implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     ).subscribe(params => {
       this.streamId = params['streamId'];
-      this.loadStream();
+      this.checkStream();
     });
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.redirectInterval) {
+      clearInterval(this.redirectInterval);
+    }
   }
 
-  private loadStream() {
+  private checkStream() {
     this.isLoading = true;
     this.errorMessage = '';
+    this.streamEndedMessage = '';
+    this.isLive = false;
 
-    interval(this.pollInterval).pipe(
-      startWith(0),
-      switchMap(() => this.liveStreamsService.getStreamById(this.streamId)),
-      takeUntil(this.destroy$)
-    ).subscribe({
-      next: (stream) => {
-        if (stream) {
-          this.streamInfo = stream;
-          this.isLoading = false;
-          this.destroy$.next();
+    let attempts = 0;
+    const maxAttempts = 5;
+    const pollDelay = 2000;
+
+    const tryCheck = () => {
+      this.liveStreamsService.getStreamById(this.streamId).pipe(
+        takeUntil(this.destroy$)
+      ).subscribe({
+        next: (stream) => {
+          if (stream) {
+            this.streamInfo = stream;
+            this.isLive = true;
+            this.isLoading = false;
+          } else {
+            attempts++;
+            if (attempts < maxAttempts) {
+              setTimeout(tryCheck, pollDelay);
+            } else {
+              this.isLoading = false;
+              this.isLive = false;
+            }
+          }
+        },
+        error: (err) => {
+          console.error('Erreur chargement stream:', err);
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(tryCheck, pollDelay);
+          } else {
+            this.isLoading = false;
+            this.errorMessage = 'Impossible de se connecter au serveur';
+          }
         }
-      },
-      error: (err) => {
-        console.error('Erreur chargement stream:', err);
-        this.errorMessage = 'Impossible de charger le stream';
-        this.isLoading = false;
-      }
-    });
+      });
+    };
 
-    setTimeout(() => {
-      if (this.isLoading) {
-        this.isLoading = false;
-        this.errorMessage = 'Le stream n\'est pas disponible';
+    tryCheck();
+  }
+
+  onStreamEnded() {
+    this.isLive = false;
+    this.streamEndedMessage = `${this.streamInfo?.title || this.streamId} a terminé sa diffusion`;
+    this.redirectCountdown = 5;
+
+    this.redirectInterval = setInterval(() => {
+      this.redirectCountdown--;
+      if (this.redirectCountdown <= 0) {
+        clearInterval(this.redirectInterval);
+        this.router.navigate(['/']);
       }
-    }, 30000);
+    }, 1000);
   }
 
   goBack() {
+    if (this.redirectInterval) {
+      clearInterval(this.redirectInterval);
+    }
     this.router.navigate(['/']);
   }
 
   retry() {
-    this.destroy$.next();
-    this.destroy$ = new Subject<void>();
-    this.loadStream();
+    this.checkStream();
   }
 }

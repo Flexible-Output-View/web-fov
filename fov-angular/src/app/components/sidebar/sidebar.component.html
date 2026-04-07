@@ -20,15 +20,18 @@
            class="channel-link is-live"
            [title]="isCollapsed ? (channel.streamId + ' - En live') : channel.streamId">
           
-          <div class="avatar-circle">{{ channel.streamId.charAt(0).toUpperCase() }}</div>
+          <img *ngIf="channel.avatarUrl" [src]="channel.avatarUrl" [alt]="channel.streamId" class="avatar">
+          <div class="avatar-circle" *ngIf="!channel.avatarUrl">{{ channel.streamId.charAt(0).toUpperCase() }}</div>
           
           <div class="channel-info" *ngIf="!isCollapsed">
             <span class="channel-name">{{ channel.streamId }}</span>
-            <span class="channel-category">{{ channel.trackCount }} flux</span>
+            <span class="channel-category" *ngIf="channel.category">{{ channel.category }}</span>
+            <span class="channel-category" *ngIf="!channel.category">{{ channel.trackCount }} flux</span>
           </div>
 
           <div class="live-info" *ngIf="!isCollapsed">
             <span class="live-dot"></span>
+            <span class="viewer-count" *ngIf="channel.viewers > 0">{{ channel.viewers }}</span>
           </div>
         </a>
       </li>
