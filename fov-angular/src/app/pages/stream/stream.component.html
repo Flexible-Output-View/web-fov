@@ -5,22 +5,23 @@
       Retour
     </button>
     
-    <div class="stream-title" *ngIf="streamInfo">
+    <div class="stream-title" *ngIf="isLive && streamInfo">
       <span class="live-badge">🔴 LIVE</span>
-      <h1>{{ streamId }}</h1>
+      <h1>{{ streamInfo.title || streamId }}</h1>
+      <span class="stream-category-badge" *ngIf="streamInfo.category">{{ streamInfo.category }}</span>
       <span class="track-info">{{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}</span>
+      <span class="viewer-info" *ngIf="streamInfo.viewers > 0">{{ streamInfo.viewers }} spectateur{{ streamInfo.viewers > 1 ? 's' : '' }}</span>
     </div>
   </div>
 
   <div class="loading-state" *ngIf="isLoading">
     <div class="loading-spinner"></div>
-    <p>Chargement du stream <strong>{{ streamId }}</strong>...</p>
-    <span class="loading-hint">En attente de la diffusion...</span>
+    <p>Vérification...</p>
   </div>
 
   <div class="error-state" *ngIf="!isLoading && errorMessage">
-    <div class="error-icon">😕</div>
-    <h2>Stream indisponible</h2>
+    <div class="error-icon">⚠️</div>
+    <h2>Erreur</h2>
     <p>{{ errorMessage }}</p>
     <div class="error-actions">
       <button class="btn-retry" (click)="retry()">Réessayer</button>
@@ -28,7 +29,27 @@
     </div>
   </div>
 
-  <div class="player-wrapper" *ngIf="!isLoading && !errorMessage && streamInfo">
-    <app-fov-player [streamId]="streamId"></app-fov-player>
+  <div class="offline-state" *ngIf="!isLoading && !isLive && !errorMessage && !streamEndedMessage">
+    <div class="offline-icon">📴</div>
+    <h2>{{ streamId }} n'est pas en live</h2>
+    <p>Ce streamer ne diffuse pas actuellement.</p>
+    <div class="offline-actions">
+      <button class="btn-retry" (click)="retry()">Actualiser</button>
+      <button class="btn-back-home" (click)="goBack()">Retour à l'accueil</button>
+    </div>
+  </div>
+
+  <div class="ended-state" *ngIf="streamEndedMessage">
+    <div class="ended-icon">👋</div>
+    <h2>{{ streamEndedMessage }}</h2>
+    <p>Redirection vers l'accueil dans {{ redirectCountdown }}s...</p>
+    <button class="btn-back-home" (click)="goBack()">Retour à l'accueil</button>
+  </div>
+
+  <div class="player-wrapper" *ngIf="!isLoading && isLive && !errorMessage && !streamEndedMessage">
+    <app-fov-player
+      [streamId]="streamId"
+      (streamEnded)="onStreamEnded()">
+    </app-fov-player>
   </div>
 </div>
