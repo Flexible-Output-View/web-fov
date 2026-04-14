@@ -17,7 +17,7 @@ export class TwitchService {
 
   getTopCategories(limit: number = 30): Observable<Category[]> {
     return this.http.get<Category[]>(
-      `${this.API_URL}/api/twitch/top-categories?limit=${limit}`
+      `${this.API_URL}/twitch/top-categories?limit=${limit}`
     ).pipe(
       catchError(error => {
         console.error('Error fetching top categories:', error);

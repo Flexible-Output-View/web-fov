@@ -2,8 +2,8 @@ import express from 'express';
 import fetch from 'node-fetch';
 const router = express.Router();
 
-const CLIENT_ID = process.env.TWITCH_CLIENT_ID;
-const CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
+const CLIENT_ID = process.env.TWITCH_ID;
+const CLIENT_SECRET = process.env.TWITCH_SECRET;
 
 const TOKEN_URL = 'https://id.twitch.tv/oauth2/token';
 const API_URL = 'https://api.twitch.tv/helix';
