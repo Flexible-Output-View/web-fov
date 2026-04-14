@@ -27,7 +27,7 @@ app.get('/', (req, res) => res.json({ ok: true, message: 'FOV backend running' }
 // Mount API routes under /api
 app.use('/api', apiRoutes);
 
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
     console.error(err);
     res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
