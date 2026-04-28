@@ -48,7 +48,7 @@ curl http://localhost:4000/api/users/1
     "id": 1,
     "username": "john_doe",
     "display_name": "John Doe",
-    "created_at": "2024-01-15T10:30:00Z"
+    "created_at": "2026-01-15T10:30:00Z"
   }
 }
 ```

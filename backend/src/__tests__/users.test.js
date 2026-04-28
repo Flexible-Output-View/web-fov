@@ -22,7 +22,7 @@ describe('Users Routes', () => {
                 id: 1,
                 username: 'testuser',
                 display_name: 'Test User',
-                created_at: '2024-01-01T00:00:00Z'
+                created_at: '2026-01-01T00:00:00Z'
             };
 
             db.query.mockResolvedValue([mockUser]);

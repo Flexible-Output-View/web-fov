@@ -353,27 +353,6 @@ git secrets --install
 
 ## Roadmap
 
-### v0.2.0 (Q2 2024)
-- [ ] Implement JWT authentication
-- [ ] Add input validation middleware (joi)
-- [ ] Implement rate limiting
-- [ ] Security headers (helmet)
-- [ ] Password hashing if user passwords added
-- [ ] API documentation with security notes
-
-### v0.3.0 (Q3 2024)
-- [ ] OAuth2 integration (optional sign-in)
-- [ ] Two-factor authentication (2FA)
-- [ ] Audit logging
-- [ ] User role-based access control (RBAC)
-- [ ] Secrets rotation automation
-
-### v1.0.0 (Q4 2024)
-- [ ] Third-party security audit
-- [ ] Penetration testing results
-- [ ] Incident response plan implemented
-- [ ] GDPR/SOC2 compliance (if applicable)
-- [ ] Security advisory process established
 
 ---
 
@@ -404,5 +383,5 @@ Include:
 ---
 
 **Document Version**: 1.0  
-**Last Updated**: April 2024  
+**Last Updated**: April 2026 
 **Status**: Active Review Required Before Production
