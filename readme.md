@@ -179,7 +179,7 @@ Encoders should use these settings:
 | `/categories` | GET | List categories |
 | `/categories/:id` | GET | Get category details |
 
-See [backend/API-TESTING.md](backend/API-TESTING.md) for detailed examples.
+See [DOCUMENTS/API-TESTING.md](DOCUMENTS/API-TESTING.md) for detailed examples.
 
 ---
 
@@ -204,7 +204,7 @@ npm run lint
 npm run lint:fix
 ```
 
-See [backend/DEVELOPMENT.md](backend/DEVELOPMENT.md) for details.
+See [DOCUMENTS/DEVELOPMENT.md](DOCUMENTS/DEVELOPMENT.md) for details.
 
 ### Frontend Development
 
@@ -256,18 +256,18 @@ docker-compose -f docker-compose.prod.yml up -d
 - Rate limiting
 - HTTPS enforcement
 
-See [backend/SECURITY.md](backend/SECURITY.md) for full security policy.
+See [DOCUMENTS/SECURITY.md](DOCUMENTS/SECURITY.md) for full security policy.
 
 ---
 
 ## 📖 Documentation
 
-- [Backend Architecture](backend/ARCHITECTURE.md) - System design & technical justification
-- [Backend API Testing](backend/API-TESTING.md) - API endpoint examples
-- [Deployment Guide](backend/DEPLOYMENT.md) - Production setup
-- [Development Guide](backend/DEVELOPMENT.md) - Development workflow
-- [Security Policy](backend/SECURITY.md) - Security practices & roadmap
-- [Changelog](backend/CHANGELOG.md) - Version history
+- [Backend Architecture](DOCUMENTS/ARCHITECTURE.md) - System design & technical justification
+- [Backend API Testing](DOCUMENTS/API-TESTING.md) - API endpoint examples
+- [Deployment Guide](DOCUMENTS/DEPLOYMENT.md) - Production setup
+- [Development Guide](DOCUMENTS/DEVELOPMENT.md) - Development workflow
+- [Security Policy](DOCUMENTS/SECURITY.md) - Security practices & roadmap
+- [Changelog](DOCUMENTS/CHANGELOG.md) - Version history
 
 ---
 
