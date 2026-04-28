@@ -28,14 +28,14 @@ services:
       - MEDIA_ROOT=/var/media
       - SRT_URL=${SRT_URL}
       - API_HOSTNAME=${API_URL}
+      - TWITCH_ID=${TWITCH_ID}
+      - TWITCH_SECRET=${TWITCH_SECRET}
 
   frontend:
     build:
       context: ./fov-angular
       args:
         - API_URL=${API_URL}
-        - TWITCH_ID=${TWITCH_ID}
-        - TWITCH_SECRET=${TWITCH_SECRET} # TODO: move this to backend - security issue
 
     restart: unless-stopped
     depends_on:

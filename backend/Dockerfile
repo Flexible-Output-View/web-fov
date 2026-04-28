@@ -1,4 +1,4 @@
-FROM node:18-slim
+FROM node:latest
 
 # install ffmpeg for media processing
 RUN apt-get update \
