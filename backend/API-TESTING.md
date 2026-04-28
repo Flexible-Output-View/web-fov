@@ -34,7 +34,7 @@ curl http://localhost:4000/
 
 ## Users Endpoints
 
-### List Users (GET)
+### Get User by ID (GET)
 
 **Request:**
 ```bash
@@ -107,38 +107,36 @@ curl http://localhost:4000/api/categories
 
 **Response (200 OK):**
 ```json
-{
-  "data": [
-    {
-      "id": 1,
-      "name": "Gaming",
-      "description": "Gaming streams"
-    },
-    {
-      "id": 2,
-      "name": "Music",
-      "description": "Music streams"
-    }
-  ]
-}
+[
+  {
+    "id": 1,
+    "name": "Gaming",
+    "viewers": 1250,
+    "image_url": "http://localhost:4000/images/gaming.jpg"
+  },
+  {
+    "id": 2,
+    "name": "Music",
+    "viewers": 890,
+    "image_url": "http://localhost:4000/images/music.jpg"
+  }
+]
 ```
 
-### Create Category (POST)
+### Get Category by ID (GET)
 
 **Request:**
 ```bash
-curl -X POST http://localhost:4000/api/categories \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Sports",
-    "description": "Sports streaming"
-  }'
+curl http://localhost:4000/api/categories/1
 ```
 
-**Response (201 Created):**
+**Response (200 OK):**
 ```json
 {
-  "id": 3
+  "id": 1,
+  "name": "Gaming",
+  "viewers": 1250,
+  "image_url": "http://localhost:4000/images/gaming.jpg"
 }
 ```
 
@@ -157,15 +155,94 @@ curl http://localhost:4000/api/streams
 ```json
 {
   "data": [
-    {
-      "id": 1,
-      "title": "Epic Gaming Session",
-      "description": "Live gameplay",
-      "stream_url": "rtmp://localhost:1935/live/stream1",
-      "hls_url": "http://localhost:4000/hls/stream1/playlist.m3u8",
-      "status": "active"
-    }
-  ]
+[
+  {
+    "id": 1,
+    "streamer": "john_doe",
+    "title": "Epic Gaming Session",
+    "category_id": 1,
+    "viewers": 245,
+    "thumbnail_url": "http://localhost:4000/images/stream1.jpg",
+    "avatar_url": "http://localhost:4000/images/avatar1.jpg",
+    "is_live": 1
+  },
+  {
+    "id": 2,
+    "streamer": "jane_smith",
+    "title": "Music Production Stream",
+    "category_id": 2,
+    "viewers": 128,
+    "thumbnail_url": "http://localhost:4000/images/stream2.jpg",
+    "avatar_url": "http://localhost:4000/images/avatar2.jpg",
+    "is_live": 1
+  }
+]
+```
+
+### Get Stream by ID (GET)
+
+**Request:**
+```bash
+curl http://localhost:4000/api/streams/1
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "streamer": "john_doe",
+  "title": "Epic Gaming Session",
+  "category_id": 1,
+  "viewers": 245,
+  "thumbnail_url": "http://localhost:4000/images/stream1.jpg",
+  "avatar_url": "http://localhost:4000/images/avatar1.jpg",
+  "is_live": 1
+}
+```
+
+### Get Available Streams with HLS Tracks (GET)
+
+**Request:**
+```bash
+curl http://localhost:4000/api/streams/available
+```
+
+**Response (200 OK):**
+```json
+[
+  {
+    "streamId": "1",
+    "trackCount": 2,
+    "tracks": [
+      {
+        "trackId": "v:0",
+        "videoUrl": "http://localhost:4000/hls/1/v:0/playlist.m3u8"
+      },
+      {
+        "trackId": "v:1",
+        "videoUrl": "http://localhost:4000/hls/1/v:1/playlist.m3u8"
+      }
+    ],
+    "title": "Epic Gaming Session",
+    "category": "Gaming",
+    "viewers": 245,
+    "avatarUrl": "http://localhost:4000/images/avatar1.jpg",
+    "thumbnailUrl": "http://localhost:4000/images/stream1.jpg"
+  }
+]
+```
+
+### Get Stream HLS URL (GET)
+
+**Request:**
+```bash
+curl http://localhost:4000/api/streams/1/hls
+```
+
+**Response (200 OK):**
+```json
+{
+  "hls": "http://localhost:4000/hls/live/1/playlist.m3u8"
 }
 ```
 
@@ -173,20 +250,18 @@ curl http://localhost:4000/api/streams
 
 **Request:**
 ```bash
-curl http://localhost:4000/hls/stream1/playlist.m3u8
+curl http://localhost:4000/hls/1/v:0/playlist.m3u8
 ```
 
 **Response (200 OK):**
 ```
 #EXTM3U
 #EXT-X-VERSION:3
-#EXT-X-TARGETDURATION:10
-#EXTINF:10.0,
-segment00000.ts
-#EXTINF:10.0,
-segment00001.ts
-#EXT-X-ENDLIST
-```
+#EXT-X-TARGETDURATION:2
+#EXTINF:2.0,
+seg00000.ts
+#EXTINF:2.0,
+seg
 
 ---
 
@@ -268,68 +343,6 @@ console.log('User:', getUserResponse.data);
 
 ---
 
-## Testing with Postman
-
-### Import Collection
-
-1. Open Postman
-2. Click "Import"
-3. Paste this as raw JSON:
-
-```json
-{
-  "info": {
-    "name": "FOV Backend API",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "item": [
-    {
-      "name": "Users",
-      "item": [
-        {
-          "name": "Get User",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/users/1"
-          }
-        },
-        {
-          "name": "Create User",
-          "request": {
-            "method": "POST",
-            "url": "{{baseUrl}}/api/users",
-            "body": {
-              "mode": "raw",
-              "raw": "{\"username\":\"newuser\",\"display_name\":\"New User\"}"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Categories",
-      "item": [
-        {
-          "name": "List Categories",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/categories"
-          }
-        }
-      ]
-    }
-  ],
-  "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:4000"
-    }
-  ]
-}
-```
-
----
-
 ## Automated Testing
 
 ### Run Test Suite
@@ -375,46 +388,6 @@ Coverage summary:
   Lines        : 65% ( 128/197 )
 ```
 
----
-
-## Stress Testing
-
-### Using Apache Bench
-
-**Install:**
-```bash
-# macOS
-brew install httpd
-
-# Linux
-apt-get install apache2-utils
-```
-
-**Run test:**
-```bash
-# 1000 requests, 10 concurrent
-ab -n 1000 -c 10 http://localhost:4000/api/users/1
-
-# Results:
-# Requests per second: 250 [#/sec] (mean)
-# Time per request: 40ms [ms] (mean)
-# Failed requests: 0
-```
-
-### Using wrk
-
-**Install:**
-```bash
-brew install wrk
-```
-
-**Run test:**
-```bash
-# 4 threads, 100 connections, 30 seconds
-wrk -t4 -c100 -d30s http://localhost:4000/api/users/1
-
-# Results show throughput and latency
-```
 
 ---
 
@@ -529,4 +502,4 @@ Before considering API ready:
 
 ---
 
-**Last Updated**: April 2024
+**Last Updated**: April 2026

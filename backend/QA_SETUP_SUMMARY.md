@@ -351,7 +351,7 @@ docker push registry/fov-backend:0.2.0
 | morgan | ^1.10.0 | HTTP request logging |
 | mysql2 | ^3.6.5 | MySQL database driver |
 | dotenv | ^16.0.0 | Environment variables |
-| node-media-server | 2.2.0 | RTMP/HLS streaming |
+| node-media-server | 2.2.0 | SRT ingest and streaming capability |
 
 ### Development Dependencies
 
@@ -506,7 +506,7 @@ The FOV Backend now has:
 
 ---
 
-**Setup Completed**: April 14, 2024  
+**Setup Completed**: April 28, 2026
 **Backend Version**: 0.1.0  
 **Node.js Version**: v20 recommended  
 **Total Documentation Files**: 9  

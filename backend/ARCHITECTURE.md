@@ -5,7 +5,7 @@
 The FOV Backend is a **modular Express.js REST API** with media streaming capabilities. It separates concerns into:
 - **API Layer**: RESTful routes for data management
 - **Database Layer**: MySQL connection pooling
-- **Media Layer**: HLS video streaming (RTMP ingest)
+- **Media Layer**: HLS video streaming (SRT ingest)
 - **Middleware Layer**: CORS, logging, error handling
 
 ```
@@ -27,8 +27,8 @@ The FOV Backend is a **modular Express.js REST API** with media streaming capabi
        │                │
 ┌──────▼─────┐   ┌──────▼─────────┐
 │ MySQL Pool │   │ Media Server    │
-│ (Port 3306)│   │ RTMP/HLS        │
-│            │   │ (Port 1935)     │
+│ (Port 3306)│   │ SRT/HLS        │
+│            │   │ (Port 9999)     │
 └────────────┘   └─────────────────┘
        │                │
        │                │
@@ -68,23 +68,23 @@ The FOV Backend is a **modular Express.js REST API** with media streaming capabi
 
 **Schema Highlights:**
 - Users: `id`, `username`, `display_name`, `created_at`
-- Streams: `id`, `title`, `description`, `category_id`, `creator_id`, `status`
-- Categories: `id`, `name`, `description`
+- Streams: `id`, `streamer`, `title`, `category_id`, `viewers`, `thumbnail_url`, `avatar_url`, `is_live`
+- Categories: `id`, `name`, `viewers`, `image_url`
 
-### Media Streaming: **RTMP → HLS**
+### Media Streaming: **SRT → HLS**
 
-**Why RTMP Ingest + HLS Delivery?**
+**Why SRT Ingest + HLS Delivery?**
 
 | Component | Purpose | Alternative | Why Not |
 |-----------|---------|-------------|---------|
-| **RTMP Input** | Encoder standard (OBS, FFmpeg) | HTTP Live Push | Limited tooling |
-| **HLS Output** | HTTP-based delivery | DASH, HLS via RTMP | Most compatible (Safari, iOS native) |
-| **FFmpeg** | Transcoding/segmentation | Node-media-server only | Better quality control, codec flexibility |
+| **SRT Input** | Secure, low-latency protocol (OBS, FFmpeg) | RTMP, RTSP | Superior reliability and latency performance |
+| **HLS Output** | HTTP-based delivery | DASH, RTMP | Most compatible (Safari, iOS native, widely supported) |
+| **FFmpeg** | Transcoding/segmentation & format conversion | Node-media-server only | Better quality control, codec flexibility, extensive format support |
 
 **Media Pipeline:**
 ```
-Encoder → RTMP Server → FFmpeg → Segmentation → HLS Segments → CDN/Client
-(OBS)     (Port 1935)  (Transcode) (/media/hls/) (.m3u8, .ts files)
+Encoder → SRT Server → FFmpeg → Segmentation → HLS Segments → CDN/Client
+(OBS)     (Port 9999) (Transcode) (/media/hls/) (.m3u8, .ts files)
 ```
 
 ### Connection Management: **mysql2/promise Pool**
@@ -169,9 +169,10 @@ export default { pool, getConnection(), query() }
 ### `src/mediaServer.mjs` - Media Server
 
 **Features:**
-- RTMP server (ingest from encoders)
-- RTMP → HLS transcoding
-- Stream monitoring
+- SRT server (ingest from encoders on port 9999)
+- SRT → HLS transcoding via FFmpeg
+- Stream monitoring and segment management
+- Automatic process lifecycle management
 
 **Why Separate File:**
 - Complex live-streaming logic isolated
@@ -200,11 +201,11 @@ Error Handler (if exception)
 ### Live Stream Ingestion Flow
 
 ```
-Encoder (OBS)
-    ↓ RTMP (Port 1935)
-RTMP Server
-    ↓ Transcode
+EncodeSRT (Port 9999)
+SRT Server (mediaServer.mjs)
+    ↓ Transcode via FFmpeg
 FFmpeg Process
+    ↓ Segment & Outpuss
     ↓ Segment
 /media/hls/ (m3u8 + .ts files)
     ↓ HTTP GET
@@ -361,4 +362,4 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 ---
 
 **Document Version:** 1.0  
-**Last Updated:** April 2024
+**Last Updated:** April 2026

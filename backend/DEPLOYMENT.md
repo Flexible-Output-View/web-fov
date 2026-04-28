@@ -48,11 +48,11 @@ docker run -d \
   fov-backend:1.0.0
 ```
 
-**With volume mounts (for media storage):**
+**With volume mounts (for media storage and SRT ingest):**
 ```bash
 docker run -d \
   -p 4000:4000 \
-  -p 1935:1935 \
+  -p 9999:9999/udp \
   -v /var/fov/media:/app/media \
   -e DB_HOST=mysql-server \
   -e DB_USER=admin \
@@ -83,7 +83,7 @@ docker rm fov-backend
 **File: `docker-compose.yml` (already exists)**
 
 ```bash
-docker-compose up -d
+docker-compose up --build
 ```
 
 **Check services:**
@@ -522,4 +522,4 @@ docker exec fov-backend ls -la /app/media/
 
 ---
 
-**Last Updated:** April 2024
+**Last Updated:** April 2026

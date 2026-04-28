@@ -28,7 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.1.0] - 2024-04-14
+## [0.1.0] - 2026-04-14
 
 ### Added
 
@@ -46,10 +46,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Database module with singleton pattern
 
 #### Media Streaming
-- RTMP server for encoder ingest
-- HLS segmentation and delivery
+- **SRT server** for secure, low-latency encoder ingest (port 9999)
+- **FFmpeg-based transcoding** for HLS segmentation and delivery
 - Stream playlist validation (`isPlaylistReady`, `getSegmentCount`)
-- Media server integration
+- Media server integration with process lifecycle management
 
 #### Development Tools
 - **ESLint** configuration for code quality
@@ -113,27 +113,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Roadmap
 
-### Version 0.2.0 (Q2 2024)
-- [ ] JWT authentication implementation
-- [ ] Input validation middleware (joi/yup)
-- [ ] Rate limiting (express-limiter)
-- [ ] API documentation (Swagger)
-- [ ] Increase test coverage to 75%+
-
-### Version 0.3.0 (Q3 2024)
-- [ ] Database migration system
-- [ ] Structured logging (Winston)
-- [ ] Stream analytics module
-- [ ] Real-time notifications (Socket.io)
-- [ ] Performance monitoring integration
-
-### Version 1.0.0 (Q4 2024)
-- [ ] Production-ready security audit
-- [ ] Multi-region deployment support
-- [ ] WebRTC streaming support
-- [ ] Advanced transcoding options
-- [ ] Red5 or Wowza integration
-
 ---
 
 ## Know Issues
@@ -164,7 +143,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 | morgan | ^1.10.0 | HTTP request logging |
 | mysql2 | ^3.6.5 | Database driver |
 | dotenv | ^16.0.0 | Environment variables |
-| node-media-server | 2.2.0 | RTMP/HLS media server |
+| node-media-server | 2.2.0 | Media server foundation (SRT ingest capability) |
 | srt | ^0.0.3 | SRT protocol support |
 
 ### Development
@@ -210,5 +189,5 @@ See [LICENSE](../LICENSE) file.
 ---
 
 **Format Version**: 1.0  
-**Last Updated**: April 14, 2024  
+**Last Updated**: April 28, 2026  
 **Document Version**: 1.0
