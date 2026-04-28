@@ -20,14 +20,13 @@
 }
 
 .sidebar-toggle {
-    width: 30px;
+  width: 30px;
   height: 30px;
   border-radius: 50%;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   cursor: pointer;
-  
   display: flex;
   align-items: center;
   justify-content: center;
@@ -147,5 +146,60 @@
     color: var(--text-primary);
     font-size: 0.8rem;
     font-weight: 500;
+  }
+}
+
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 60px;
+    padding: var(--spacing-sm) var(--spacing-xs);
+
+    .sidebar-header {
+      justify-content: center;
+    }
+
+    .section-title {
+      display: none;
+    }
+
+    .channel-link {
+      justify-content: center;
+      gap: 0;
+      padding: var(--spacing-sm) 0;
+    }
+
+    .channel-info,
+    .live-info {
+      display: none;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+}
+
+.avatar-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #9147ff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.sidebar-empty {
+  padding: 12px 8px;
+
+  .empty-text {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
   }
 }

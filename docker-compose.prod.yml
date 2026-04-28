@@ -1,0 +1,22 @@
+services:
+  backend:
+    ports: !override
+      - "127.0.0.1:4001:4000"
+      - "0.0.0.0:9999-10010:9999-10010"
+      - "0.0.0.0:9999-10010:9999-10010/udp"
+    networks:
+      - nginx-proxy-network
+
+  frontend:
+    ports: !override
+      - "127.0.0.1:4201:80"
+    networks:
+      - nginx-proxy-network
+
+  fov-db:
+    ports: !override
+      - "127.0.0.1:3306:3306"
+
+networks:
+  nginx-proxy-network:
+    external: true

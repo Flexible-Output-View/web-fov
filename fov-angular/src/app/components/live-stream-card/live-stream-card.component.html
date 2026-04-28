@@ -1,20 +1,42 @@
-<a [routerLink]="['/stream', stream.streamId]" class="live-stream-card">
+<a class="live-stream-card" [routerLink]="['/stream', stream.streamId]">
   <div class="card-thumbnail">
+    <img *ngIf="stream.thumbnailUrl" 
+         [src]="stream.thumbnailUrl" 
+         [alt]="stream.title || stream.streamId"
+         class="thumbnail-img">
+    
+    <div class="placeholder-thumbnail" *ngIf="!stream.thumbnailUrl">
+      <span class="streamer-initial">{{ stream.streamId.charAt(0) }}</span>
+    </div>
+
     <div class="live-badge">
       <span class="live-dot"></span>
-      LIVE
+      EN DIRECT
     </div>
     <div class="track-count">
-      <span class="icon">🎥</span>
-      {{ stream.trackCount }} flux{{ stream.trackCount > 1 ? 's' : '' }}
-    </div>
-    <div class="placeholder-thumbnail">
-      <span class="streamer-initial">{{ stream.streamId.charAt(0).toUpperCase() }}</span>
+      <span class="icon">📹</span>
+      {{ stream.trackCount }} flux
     </div>
   </div>
-  
   <div class="card-info">
-    <h3 class="streamer-name">{{ stream.streamId }}</h3>
-    <p class="stream-description">Stream multi-flux en direct</p>
+    <div class="card-info-row">
+      <div class="avatar-wrapper" *ngIf="stream.avatarUrl">
+        <img [src]="stream.avatarUrl" [alt]="stream.streamId" class="avatar-img">
+      </div>
+      <div class="avatar-placeholder" *ngIf="!stream.avatarUrl">
+        {{ stream.streamId.charAt(0).toUpperCase() }}
+      </div>
+      
+      <div class="card-text">
+        <h3 class="streamer-name">{{ stream.streamId }}</h3>
+        <p class="stream-title" *ngIf="stream.title">{{ stream.title }}</p>
+        <p class="stream-category" *ngIf="stream.category">{{ stream.category }}</p>
+        <p class="stream-description" *ngIf="!stream.title && !stream.category">{{ stream.trackCount }} flux vidéo</p>
+      </div>
+    </div>
+    
+    <div class="viewer-count-info" *ngIf="stream.viewers > 0">
+      {{ stream.viewers }} spectateur{{ stream.viewers > 1 ? 's' : '' }}
+    </div>
   </div>
 </a>

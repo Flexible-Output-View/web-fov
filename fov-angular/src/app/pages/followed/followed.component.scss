@@ -100,3 +100,104 @@
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: var(--spacing-md);
 }
+
+.login-required-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  text-align: center;
+
+  .login-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-md);
+  }
+
+  h2 {
+    color: var(--text-primary);
+    margin: 0 0 8px;
+  }
+
+  p {
+    color: var(--text-secondary);
+    margin: 0 0 var(--spacing-lg);
+  }
+
+  .btn-login {
+    display: inline-block;
+    padding: 12px 32px;
+    background: var(--accent-primary, #9147ff);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: var(--accent-secondary, #7c3aed);
+    }
+  }
+}
+
+@media (max-width: 1024px) {
+  .followed-page {
+    padding: var(--spacing-md);
+  }
+}
+
+@media (max-width: 768px) {
+  .followed-page {
+    padding: var(--spacing-sm);
+
+    h1 {
+      font-size: 1.5rem;
+    }
+  }
+
+  .section .section-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .tabs .tab-btn {
+    font-size: 0.95rem;
+  }
+
+  .streams-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .offline-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: var(--spacing-md);
+  }
+
+  .offline-card {
+    &:hover {
+      transform: none;
+    }
+
+    .avatar {
+      width: 60px;
+      height: 60px;
+    }
+
+    .channel-name {
+      font-size: 0.8rem;
+      max-width: 80px;
+    }
+  }
+
+  .categories-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .login-required-state {
+    padding: 60px 20px;
+
+    h2 {
+      font-size: 1.2rem;
+    }
+  }
+}

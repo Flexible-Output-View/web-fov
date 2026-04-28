@@ -1,35 +1,57 @@
-<div class="carousel">
-  <button class="carousel-btn carousel-btn-prev" (click)="prevSlide()">
+<div class="carousel" *ngIf="!isLoading && streams.length > 0">
+  <button class="carousel-btn carousel-btn-prev" (click)="prevSlide()" *ngIf="streams.length > 1">
     ‹
   </button>
   
   <div class="carousel-container">
     <div class="carousel-track" [style.transform]="'translateX(-' + currentSlide * 100 + '%)'">
-      <div class="carousel-slide" *ngFor="let stream of featuredStreams">
+      <div class="carousel-slide" *ngFor="let stream of streams">
         
-        <div class="featured-stream">
+        <a [routerLink]="['/stream', stream.streamId]" class="featured-stream">
           <div class="stream-thumbnail">
-            <div class="live-indicator">EN DIRECT</div>
-            <div class="viewer-count">{{ stream.viewers }} spectateurs</div>
-            <img [src]="stream.thumbnail" [alt]="stream.title" class="thumbnail-img">
+            <div class="live-indicator">🔴 EN DIRECT</div>
+            <div class="viewer-count" *ngIf="stream.viewers > 0">{{ stream.viewers }} spectateurs</div>
+            <div class="viewer-count" *ngIf="stream.viewers === 0">{{ stream.trackCount }} flux</div>
+            
+            <img *ngIf="stream.thumbnailUrl" 
+                 [src]="stream.thumbnailUrl" 
+                 [alt]="stream.title || stream.streamId" 
+                 class="thumbnail-img">
+            
+            <div class="thumbnail-placeholder" *ngIf="!stream.thumbnailUrl">
+              <span class="placeholder-icon">🎮</span>
+              <span class="placeholder-text">{{ stream.streamId }}</span>
+            </div>
           </div>
           <div class="stream-info">
             <div class="streamer-avatar">
-              <img [src]="stream.avatar" [alt]="stream.streamer">
+              <img *ngIf="stream.avatarUrl" [src]="stream.avatarUrl" [alt]="stream.streamId">
+              <div class="avatar-placeholder" *ngIf="!stream.avatarUrl">{{ stream.streamId.charAt(0).toUpperCase() }}</div>
             </div>
             <div class="stream-details">
-              <h3 class="stream-title">{{ stream.title }}</h3>
-              <p class="streamer-name">{{ stream.streamer }}</p>
-              <p class="stream-category">{{ stream.category }}</p>
+              <h3 class="stream-title">{{ stream.title || stream.streamId }}</h3>
+              <p class="streamer-name">{{ stream.streamId }}</p>
+              <p class="stream-category" *ngIf="stream.category">{{ stream.category }}</p>
             </div>
           </div>
-        </div>
+        </a>
 
       </div>
     </div>
   </div>
   
-  <button class="carousel-btn carousel-btn-next" (click)="nextSlide()">
+  <button class="carousel-btn carousel-btn-next" (click)="nextSlide()" *ngIf="streams.length > 1">
     ›
   </button>
+</div>
+
+<div class="carousel-empty" *ngIf="!isLoading && streams.length === 0">
+  <div class="empty-content">
+    <span class="empty-icon">📡</span>
+    <p>Aucun live en cours pour le moment</p>
+  </div>
+</div>
+
+<div class="carousel-loading" *ngIf="isLoading">
+  <div class="loading-spinner"></div>
 </div>

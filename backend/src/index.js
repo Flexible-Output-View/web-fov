@@ -13,8 +13,8 @@ import { createMediaRoutes, startMediaServer } from './mediaServer.mjs';
 const PORT = process.env.PORT || 4000;
 
 const app = express();
-app.use(morgan('dev'));
 app.use(cors());
+app.use(morgan('dev'));
 app.use(express.json());
 app.enable('trust proxy');
 
@@ -27,7 +27,7 @@ app.get('/', (req, res) => res.json({ ok: true, message: 'FOV backend running' }
 // Mount API routes under /api
 app.use('/api', apiRoutes);
 
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
     console.error(err);
     res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
@@ -41,11 +41,17 @@ async function start() {
         console.log('✅ Connected to BDD');
 
         // initialize media server
-        await startMediaServer();
+        await startMediaServer(app);
 
-        app.listen(PORT, () => {
+        const server = app.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);
             console.log(`📺 HLS available at http://localhost:${PORT}/hls`);
+        });
+
+        // Handle server errors
+        server.on('error', (err) => {
+            console.error('Server error:', err);
+            process.exit(1);
         });
     } catch (err) {
         console.error('Unable to connect to DB', err);
