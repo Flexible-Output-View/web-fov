@@ -27,7 +27,7 @@ services:
       - FFMPEG_PATH=/usr/local/bin/ffmpeg
       - MEDIA_ROOT=/var/media
       - SRT_URL=${SRT_URL}
-      - API_HOSTNAME=${API_HOSTNAME}
+      - API_HOSTNAME=${API_URL}
 
   frontend:
     build:
@@ -61,7 +61,7 @@ services:
       - backend
 
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}" ]
       interval: 5s
       timeout: 5s
       retries: 10

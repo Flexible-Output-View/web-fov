@@ -7,7 +7,7 @@ The **FOV Backend** is an Express.js-based REST API and media streaming server t
 **Key Features:**
 - RESTful API for users, streams, and categories
 - MySQL database integration with connection pooling
-- HLS streaming support via RTMP ingest
+- HLS streaming support via SRT ingest
 - CORS-enabled for multi-origin requests
 - Comprehensive error handling and logging
 - Docker-ready deployment
@@ -99,7 +99,7 @@ backend/
 ├── src/
 │   ├── index.js                 # Express app initialization & server startup
 │   ├── db.js                    # MySQL connection pool & helper methods
-│   ├── mediaServer.mjs          # HLS/RTMP media server setup
+│   ├── mediaServer.mjs          # SRT server & HLS transcoding setup
 │   └── routes/
 │       ├── index.js             # Route aggregator
 │       ├── users.js             # User CRUD operations
@@ -337,5 +337,5 @@ For issues, improvements, or questions:
 
 ---
 
-**Last Updated**: April 2024  
+**Last Updated**: April 2026
 **Maintainer**: FOV Development Team

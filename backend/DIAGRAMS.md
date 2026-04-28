@@ -48,10 +48,10 @@ Visual representations of the FOV Backend system architecture and workflows.
      ├──────────────────────────────┬───────────────────────────────┐
      ▼                              ▼                               ▼
 ┌─────────────────┐    ┌────────────────────────┐    ┌──────────────────┐
-│  MySQL Database │    │  Media Server (RTMP)   │    │  File System     │
-│  (Port 3306)    │    │  (Port 1935)           │    │  (/media/hls)    │
+│  MySQL Database │    │  Media Server (SRT)    │    │  File System     │
+│  (Port 3306)    │    │  (Port 9999)           │    │  (/media/hls)    │
 ├─────────────────┤    ├────────────────────────┤    ├──────────────────┤
-│ Connection Pool │    │  ├─ RTMP Ingest       │    │ ├─ Segments      │
+│ Connection Pool │    │  ├─ SRT Ingest        │    │ ├─ Segments      │
 │ ├─ users        │    │  ├─ FFmpeg Trans.    │    │ ├─ Playlists     │
 │ ├─ streams      │    │  └─ HLS Output       │    │ └─ Metadata      │
 │ └─ categories   │    │                       │    │                  │
@@ -526,4 +526,4 @@ Database Connection:
 
 ---
 
-**Last Updated**: April 2024
+**Last Updated**: April 2026
