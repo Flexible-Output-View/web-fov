@@ -10,12 +10,11 @@ This document covers deploying FOV Backend to production environments using Dock
 
 1. [Docker Deployment](#docker-deployment)
 2. [Docker Compose](#docker-compose)
-3. [Cloud Platforms](#cloud-platforms)
-4. [Environment Configuration](#environment-configuration)
-5. [Database Setup](#database-setup)
-6. [Monitoring & Logging](#monitoring--logging)
-7. [Backup & Recovery](#backup--recovery)
-8. [Troubleshooting](#troubleshooting)
+3. [Environment Configuration](#environment-configuration)
+4. [Database Setup](#database-setup)
+5. [Monitoring & Logging](#monitoring--logging)
+6. [Backup & Recovery](#backup--recovery)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -125,87 +124,6 @@ services:
 **Start with .env file:**
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
-```
-
----
-
-## Cloud Platforms
-
-### AWS - Elastic Container Service (ECS)
-
-**Step 1: Push image to ECR**
-```bash
-# Create ECR repository
-aws ecr create-repository --repository-name fov-backend --region us-east-1
-
-# Get login token
-aws ecr get-login-password --region us-east-1 | \
-  docker login --username AWS --password-stdin 123456789.dkr.ecr.us-east-1.amazonaws.com
-
-# Tag and push image
-docker tag fov-backend:1.0.0 123456789.dkr.ecr.us-east-1.amazonaws.com/fov-backend:1.0.0
-docker push 123456789.dkr.ecr.us-east-1.amazonaws.com/fov-backend:1.0.0
-```
-
-**Step 2: Create ECS Task Definition**
-
-In AWS Console:
-1. Navigate to ECS → Task Definitions
-2. Create new task definition "fov-backend"
-3. Container configuration:
-   - Image: `123456789.dkr.ecr.us-east-1.amazonaws.com/fov-backend:1.0.0`
-   - Memory: 512 MB
-   - Port mappings: 4000 → 4000
-   - Environment variables:
-     - `DB_HOST`: RDS endpoint
-     - `DB_USER`: admin
-     - `DB_PASSWORD`: (from Secrets Manager)
-     - `NODE_ENV`: production
-
-**Step 3: Create ECS Service**
-
-1. Cluster → Create Service
-2. Select task definition: fov-backend
-3. Service name: fov-backend-prod
-4. Desired tasks: 2 (for HA)
-5. Load Balancer: Application Load Balancer
-6. Target group: Create new
-
-### DigitalOcean - App Platform
-
-**Deploy via GitHub integration:**
-1. Fork/push repo to GitHub
-2. DigitalOcean App Platform → New App
-3. Select GitHub repo
-4. Configure:
-   - component Name: `backend`
-   - Source dir: `backend/`
-   - Build command: `npm install`
-   - Run command: `npm start`
-5. Set environment variables from Console
-6. Allocate persistent volume for `/media`
-7. Deploy
-
-**Dockerfile must exist** (already present).
-
-### Heroku
-
-**Deploy using Heroku CLI:**
-```bash
-# Login
-heroku login
-
-# Create app
-heroku create fov-backend
-
-# Set environment variables
-heroku config:set DB_HOST=your-db.com DB_USER=admin DB_PASSWORD=xxx
-
-# Deploy
-git push heroku main:main
-
-# View logs
-heroku logs --tail
 ```
 
 ---
