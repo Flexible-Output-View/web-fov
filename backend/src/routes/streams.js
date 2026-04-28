@@ -4,207 +4,242 @@ import db from '../db.js';
 import fs from 'fs';
 import path from 'path';
 
-const HLS_DIR = path.join(process.cwd(), "media", "hls");
+const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
+const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
 
 function isPlaylistReady(playlistPath, minSegments = 2) {
-  try {
-    if (!fs.existsSync(playlistPath)) {
-      return false;
+    try {
+        if (!fs.existsSync(playlistPath)) {
+            return false;
+        }
+
+        const content = fs.readFileSync(playlistPath, 'utf8');
+
+        if (!content.includes('#EXTM3U')) {
+            return false;
+        }
+
+        const segmentMatches = content.match(/\.ts/g);
+        if (!segmentMatches) {
+            return false;
+        }
+
+        return segmentMatches.length >= minSegments;
+    } catch (err) {
+        console.error(`Error checking playlist ${playlistPath}:`, err.message);
+        return false;
     }
-
-    const content = fs.readFileSync(playlistPath, 'utf8');
-
-    if (!content.includes('#EXTM3U')) {
-      return false;
-    }
-
-    const segmentMatches = content.match(/\.ts/g);
-    if (!segmentMatches) {
-      return false;
-    }
-
-    return segmentMatches.length >= minSegments;
-  } catch (err) {
-    console.error(`Error checking playlist ${playlistPath}:`, err.message);
-    return false;
-  }
 }
 
 function getSegmentCount(playlistPath) {
-  try {
-    if (!fs.existsSync(playlistPath)) {
-      return 0;
+    try {
+        if (!fs.existsSync(playlistPath)) {
+            return 0;
+        }
+        const content = fs.readFileSync(playlistPath, 'utf8');
+        const segmentMatches = content.match(/\.ts/g);
+        return segmentMatches ? segmentMatches.length : 0;
+    } catch (err) {
+        return 0;
     }
-    const content = fs.readFileSync(playlistPath, 'utf8');
-    const segmentMatches = content.match(/\.ts/g);
-    return segmentMatches ? segmentMatches.length : 0;
-  } catch (err) {
-    return 0;
-  }
 }
 
 function getCurrentTracksState(protocol = 'http') {
-  try {
-    if (!fs.existsSync(HLS_DIR)) {
-      return {
-        tracks: [],
-        videoCount: 0,
-        ready: false,
-        pending: 0,
-        totalDirs: 0,
-        message: 'HLS directory does not exist yet'
-      };
-    }
-
-    let dirs;
     try {
-      dirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name)
-        .sort((a, b) => parseInt(a) - parseInt(b));
+        if (!fs.existsSync(HLS_DIR)) {
+            return {
+                tracks: [],
+                videoCount: 0,
+                ready: false,
+                pending: 0,
+                totalDirs: 0,
+                message: 'HLS directory does not exist yet'
+            };
+        }
+
+        let dirs;
+        try {
+            dirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
+                .filter(dirent => dirent.isDirectory())
+                .map(dirent => dirent.name)
+                .sort((a, b) => parseInt(a) - parseInt(b));
+        } catch (err) {
+            return {
+                tracks: [],
+                videoCount: 0,
+                ready: false,
+                pending: 0,
+                totalDirs: 0,
+                message: 'Cannot read HLS directory'
+            };
+        }
+
+        if (dirs.length === 0) {
+            return {
+                tracks: [],
+                videoCount: 0,
+                ready: false,
+                pending: 0,
+                totalDirs: 0,
+                message: 'No track directories found'
+            };
+        }
+
+        const httpPort = `localhost:${process.env.PORT || 4000}`;
+        const readyTracks = [];
+        const pendingTracks = [];
+
+        for (const id of dirs) {
+            const playlistPath = path.join(HLS_DIR, id, 'playlist.m3u8');
+            const segmentCount = getSegmentCount(playlistPath);
+
+            if (isPlaylistReady(playlistPath, 2)) {
+                readyTracks.push({
+                    index: readyTracks.length,
+                    name: id,
+                    videoUrl: `${protocol}://${httpPort}/hls/${id}/playlist.m3u8`,
+                    segments: segmentCount
+                });
+            } else {
+                pendingTracks.push({
+                    name: id,
+                    segments: segmentCount,
+                    exists: fs.existsSync(playlistPath)
+                });
+            }
+        }
+
+        return {
+            tracks: readyTracks,
+            videoCount: readyTracks.length,
+            ready: readyTracks.length > 0 && pendingTracks.length === 0 && readyTracks.length === dirs.length,
+            pending: pendingTracks.length,
+            totalDirs: dirs.length
+        };
     } catch (err) {
-      return {
-        tracks: [],
-        videoCount: 0,
-        ready: false,
-        pending: 0,
-        totalDirs: 0,
-        message: 'Cannot read HLS directory'
-      };
+        console.error('[getCurrentTracksState] Error:', err);
+        return {
+            tracks: [],
+            videoCount: 0,
+            ready: false,
+            pending: 0,
+            totalDirs: 0,
+            message: 'Error reading tracks'
+        };
     }
-
-    if (dirs.length === 0) {
-      return {
-        tracks: [],
-        videoCount: 0,
-        ready: false,
-        pending: 0,
-        totalDirs: 0,
-        message: 'No track directories found'
-      };
-    }
-
-    const httpPort = `localhost:${process.env.PORT || 4000}`;
-    const readyTracks = [];
-    const pendingTracks = [];
-
-    for (const id of dirs) {
-      const playlistPath = path.join(HLS_DIR, id, 'playlist.m3u8');
-      const segmentCount = getSegmentCount(playlistPath);
-
-      if (isPlaylistReady(playlistPath, 2)) {
-        readyTracks.push({
-          index: readyTracks.length,
-          name: id,
-          videoUrl: `${protocol}://${httpPort}/hls/${id}/playlist.m3u8`,
-          segments: segmentCount
-        });
-      } else {
-        pendingTracks.push({
-          name: id,
-          segments: segmentCount,
-          exists: fs.existsSync(playlistPath)
-        });
-      }
-    }
-
-    return {
-      tracks: readyTracks,
-      videoCount: readyTracks.length,
-      ready: readyTracks.length > 0 && pendingTracks.length === 0 && readyTracks.length === dirs.length,
-      pending: pendingTracks.length,
-      totalDirs: dirs.length
-    };
-  } catch (err) {
-    console.error('[getCurrentTracksState] Error:', err);
-    return {
-      tracks: [],
-      videoCount: 0,
-      ready: false,
-      pending: 0,
-      totalDirs: 0,
-      message: 'Error reading tracks'
-    };
-  }
 }
 
 router.get('/', async (req, res, next) => {
-  try {
-    const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams ORDER BY viewers DESC');
-    res.json(rows[0]);
-  } catch (err) {
-    next(err);
-  }
+    try {
+        const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams ORDER BY viewers DESC');
+        res.json(rows[0]);
+    } catch (err) {
+        next(err);
+    }
 });
 
 router.get('/available', async (req, res, next) => {
-  try {
-    res.set('Cache-Control', 'no-store'); // Disable caching
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+    try {
+        res.set('Cache-Control', 'no-store'); // Disable caching
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
 
-    const port = process.env.PORT || 4000;
-    const host = process.env.API_HOSTNAME || `localhost:${port}`;
-    const url = `${req.protocol}://${host}`;
+        const port = process.env.PORT || 4000;
+        const host = process.env.API_HOSTNAME || `localhost:${port}`;
+        const url = `${req.protocol}://${host}`;
+        const streams = [];
 
-    const HLS_DIR = path.join(process.cwd(), "media", "hls");
+        // Get all stream directories
+        const streamDirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
 
-    const streams = [];
+        // For each stream, get database info and HLS tracks
+        for (const streamId of streamDirs) {
+            try {
+                // Get stream info from database
+                const dbRows = await db.query(
+                    'SELECT s.id, s.title, s.viewers, s.avatar_url, s.thumbnail_url, c.name as category FROM streams s LEFT JOIN categories c ON s.category_id = c.id WHERE s.id = ?',
+                    [streamId]
+                );
 
-    // Get all stream directories
-    const streamDirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .map(dirent => dirent.name);
+                const streamInfo = dbRows[0] && dbRows[0].length > 0 ? dbRows[0][0] : null;
 
-    // For each stream, count the number of video tracks
-    for (const streamId of streamDirs) {
-      const streamPath = path.join(HLS_DIR, streamId);
-      const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => dirent.name);
+                const streamPath = path.join(HLS_DIR, streamId);
+                const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
+                    .filter(dirent => dirent.isDirectory())
+                    .map(dirent => dirent.name);
 
-      const tracks = trackDirs.map((trackId) => ({
-        trackId: trackId,
-        videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
-      }));
+                const tracks = trackDirs.map((trackId) => ({
+                    trackId,
+                    videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
+                }));
 
-      streams.push({
-        streamId: streamId,
-        trackCount: tracks.length,
-        tracks: tracks
-      });
+                streams.push({
+                    streamId,
+                    trackCount: tracks.length,
+                    tracks,
+                    title: streamInfo?.title || '',
+                    category: streamInfo?.category || '',
+                    viewers: streamInfo?.viewers || 0,
+                    avatarUrl: streamInfo?.avatar_url || '',
+                    thumbnailUrl: streamInfo?.thumbnail_url || ''
+                });
+            } catch (err) {
+                console.error(`Error processing stream ${streamId}:`, err);
+                // Still include the stream with empty fields if DB query fails
+                const streamPath = path.join(HLS_DIR, streamId);
+                const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
+                    .filter(dirent => dirent.isDirectory())
+                    .map(dirent => dirent.name);
+
+                const tracks = trackDirs.map((trackId) => ({
+                    trackId,
+                    videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
+                }));
+
+                streams.push({
+                    streamId,
+                    trackCount: tracks.length,
+                    tracks,
+                    title: '',
+                    category: '',
+                    viewers: 0,
+                    avatarUrl: '',
+                    thumbnailUrl: ''
+                });
+            }
+        }
+
+        res.status(200).json(streams);
+    } catch (err) {
+        console.error('[/available] Error:', err);
+        next(err);
     }
-
-    res.status(200).json({
-      streams: streams,
-      streamCount: streams.length
-    });
-  } catch (err) {
-    console.error('[/available] Error:', err);
-    next(err);
-  }
 });
 
 router.get('/:id', async (req, res, next) => {
-  try {
-    const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams WHERE id = ?', [req.params.id]);
-    if (!rows || rows.length === 0) return res.status(404).json({ error: 'Stream not found' });
-    res.json(rows[0]);
-  } catch (err) {
-    next(err);
-  }
+    try {
+        const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams WHERE id = ?', [req.params.id]);
+        if (!rows || rows.length === 0) {
+            return res.status(404).json({ error: 'Stream not found' });
+        }
+        res.json(rows[0]);
+    } catch (err) {
+        next(err);
+    }
 });
 
 router.get('/:id/hls', async (req, res, next) => {
-  try {
-    const streamId = req.params.id;
-    const host = req.get('host') || `localhost:${process.env.PORT || 4000}`;
-    const protocol = req.protocol || 'http';
-    const hlsUrl = `${protocol}://${host}/hls/live/${streamId}/playlist.m3u8`;
-    res.json({ hls: hlsUrl });
-  } catch (err) {
-    next(err);
-  }
+    try {
+        const streamId = req.params.id;
+        const host = req.get('host') || `localhost:${process.env.PORT || 4000}`;
+        const protocol = req.protocol || 'http';
+        const hlsUrl = `${protocol}://${host}/hls/live/${streamId}/playlist.m3u8`;
+        res.json({ hls: hlsUrl });
+    } catch (err) {
+        next(err);
+    }
 });
 
 export default router;

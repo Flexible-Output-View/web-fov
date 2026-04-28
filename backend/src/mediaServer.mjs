@@ -1,18 +1,22 @@
-import express from "express";
-import fs from "fs";
-import path from "path";
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import cors from 'cors';
-import { spawn } from "child_process";
-import { randomUUID } from "crypto";
+import { spawn } from 'child_process';
+import { randomUUID } from 'crypto';
 
-const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), "media");
-const HLS_DIR = path.join(MEDIA_ROOT, "hls");
+const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
+const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
 
 await fs.promises.mkdir(HLS_DIR, { recursive: true });
 
 const ffmpegProcesses = new Map();
 const registeredStreams = new Map();
-const baseSrtPort = parseInt(process.env.SRT_PORT || "9999", 10);
+const baseSrtPort = parseInt(process.env.SRT_PORT || '9999', 10);
+
+// Configuration for process termination
+const PROCESS_GRACE_PERIOD = 5000; // 5 seconds to gracefully shut down
+const PROCESS_CHECK_INTERVAL = 30000; // Check every 30 seconds for zombie processes
 
 function clearHLSFiles() {
     try {
@@ -20,10 +24,10 @@ function clearHLSFiles() {
             for (const file of fs.readdirSync(HLS_DIR)) {
                 fs.rmSync(path.join(HLS_DIR, file), { recursive: true, force: true });
             }
-            console.log("🧹 HLS directory cleared");
+            console.log('🧹 HLS directory cleared');
         }
     } catch (err) {
-        console.error("⚠️ Failed to clear HLS directory:", err);
+        console.error('⚠️ Failed to clear HLS directory:', err);
     }
 }
 
@@ -39,6 +43,42 @@ function clearStreamHLSFiles(streamId) {
     }
 }
 
+// Safely kill a process with grace period - try SIGINT first, then SIGKILL
+function killFFmpegProcess(streamId, process, timeout = PROCESS_GRACE_PERIOD) {
+    return new Promise((resolve) => {
+        if (!process || process.killed) {
+            resolve(true);
+            return;
+        }
+
+        const killTimer = setTimeout(() => {
+            if (!process.killed) {
+                console.log(`⚠️ FFmpeg for stream ${streamId} did not exit gracefully, force killing (SIGKILL)...`);
+                try {
+                    process.kill('SIGKILL');
+                } catch (err) {
+                    console.error(`⚠️ Failed to SIGKILL ffmpeg for stream ${streamId}:`, err);
+                }
+            }
+            resolve(true);
+        }, timeout);
+
+        process.once('exit', () => {
+            clearTimeout(killTimer);
+            resolve(true);
+        });
+
+        // Try graceful shutdown first
+        try {
+            process.kill('SIGINT');
+        } catch (err) {
+            console.error(`⚠️ Failed to SIGINT ffmpeg for stream ${streamId}:`, err);
+            clearTimeout(killTimer);
+            resolve(false);
+        }
+    });
+}
+
 function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
     const streamHlsDir = path.join(HLS_DIR, streamId);
     const mapArgs = [];
@@ -46,9 +86,9 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
     const varStreamEntries = [];
 
     for (let i = 0; i < videoTrackCount; i++) {
-        mapArgs.push("-map", `0:v:${i}`);
-        mapArgs.push("-map", "0:a?");
-        audioCodecArgs.push(`-c:a:${i}`, "copy");
+        mapArgs.push('-map', `0:v:${i}`);
+        mapArgs.push('-map', '0:a?');
+        audioCodecArgs.push(`-c:a:${i}`, 'copy');
         varStreamEntries.push(`v:${i},a:${i}`);
     }
 
@@ -66,25 +106,25 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
 
     const inputSource = srtUrl
         ? `${srtUrl}?${srtParams}`
-        : "pipe:";
+        : 'pipe:';
 
     const ffmpegArgs = [
-        "-err_detect", "ignore_err",
-        "-fflags", "+genpts+discardcorrupt+igndts",
-        "-flags", "low_delay",
-        "-strict", "experimental",
-        "-i", inputSource,
+        '-err_detect', 'ignore_err',
+        '-fflags', '+genpts+discardcorrupt+igndts',
+        '-flags', 'low_delay',
+        '-strict', 'experimental',
+        '-i', inputSource,
         ...mapArgs,
-        "-c:v", "copy",
+        '-c:v', 'copy',
         ...audioCodecArgs,
-        "-f", "hls",
-        "-hls_time", "2",
-        "-hls_list_size", "15",
-        "-hls_flags", "delete_segments+independent_segments+omit_endlist",
-        "-hls_segment_type", "mpegts",
-        "-hls_segment_filename", path.join(streamHlsDir, "%v", "seg%05d.ts"),
-        "-var_stream_map", varStreamEntries.join(" "),
-        path.join(streamHlsDir, "%v", "playlist.m3u8")
+        '-f', 'hls',
+        '-hls_time', '2',
+        '-hls_list_size', '15',
+        '-hls_flags', 'delete_segments+independent_segments+omit_endlist',
+        '-hls_segment_type', 'mpegts',
+        '-hls_segment_filename', path.join(streamHlsDir, '%v', 'seg%05d.ts'),
+        '-var_stream_map', varStreamEntries.join(' '),
+        path.join(streamHlsDir, '%v', 'playlist.m3u8')
     ];
 
     return ffmpegArgs;
@@ -92,44 +132,67 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
 
 function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
     if (!tracks || tracks === 0) {
-        if (socket) socket.destroy();
+        if (socket) {
+            socket.destroy();
+        }
         return;
     }
 
     const ffmpegArgs = buildFfmpegArgs(tracks, streamId, srtUrl);
 
-    console.log(`📀 Spawning FFmpeg for stream ${streamId}:`, "ffmpeg", ffmpegArgs.join(" "));
+    console.log(`📀 Spawning FFmpeg for stream ${streamId}:`, 'ffmpeg', ffmpegArgs.join(' '));
 
-    const stdio = srtUrl ? ["inherit", "inherit", "inherit"] : ["pipe", "inherit", "inherit"];
-    const ffmpegProc = spawn("ffmpeg", ffmpegArgs, { stdio });
+    const stdio = srtUrl ? ['inherit', 'inherit', 'inherit'] : ['pipe', 'inherit', 'inherit'];
+    const ffmpegProc = spawn('ffmpeg', ffmpegArgs, { stdio });
 
     if (socket) {
         socket.pipe(ffmpegProc.stdin);
     }
 
-    ffmpegProc.on("exit", (code, signal) => {
+    ffmpegProc.on('exit', (code, signal) => {
         console.log(`ℹ️ FFmpeg for stream ${streamId} exited (code=${code} signal=${signal})`);
         clearStreamHLSFiles(streamId);
         ffmpegProcesses.delete(streamId);
         registeredStreams.delete(streamId);
         console.log(`📊 Active streams: ${ffmpegProcesses.size}`);
-        if (socket) socket.destroy();
+        if (socket) {
+            try {
+                socket.destroy();
+            } catch (err) {
+                console.error(`⚠️ Error destroying socket for stream ${streamId}:`, err);
+            }
+        }
     });
 
-    ffmpegProc.on("error", (err) => {
+    ffmpegProc.on('error', (err) => {
         console.error(`⚠️ FFmpeg spawn failed for stream ${streamId}:`, err);
-        if (socket) socket.destroy();
+        if (socket) {
+            try {
+                socket.destroy();
+            } catch (err) {
+                console.error(`⚠️ Error destroying socket for stream ${streamId}:`, err);
+            }
+        }
     });
 
     if (socket) {
-        socket.on("error", (err) => {
+        socket.on('error', (err) => {
             console.error(`⚠️ Socket error for stream ${streamId}:`, err);
-            ffmpegProc.kill("SIGINT");
+            // Use the new kill function with grace period
+            killFFmpegProcess(streamId, ffmpegProc).catch(err => {
+                console.error(`⚠️ Error killing ffmpeg for stream ${streamId}:`, err);
+            });
         });
 
-        socket.on("end", () => {
+        socket.on('end', () => {
             console.log(`📴 Socket closed for stream ${streamId}`);
-            ffmpegProc.kill("SIGINT");
+            killFFmpegProcess(streamId, ffmpegProc).catch(err => {
+                console.error(`⚠️ Error killing ffmpeg for stream ${streamId}:`, err);
+            });
+        });
+
+        socket.on('close', () => {
+            console.log(`🔌 Socket fully closed for stream ${streamId}`);
         });
     }
 
@@ -137,7 +200,8 @@ function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
         process: ffmpegProc,
         tracks,
         socket,
-        stopped: false
+        stopped: false,
+        createdAt: Date.now()
     });
 }
 
@@ -151,7 +215,7 @@ function createMediaRoutes() {
         exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges']
     }));
 
-    router.use("/hls", (req, res, next) => {
+    router.use('/hls', (req, res, next) => {
         if (req.path.endsWith('.m3u8')) {
             res.set({
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -176,7 +240,7 @@ function createMediaRoutes() {
     router.use(express.json());
 
     // POST /ffmpeg/register — register a stream and create a unique SRT listener
-    router.post("/ffmpeg/register", (req, res) => {
+    router.post('/ffmpeg/register', (req, res) => {
         const { tracks, streamId: providedStreamId } = req.body ?? {};
         const trackNum = Number.parseInt(tracks, 10);
 
@@ -187,11 +251,11 @@ function createMediaRoutes() {
         const streamId = providedStreamId || randomUUID();
 
         if (registeredStreams.has(streamId)) {
-            return res.status(409).json({ error: "StreamId already registered", streamId });
+            return res.status(409).json({ error: 'StreamId already registered', streamId });
         }
 
         try {
-            let url = process.env.SRT_URL || '127.0.0.1';
+            const url = process.env.SRT_URL || '127.0.0.1';
             let srtPort = baseSrtPort;
             while (Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
                 srtPort++;
@@ -221,7 +285,7 @@ function createMediaRoutes() {
             console.log(`📝 Stream registered: ${streamId} (tracks=${trackNum}, port=${srtPort})`);
 
             return res.status(200).json({
-                status: "registered",
+                status: 'registered',
                 streamId,
                 tracks: trackNum,
                 srtUrl: srtUrlExternal,
@@ -229,12 +293,12 @@ function createMediaRoutes() {
             });
         } catch (err) {
             console.error(`⚠️ Failed to register stream ${streamId}:`, err);
-            return res.status(500).json({ error: "Failed to register stream" });
+            return res.status(500).json({ error: 'Failed to register stream' });
         }
     });
 
     // POST /ffmpeg/stop — request FFmpeg to stop for a specific stream
-    router.post("/ffmpeg/stop", (req, res) => {
+    router.post('/ffmpeg/stop', async (req, res) => {
         const { streamId } = req.body ?? {};
 
         if (!streamId) {
@@ -245,15 +309,15 @@ function createMediaRoutes() {
         const registered = registeredStreams.get(streamId);
 
         if (!streamData && !registered) {
-            return res.status(200).json({ status: "not_found", streamId });
+            return res.status(200).json({ status: 'not_found', streamId });
         }
 
         try {
             if (streamData) {
                 if (streamData.process) {
                     const pid = streamData.process.pid;
-                    streamData.process.kill("SIGINT");
                     console.log(`⏹️ FFmpeg stop requested for stream ${streamId} (pid=${pid})`);
+                    await killFFmpegProcess(streamId, streamData.process);
                 }
                 if (streamData.socket) {
                     streamData.socket.destroy();
@@ -267,15 +331,15 @@ function createMediaRoutes() {
             }
 
             clearStreamHLSFiles(streamId);
-            return res.status(200).json({ status: "stopped", streamId });
+            return res.status(200).json({ status: 'stopped', streamId });
         } catch (err) {
             console.error(`⚠️ Failed to stop stream ${streamId}:`, err);
-            return res.status(500).json({ error: "Failed to stop stream" });
+            return res.status(500).json({ error: 'Failed to stop stream' });
         }
     });
 
     // GET /ffmpeg/status — get current FFmpeg state for all or a specific stream
-    router.get("/ffmpeg/status", (req, res) => {
+    router.get('/ffmpeg/status', (req, res) => {
         const { streamId } = req.query;
 
         if (streamId) {
@@ -285,7 +349,7 @@ function createMediaRoutes() {
             if (streamData) {
                 return res.status(200).json({
                     streamId,
-                    status: "active",
+                    status: 'active',
                     running: true,
                     pid: streamData.process?.pid,
                     tracks: streamData.tracks,
@@ -296,7 +360,7 @@ function createMediaRoutes() {
                 });
             }
 
-            return res.status(200).json({ streamId, status: "not_found" });
+            return res.status(200).json({ streamId, status: 'not_found' });
         }
 
         const allStreams = {};
@@ -304,7 +368,7 @@ function createMediaRoutes() {
         for (const [id, data] of ffmpegProcesses.entries()) {
             const registered = registeredStreams.get(id);
             allStreams[id] = {
-                status: "active",
+                status: 'active',
                 running: true,
                 pid: data.process.pid,
                 tracks: data.tracks,
@@ -326,11 +390,60 @@ function createMediaRoutes() {
     return router;
 }
 
-async function startMediaServer(app) {
-    console.log("🚀 Media server ready!");
+async function startMediaServer() {
+    console.log('🚀 Media server ready!');
     console.log(`   📝 Register stream: POST http://${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/register with {"tracks": 2}`);
-    console.log(`   🔗 FFmpeg starts immediately with its own SRT URL`);
+    console.log('   🔗 FFmpeg starts immediately with its own SRT URL');
     console.log(`   📊 Check status: GET http://${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/status`);
+
+    // Periodic check for zombie processes (every 30 seconds)
+    const healthCheckInterval = setInterval(async () => {
+        const deadStreams = [];
+        for (const [streamId, streamData] of ffmpegProcesses.entries()) {
+            if (streamData.process && streamData.process.killed) {
+                console.log(`🧟 Detected killed ffmpeg for stream ${streamId}, cleaning up...`);
+                deadStreams.push(streamId);
+            }
+        }
+        // Clean up dead processes
+        for (const streamId of deadStreams) {
+            clearStreamHLSFiles(streamId);
+            ffmpegProcesses.delete(streamId);
+            registeredStreams.delete(streamId);
+        }
+    }, PROCESS_CHECK_INTERVAL);
+
+    // Graceful shutdown handler
+    async function gracefulShutdown(signal) {
+        console.log(`\n⏳ ${signal} received, gracefully shutting down ffmpeg processes...`);
+
+        const shutdownPromises = [];
+        for (const [streamId, streamData] of ffmpegProcesses.entries()) {
+            console.log(`   Stopping stream ${streamId}...`);
+            shutdownPromises.push(killFFmpegProcess(streamId, streamData.process));
+        }
+
+        await Promise.all(shutdownPromises);
+
+        // Clear HLS files
+        clearHLSFiles();
+
+        // Clean up health check interval
+        clearInterval(healthCheckInterval);
+
+        console.log('✅ All ffmpeg processes stopped');
+        process.exit(0);
+    }
+
+    // Register shutdown handlers
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+    // Handle uncaught exceptions
+    process.on('uncaughtException', async (err) => {
+        console.error('💥 Uncaught exception:', err);
+        await gracefulShutdown('uncaughtException');
+    });
 }
 
-export { createMediaRoutes, startMediaServer };
+export { createMediaRoutes, startMediaServer, ffmpegProcesses, killFFmpegProcess };

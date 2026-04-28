@@ -8,7 +8,7 @@ const pool = mysql.createPool({
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'fovwebdb',
     connectionLimit: 5,
-    enableKeepAlive: true,
+    enableKeepAlive: true
 });
 
 export default {
@@ -22,7 +22,9 @@ export default {
             const res = await conn.query(sql, params);
             return res;
         } finally {
-            if (conn) conn.release();
+            if (conn) {
+                conn.release();
+            }
         }
     }
 };
