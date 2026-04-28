@@ -3,8 +3,6 @@ FROM node:22-slim AS build
 WORKDIR /app
 
 ARG API_URL
-ARG TWITCH_ID
-ARG TWITCH_SECRET
 
 # Install Angular CLI globally
 RUN npm install -g @angular/cli@latest
@@ -21,8 +19,6 @@ COPY . .
 
 RUN cp src/environments/environment.example.ts src/environments/environment.ts
 RUN sed -i "s|API_URL_HERE|$API_URL|g" src/environments/environment.ts
-RUN sed -i "s|YOUR_CLIENT_ID_HERE|$TWITCH_ID|g" src/environments/environment.ts
-RUN sed -i "s|YOUR_CLIENT_SECRET_HERE|$TWITCH_SECRET|g" src/environments/environment.ts
 
 # FOR DEV ONLY Start the dev server, listen on all interfaces so host can reach it
 # CMD ["ng", "serve", "--host", "0.0.0.0", "--port", "80"]
