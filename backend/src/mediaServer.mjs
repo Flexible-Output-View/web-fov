@@ -215,7 +215,7 @@ function createMediaRoutes() {
         exposedHeaders: ['Content-Length', 'Content-Range', 'Accept-Ranges']
     }));
 
-    router.use('/hls', (req, res, next) => {
+    router.use('/api/hls', (req, res, next) => {
         if (req.path.endsWith('.m3u8')) {
             res.set({
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -289,7 +289,7 @@ function createMediaRoutes() {
                 streamId,
                 tracks: trackNum,
                 srtUrl: srtUrlExternal,
-                hlsUrl: `/hls/${streamId}/0/playlist.m3u8`
+                hlsUrl: `/api/hls/${streamId}/0/playlist.m3u8`
             });
         } catch (err) {
             console.error(`⚠️ Failed to register stream ${streamId}:`, err);
@@ -353,7 +353,7 @@ function createMediaRoutes() {
                     running: true,
                     pid: streamData.process?.pid,
                     tracks: streamData.tracks,
-                    hlsUrl: `/hls/${streamId}/0/playlist.m3u8`,
+                    hlsUrl: `/api/hls/${streamId}/0/playlist.m3u8`,
                     srtUrl: registered
                         ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
                         : null
@@ -372,7 +372,7 @@ function createMediaRoutes() {
                 running: true,
                 pid: data.process.pid,
                 tracks: data.tracks,
-                hlsUrl: `/hls/${id}/0/playlist.m3u8`,
+                hlsUrl: `/api/hls/${id}/0/playlist.m3u8`,
                 srtUrl: registered
                     ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
                     : null,
