@@ -27,7 +27,7 @@ app.get('/', (req, res) => res.json({ ok: true, message: 'FOV backend running' }
 // Mount API routes under /api
 app.use('/api', apiRoutes);
 
-app.use((err, req, res) => {
+app.use((err, req, res, next) => {
     console.error(err);
     res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
@@ -45,7 +45,7 @@ async function start() {
 
         const server = app.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);
-            console.log(`📺 HLS available at http://localhost:${PORT}/hls`);
+            console.log(`📺 HLS available at http://localhost:${PORT}/api/hls`);
         });
 
         // Handle server errors
