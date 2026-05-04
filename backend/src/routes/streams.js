@@ -97,7 +97,7 @@ function getCurrentTracksState(protocol = 'http') {
                 readyTracks.push({
                     index: readyTracks.length,
                     name: id,
-                    videoUrl: `${protocol}://${httpPort}/hls/${id}/playlist.m3u8`,
+                    videoUrl: `${protocol}://${httpPort}/api/hls/${id}/playlist.m3u8`,
                     segments: segmentCount
                 });
             } else {
@@ -145,8 +145,12 @@ router.get('/available', async (req, res, next) => {
         res.setHeader('Expires', '0');
 
         const port = process.env.PORT || 4000;
-        const host = process.env.API_HOSTNAME || `localhost:${port}`;
-        const url = `${req.protocol}://${host}`;
+        const rawHost = process.env.API_HOSTNAME || req.get('host') || `localhost:${port}`;
+        const normalizedHost = rawHost.trim().replace(/:\s*/, ':');
+        const hostUrl = new URL(/^https?:\/\//i.test(normalizedHost) ? normalizedHost : `http://${normalizedHost}`);
+        const host = hostUrl.host.replace(/\/api(?:\/.*)?$/i, '');
+        const protocol = process.env.API_PROTOCOL || req.protocol || hostUrl.protocol.replace(':', '') || 'http';
+        const url = `${protocol}://${host}`;
         const streams = [];
 
         // Get all stream directories
@@ -172,7 +176,7 @@ router.get('/available', async (req, res, next) => {
 
                 const tracks = trackDirs.map((trackId) => ({
                     trackId,
-                    videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
+                    videoUrl: `${url}/api/hls/${streamId}/${trackId}/playlist.m3u8`
                 }));
 
                 streams.push({
@@ -186,7 +190,7 @@ router.get('/available', async (req, res, next) => {
                     thumbnailUrl: streamInfo?.thumbnail_url || ''
                 });
             } catch (err) {
-                console.error(`Error processing stream ${streamId}:`, err);
+                console.error(`Error processing stream ${streamId}: `, err);
                 // Still include the stream with empty fields if DB query fails
                 const streamPath = path.join(HLS_DIR, streamId);
                 const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
@@ -195,7 +199,7 @@ router.get('/available', async (req, res, next) => {
 
                 const tracks = trackDirs.map((trackId) => ({
                     trackId,
-                    videoUrl: `${url}/hls/${streamId}/${trackId}/playlist.m3u8`
+                    videoUrl: `${url}/api/hls/${streamId}/${trackId}/playlist.m3u8`
                 }));
 
                 streams.push({
@@ -235,7 +239,8 @@ router.get('/:id/hls', async (req, res, next) => {
         const streamId = req.params.id;
         const host = req.get('host') || `localhost:${process.env.PORT || 4000}`;
         const protocol = req.protocol || 'http';
-        const hlsUrl = `${protocol}://${host}/hls/live/${streamId}/playlist.m3u8`;
+        const hlsUrl = `${protocol}://${host}/api/hls/live/${streamId}/playlist.m3u8`;
+        console.log(`DEBUG 111 HLS URL: ${hlsUrl}`);
         res.json({ hls: hlsUrl });
     } catch (err) {
         next(err);
