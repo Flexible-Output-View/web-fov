@@ -1,5 +1,6 @@
 <div class="fov-player">
-  <div class="fov-toolbar">
+  
+  <div class="fov-toolbar" *ngIf="!isLoading">
     <div class="toolbar-left">
       <span class="live-indicator" *ngIf="playbackStarted">🔴 LIVE</span>
     </div>
@@ -21,14 +22,15 @@
     <button (click)="refreshStream()" class="btn-retry">Réessayer</button>
   </div>
 
-  <div class="buffering-overlay" *ngIf="!isLoading && !errorMessage && isBufferingPhase">
-    <div class="buffering-content">
-      <div class="loading-spinner large"></div>
-      <div class="buffering-text">Chargement du live...</div>
-    </div>
-  </div>
-
   <div class="fov-workspace" *ngIf="!isLoading && !errorMessage">
+    
+    <div class="buffering-overlay" *ngIf="isBufferingPhase">
+      <div class="buffering-content">
+        <div class="loading-spinner large"></div>
+        <div class="buffering-text">Chargement du live...</div>
+      </div>
+    </div>
+
     <div class="fov-stage" [id]="'stageArea_' + playerId">
       <ng-container *ngFor="let wrapper of videoWrappers; let i = index">
         <div
@@ -98,5 +100,6 @@
         </div>
       </div>
     </div>
+
   </div>
 </div>
