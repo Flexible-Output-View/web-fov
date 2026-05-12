@@ -1,5 +1,7 @@
 <div class="fov-player">
-  <div class="fov-toolbar">
+  
+  <!-- 1. BARRE D'OUTILS -->
+  <div class="fov-toolbar" *ngIf="!isLoading">
     <div class="toolbar-left">
       <span class="live-indicator" *ngIf="playbackStarted">🔴 LIVE</span>
     </div>
@@ -11,6 +13,7 @@
     </div>
   </div>
 
+  <!-- 2. ÉTATS DE CHARGEMENT API / ERREUR -->
   <div class="loading-state" *ngIf="isLoading">
     <div class="loading-spinner"></div>
     <span>{{ getLoadingMessage() }}</span>
@@ -21,14 +24,18 @@
     <button (click)="refreshStream()" class="btn-retry">Réessayer</button>
   </div>
 
-  <div class="buffering-overlay" *ngIf="!isLoading && !errorMessage && isBufferingPhase">
-    <div class="buffering-content">
-      <div class="loading-spinner large"></div>
-      <div class="buffering-text">Chargement du live...</div>
-    </div>
-  </div>
-
+  <!-- 3. ZONE DE LECTURE (S'affiche quand l'API a répondu) -->
   <div class="fov-workspace" *ngIf="!isLoading && !errorMessage">
+    
+    <!-- OVERLAY DE BUFFERING (Flotte PAR DESSUS les vidéos tant qu'elles chargent) -->
+    <div class="buffering-overlay" *ngIf="isBufferingPhase">
+      <div class="buffering-content">
+        <div class="loading-spinner large"></div>
+        <div class="buffering-text">Chargement du live...</div>
+      </div>
+    </div>
+
+    <!-- ZONE DES VIDÉOS -->
     <div class="fov-stage" [id]="'stageArea_' + playerId">
       <ng-container *ngFor="let wrapper of videoWrappers; let i = index">
         <div
@@ -61,6 +68,7 @@
       </ng-container>
     </div>
 
+    <!-- BARRE LATÉRALE (S'affiche quand la lecture démarre) -->
     <div class="fov-sidebar" *ngIf="playbackStarted">
       <div class="panel-section" *ngIf="editMode">
         <h4>Sources</h4>
@@ -98,5 +106,6 @@
         </div>
       </div>
     </div>
+
   </div>
 </div>
