@@ -87,7 +87,7 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
 
     for (let i = 0; i < videoTrackCount; i++) {
         mapArgs.push('-map', `0:v:${i}`);
-        mapArgs.push('-map', '0:a?');
+        mapArgs.push('-map', `0:a:${i}`);
         audioCodecArgs.push(`-c:a:${i}`, 'copy');
         varStreamEntries.push(`v:${i},a:${i}`);
     }
