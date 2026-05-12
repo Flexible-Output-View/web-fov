@@ -67,7 +67,7 @@
 }
 
 .player-wrapper {
-  height: calc(100vh - 70px);
+  height: calc(100dvh - 70px);
   overflow: hidden;
 }
 
@@ -192,12 +192,12 @@
   }
 
   .player-wrapper {
-    height: calc(100vh - 56px);
+    height: calc(100dvh - 56px);
   }
 
   .loading-state, .error-state, .offline-state, .ended-state {
     padding: var(--spacing-lg, 24px);
-    min-height: calc(100vh - 56px);
+    min-height: calc(100dvh - 56px);
 
     h2 {
       font-size: 1.2rem;
