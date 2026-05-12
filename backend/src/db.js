@@ -19,8 +19,8 @@ export default {
     async query(sql, params) {
         const conn = await pool.getConnection();
         try {
-            const res = await conn.query(sql, params);
-            return res;
+            const [rows] = await conn.query(sql, params);
+            return rows;
         } finally {
             if (conn) {
                 conn.release();

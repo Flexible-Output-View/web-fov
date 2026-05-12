@@ -1,34 +1,52 @@
-import db from '../db.js';
+import { jest } from '@jest/globals';
 
-// Mock the mysql2/promise module
-jest.mock('mysql2/promise', () => ({
-    createPool: jest.fn(() => ({
-        getConnection: jest.fn()
-    }))
+const fakeConnection = {
+    query: jest.fn(),
+    release: jest.fn()
+};
+const fakePool = {
+    getConnection: jest.fn(() => fakeConnection)
+};
+
+jest.unstable_mockModule('mysql2/promise', () => ({
+    default: {
+        createPool: jest.fn(() => fakePool)
+    }
 }));
 
+const { default: db } = await import('../db.js');
+
 describe('Database Module', () => {
-    afterEach(() => {
+    beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    test('should export pool, getConnection, and query methods', () => {
-        expect(typeof db.getConnection).toBe('function');
-        expect(typeof db.query).toBe('function');
-        expect(db.pool).toBeDefined();
+    test('should create a connection pool', () => {
+        expect(db.pool).toBe(fakePool);
     });
 
-    describe('getConnection', () => {
-        test('should return a connection object', async () => {
-            // This is a basic smoke test
-            // In production, use a test database
-            expect(typeof db.getConnection).toBe('function');
-        });
+    test('getConnection should return a connection from the pool', async () => {
+        const connection = await db.getConnection();
+
+        expect(fakePool.getConnection).toHaveBeenCalledTimes(1);
+        expect(connection).toBe(fakeConnection);
     });
 
-    describe('query', () => {
-        test('should accept SQL and params', async () => {
-            expect(typeof db.query).toBe('function');
-        });
+    test('query should execute SQL and release the connection', async () => {
+        fakeConnection.query.mockResolvedValue(['result', 'fields']);
+
+        const result = await db.query('SELECT 1', [123]);
+
+        expect(fakePool.getConnection).toHaveBeenCalledTimes(1);
+        expect(fakeConnection.query).toHaveBeenCalledWith('SELECT 1', [123]);
+        expect(fakeConnection.release).toHaveBeenCalledTimes(1);
+        expect(result).toEqual('result');
+    });
+
+    test('query should release the connection when the query fails', async () => {
+        fakeConnection.query.mockRejectedValue(new Error('Query failed'));
+
+        await expect(db.query('SELECT 1', [])).rejects.toThrow('Query failed');
+        expect(fakeConnection.release).toHaveBeenCalledTimes(1);
     });
 });

@@ -132,7 +132,7 @@ function getCurrentTracksState(protocol = 'http') {
 router.get('/', async (req, res, next) => {
     try {
         const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams ORDER BY viewers DESC');
-        res.json(rows[0]);
+        res.json(rows);
     } catch (err) {
         next(err);
     }
@@ -167,7 +167,7 @@ router.get('/available', async (req, res, next) => {
                     [streamId]
                 );
 
-                const streamInfo = dbRows[0] && dbRows[0].length > 0 ? dbRows[0][0] : null;
+                const streamInfo = Array.isArray(dbRows) && dbRows.length > 0 ? dbRows[0] : null;
 
                 const streamPath = path.join(HLS_DIR, streamId);
                 const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
@@ -247,4 +247,9 @@ router.get('/:id/hls', async (req, res, next) => {
     }
 });
 
+export {
+    isPlaylistReady,
+    getSegmentCount,
+    getCurrentTracksState
+};
 export default router;

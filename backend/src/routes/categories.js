@@ -6,7 +6,7 @@ import db from '../db.js';
 router.get('/', async (req, res, next) => {
     try {
         const rows = await db.query('SELECT id, name, viewers, image_url FROM categories ORDER BY viewers DESC');
-        res.json(rows[0]);
+        res.json(rows);
     } catch (err) {
         next(err);
     }

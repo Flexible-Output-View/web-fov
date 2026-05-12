@@ -1,58 +1,24 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+    isPlaylistReady,
+    getSegmentCount,
+    getCurrentTracksState
+} from '../routes/streams.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Mock implementation of stream helper functions from streams.js
-function isPlaylistReady(playlistPath, minSegments = 2) {
-    try {
-        if (!fs.existsSync(playlistPath)) {
-            return false;
-        }
-
-        const content = fs.readFileSync(playlistPath, 'utf8');
-
-        if (!content.includes('#EXTM3U')) {
-            return false;
-        }
-
-        const segmentMatches = content.match(/\.ts/g);
-        if (!segmentMatches) {
-            return false;
-        }
-
-        return segmentMatches.length >= minSegments;
-    } catch (err) {
-        return false;
-    }
-}
-
-function getSegmentCount(playlistPath) {
-    try {
-        if (!fs.existsSync(playlistPath)) {
-            return 0;
-        }
-        const content = fs.readFileSync(playlistPath, 'utf8');
-        const segmentMatches = content.match(/\.ts/g);
-        return segmentMatches ? segmentMatches.length : 0;
-    } catch (err) {
-        return 0;
-    }
-}
 
 describe('Stream Utilities', () => {
     const testDir = path.join(__dirname, 'test-playlists');
 
     beforeEach(() => {
-        // Create test directory
         if (!fs.existsSync(testDir)) {
             fs.mkdirSync(testDir, { recursive: true });
         }
     });
 
     afterEach(() => {
-        // Cleanup test files
         if (fs.existsSync(testDir)) {
             fs.rmSync(testDir, { recursive: true, force: true });
         }
@@ -143,6 +109,59 @@ segment4.ts`;
 
             const result = getSegmentCount(playlistPath);
             expect(result).toBe(0);
+        });
+    });
+
+    describe('getCurrentTracksState', () => {
+        const hlsTestRoot = path.join(__dirname, '..', '..', 'media', 'hls');
+        const testStreamId = 'utils-test-stream';
+
+        beforeEach(() => {
+            if (!fs.existsSync(hlsTestRoot)) {
+                fs.mkdirSync(hlsTestRoot, { recursive: true });
+            }
+        });
+
+        afterEach(() => {
+            const streamDirs = [
+                path.join(hlsTestRoot, testStreamId),
+                path.join(hlsTestRoot, `${testStreamId}-pending`)
+            ];
+            for (const streamDir of streamDirs) {
+                if (fs.existsSync(streamDir)) {
+                    fs.rmSync(streamDir, { recursive: true, force: true });
+                }
+            }
+        });
+
+        test('should return information for a ready track directory', () => {
+            const streamDir = path.join(hlsTestRoot, testStreamId);
+            fs.mkdirSync(streamDir, { recursive: true });
+            fs.writeFileSync(path.join(streamDir, 'playlist.m3u8'), '#EXTM3U\nsegment1.ts\nsegment2.ts');
+
+            const result = getCurrentTracksState('http');
+
+            expect(result.tracks).toEqual(expect.arrayContaining([
+                expect.objectContaining({
+                    name: testStreamId,
+                    segments: 2,
+                    videoUrl: expect.stringContaining(`/api/hls/${testStreamId}/playlist.m3u8`)
+                })
+            ]));
+            expect(result.videoCount).toBeGreaterThanOrEqual(1);
+        });
+
+        test('should return pending state when playlist is not ready', () => {
+            const streamDir = path.join(hlsTestRoot, `${testStreamId}-pending`);
+            fs.mkdirSync(streamDir, { recursive: true });
+            fs.writeFileSync(path.join(streamDir, 'playlist.m3u8'), '#EXTM3U\nsegment1.ts');
+
+            const result = getCurrentTracksState('https');
+
+            expect(result.tracks).toEqual([]);
+            expect(result.pending).toBe(1);
+            expect(result.totalDirs).toBe(1);
+            expect(result.ready).toBe(false);
         });
     });
 });

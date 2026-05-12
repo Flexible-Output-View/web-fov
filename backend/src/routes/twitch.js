@@ -89,4 +89,11 @@ router.get('/top-categories', async (req, res, next) => {
     }
 });
 
+export function resetTokenCache() {
+    accessToken = null;
+    tokenExpiry = 0;
+    tokenPromise = null;
+}
+
+export { getAccessToken };
 export default router;
