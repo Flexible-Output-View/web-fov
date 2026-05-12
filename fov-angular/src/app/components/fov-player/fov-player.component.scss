@@ -79,24 +79,22 @@
   &:hover { background: var(--color-primary-hover, #7c3aed); }
 }
 
-/* ZONE PRINCIPALE (WORKSPACE) */
 .fov-workspace {
   display: flex;
   flex: 1;
-  position: relative; /* VITAL POUR L'OVERLAY */
+  position: relative;
   overflow: hidden;
   background: #000;
 }
 
-/* LE FAMEUX OVERLAY NOIR */
 .buffering-overlay {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: #000; /* Fond noir totalement uni */
+  background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000; /* Assure qu'il passe au dessus des vidéos */
+  z-index: 1000;
 }
 
 .buffering-content {
@@ -113,7 +111,6 @@
   letter-spacing: 0.5px;
 }
 
-/* ZONE DES VIDEOS */
 .fov-stage {
   flex: 1;
   position: relative;
@@ -176,7 +173,6 @@
   &:hover { opacity: 1; }
 }
 
-/* SIDEBAR AUDIO/SOURCES */
 .fov-sidebar {
   width: 260px;
   background: var(--bg-secondary, #1a1a1a);
@@ -284,7 +280,6 @@
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-// ── Responsive ──
 @media (max-width: 1024px) {
   .fov-sidebar { width: 220px; }
 }
