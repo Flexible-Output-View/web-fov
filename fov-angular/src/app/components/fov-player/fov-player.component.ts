@@ -102,6 +102,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private readonly SYNC_THRESHOLD = 0.1;
   private readonly HARD_SYNC_THRESHOLD = 0.3;
   private readonly MIN_BUFFER_FOR_START = 6;
+  private readonly MIN_COMMON_RANGE = 4;
   private readonly MIN_FORWARD_BUFFER = 3;
   private readonly SAFE_POSITION_MARGIN = 0.5;
 
@@ -726,7 +727,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     });
 
     const commonRange = commonEnd - commonStart;
-    if (commonRange < this.MIN_BUFFER_FOR_START) {
+    if (commonRange < this.MIN_COMMON_RANGE) {
       console.log(
         `[Buffer] Common range too small: ${commonRange.toFixed(1)}s`,
       );
