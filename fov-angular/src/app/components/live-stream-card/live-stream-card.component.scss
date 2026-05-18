@@ -98,14 +98,11 @@
   font-size: 0.75rem;
   color: white;
   z-index: 2;
-
-  .icon {
-    font-size: 0.85rem;
-  }
 }
 
 .card-info {
   padding: 12px 14px;
+  background: var(--bg-secondary);
 }
 
 .card-info-row {
@@ -151,7 +148,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -160,7 +157,7 @@
 .stream-title {
   margin: 2px 0 0 0;
   font-size: 0.85rem;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -169,13 +166,13 @@
 .stream-category {
   margin: 2px 0 0 0;
   font-size: 0.8rem;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .stream-description {
   margin: 4px 0 0 0;
   font-size: 0.85rem;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -184,10 +181,9 @@
 .viewer-count-info {
   margin-top: 6px;
   font-size: 0.8rem;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
-// ── Responsive ──
 @media (max-width: 768px) {
   .live-stream-card {
     border-radius: var(--radius-md, 8px);

@@ -42,17 +42,17 @@
 
   .btn-refresh {
     padding: 8px 16px;
-    background: var(--bg-tertiary, #252525);
-    border: 1px solid var(--border-color, #2a2a2a);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-md, 8px);
-    color: var(--text-secondary, #888);
+    color: var(--text-secondary);
     font-size: 0.85rem;
     cursor: pointer;
     transition: all 0.2s ease;
 
     &:hover:not(:disabled) {
       background: var(--bg-hover, #333);
-      color: var(--text-primary, #fff);
+      color: var(--text-primary);
     }
 
     &:disabled {
