@@ -102,6 +102,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private readonly SYNC_THRESHOLD = 0.1;
   private readonly HARD_SYNC_THRESHOLD = 0.3;
   private readonly MIN_BUFFER_FOR_START = 6;
+  private readonly MIN_COMMON_RANGE = 4;
   private readonly MIN_FORWARD_BUFFER = 3;
   private readonly SAFE_POSITION_MARGIN = 0.5;
 
@@ -110,6 +111,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private readonly MAX_POLL_ATTEMPTS = 60;
   private pollAttempts = 0;
   private isInitialized = false;
+  private readonly MOBILE_BREAKPOINT = 768;
 
   readonly playerId = `fov_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -138,6 +140,41 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.videoWrappers.forEach((w) => w.hls?.destroy());
   }
 
+  private isMobileLayout(): boolean {
+    return window.innerWidth <= this.MOBILE_BREAKPOINT;
+  }
+
+  private getFittedSize(
+    stageW: number,
+    stageH: number,
+    aspectRatio: number,
+    fillRatio: number = 0.95,
+  ) {
+    const maxW = stageW * fillRatio;
+    const maxH = stageH * fillRatio;
+
+    let width = maxW;
+    let height = width / aspectRatio;
+
+    if (height > maxH) {
+      height = maxH;
+      width = height * aspectRatio;
+    }
+
+    return { width, height };
+  }
+
+  private clampWrapperToStage(wrapper: VideoWrapper) {
+    const stage = this.getStageElement();
+    if (!stage) return;
+
+    const maxX = Math.max(0, stage.offsetWidth - wrapper.width);
+    const maxY = Math.max(0, stage.offsetHeight - wrapper.height);
+
+    wrapper.x = Math.max(0, Math.min(wrapper.x, maxX));
+    wrapper.y = Math.max(0, Math.min(wrapper.y, maxY));
+  }
+
   private loadTracks() {
     if (this.playbackStarted || this.videoWrappers.length > 0) {
       console.warn('[loadTracks] Already initialized, skipping');
@@ -148,6 +185,80 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.playbackStarted = false;
     this.errorMessage = '';
     this.fetchAvailableTracks();
+  }
+
+  private adaptWrappersToViewport() {
+    const stage = this.getStageElement();
+    if (!stage || this.videoWrappers.length === 0) return;
+
+    const stageW = stage.offsetWidth;
+    const stageH = stage.offsetHeight;
+
+    if (this.isMobileLayout()) {
+      const main = this.videoWrappers[0];
+      const mainAspect = main.aspectRatio || 16 / 9;
+      const mainFitted = this.getFittedSize(stageW, stageH * 0.68, mainAspect, 0.96);
+
+      main.width = mainFitted.width;
+      main.height = mainFitted.height;
+      main.x = (stageW - main.width) / 2;
+      main.y = 8;
+
+      let currentX = 8;
+      let currentY = main.y + main.height + 8;
+      const thumbHeight = Math.min(90, stageH * 0.16);
+
+      for (let i = 1; i < this.videoWrappers.length; i++) {
+        const wrapper = this.videoWrappers[i];
+        const ratio = wrapper.aspectRatio || 16 / 9;
+
+        wrapper.height = thumbHeight;
+        wrapper.width = wrapper.height * ratio;
+
+        if (currentX + wrapper.width > stageW - 8) {
+          currentX = 8;
+          currentY += thumbHeight + 8;
+        }
+
+        wrapper.x = currentX;
+        wrapper.y = currentY;
+
+        currentX += wrapper.width + 8;
+        this.clampWrapperToStage(wrapper);
+      }
+    } else {
+      this.videoWrappers.forEach((wrapper, index) => {
+        const ratio = wrapper.aspectRatio || 16 / 9;
+        const fitted = this.getFittedSize(
+          stageW,
+          stageH,
+          ratio,
+          index === 0 ? 1 : this.MAX_WIDTH_RATIO,
+        );
+
+        if (wrapper.width > fitted.width) {
+          wrapper.width = fitted.width;
+          wrapper.height = wrapper.width / ratio;
+        }
+
+        if (wrapper.height > fitted.height) {
+          wrapper.height = fitted.height;
+          wrapper.width = wrapper.height * ratio;
+        }
+
+        this.clampWrapperToStage(wrapper);
+      });
+    }
+  }
+
+  @HostListener('window:resize')
+  onWindowResize() {
+    setTimeout(() => this.adaptWrappersToViewport(), 0);
+  }
+
+  @HostListener('window:orientationchange')
+  onOrientationChange() {
+    setTimeout(() => this.adaptWrappersToViewport(), 200);
   }
 
   private fetchAvailableTracks() {
@@ -316,18 +427,50 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
     const stage = this.getStageElement();
     const stageW = stage ? stage.offsetWidth : 800;
+    const stageH = stage ? stage.offsetHeight : 450;
 
     const isFirst = this.videoWrappers.length === 0;
-    const initialWidth = isFirst ? stageW : 300;
     const initialAspectRatio = 16 / 9;
+
+    let initialWidth: number;
+    let initialHeight: number;
+    let initialX: number;
+    let initialY: number;
+
+    if (isFirst) {
+      if (this.isMobileLayout()) {
+        const fitted = this.getFittedSize(stageW, stageH * 0.68, initialAspectRatio, 0.96);
+        initialWidth = fitted.width;
+        initialHeight = fitted.height;
+        initialX = (stageW - initialWidth) / 2;
+        initialY = 8;
+      } else {
+        initialWidth = stageW;
+        initialHeight = initialWidth / initialAspectRatio;
+        initialX = 0;
+        initialY = 0;
+      }
+    } else {
+      if (this.isMobileLayout()) {
+        initialHeight = Math.min(90, stageH * 0.16);
+        initialWidth = initialHeight / (1 / initialAspectRatio);
+        initialX = 8;
+        initialY = Math.min(stageH - initialHeight - 8, 20 + (this.videoWrappers.length - 1) * 20);
+      } else {
+        initialWidth = 300;
+        initialHeight = initialWidth / initialAspectRatio;
+        initialX = 20;
+        initialY = 20 + (this.videoWrappers.length - 1) * 20;
+      }
+    }
 
     const newWrapper: VideoWrapper = {
       playerId: `player_${this.playerId}_${trackCopy.index}`,
       track: trackCopy,
-      x: isFirst ? 0 : 20,
-      y: isFirst ? 0 : 20 + (this.videoWrappers.length - 1) * 20,
+      x: initialX,
+      y: initialY,
       width: initialWidth,
-      height: initialWidth / initialAspectRatio,
+      height: initialHeight,
       hls: null,
       videoElement: null,
       visible: true,
@@ -341,8 +484,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     };
 
     this.videoWrappers.push(newWrapper);
-    setTimeout(() => this.initHlsForWrapper(newWrapper, track.videoUrl), 100);
-    setTimeout(() => this.refreshLayoutState(), 100);
+
+    setTimeout(() => {
+      this.initHlsForWrapper(newWrapper, track.videoUrl);
+      this.refreshLayoutState();
+      this.adaptWrappersToViewport();
+    }, 100);
   }
 
   removeTrack(wrapper: VideoWrapper) {
@@ -403,6 +550,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
           }
         }
       }
+
+      setTimeout(() => this.adaptWrappersToViewport(), 0);
     };
 
     videoEl.volume = wrapper.volume;
@@ -578,7 +727,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     });
 
     const commonRange = commonEnd - commonStart;
-    if (commonRange < this.MIN_BUFFER_FOR_START) {
+    if (commonRange < this.MIN_COMMON_RANGE) {
       console.log(
         `[Buffer] Common range too small: ${commonRange.toFixed(1)}s`,
       );
@@ -851,17 +1000,20 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   resetLayout() {
+    if (this.isMobileLayout()) {
+      this.adaptWrappersToViewport();
+      this.refreshLayoutState();
+      this.updateMasterReference();
+      return;
+    }
+
     const stage = this.getStageElement();
     const stageW = stage ? stage.offsetWidth : 800;
     const stageH = stage ? stage.offsetHeight : 450;
 
     this.videoWrappers.sort((a, b) => {
-      const indexA = this.originalTrackOrder.indexOf(
-        a.track.name.split('_')[0],
-      );
-      const indexB = this.originalTrackOrder.indexOf(
-        b.track.name.split('_')[0],
-      );
+      const indexA = this.originalTrackOrder.indexOf(a.track.name.split('_')[0]);
+      const indexB = this.originalTrackOrder.indexOf(b.track.name.split('_')[0]);
       return indexA - indexB;
     });
 
