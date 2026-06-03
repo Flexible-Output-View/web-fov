@@ -42,10 +42,10 @@
 
 .btn-edit {
   padding: 6px 14px;
-  background: var(--bg-tertiary, #252525);
-  border: 1px solid var(--border-color, #2a2a2a);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md, 8px);
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -57,6 +57,7 @@
   &.active {
     background: var(--color-primary, #9147ff);
     border-color: var(--color-primary, #9147ff);
+    color: white;
   }
 
   &:disabled {
@@ -100,6 +101,7 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
 .fov-stage {
@@ -352,12 +354,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.95);
+  background: var(--bg-primary, #0f0f0f);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(10px);
 }
 
 .buffering-content {
@@ -389,13 +390,18 @@
     }
   }
 
-  .btn-edit, .btn-reset {
+  .btn-edit,
+  .btn-reset {
     padding: 4px 10px;
     font-size: 0.75rem;
   }
 
   .fov-workspace {
     flex-direction: column;
+  }
+
+  .fov-stage {
+    min-height: 52vh;
   }
 
   .fov-sidebar {
@@ -430,4 +436,35 @@
     width: 40px;
     height: 40px;
   }
+
+  .drag-bar {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    min-height: 34px;
+  }
+
+  .resize-handle {
+    width: 34px;
+    height: 34px;
+    opacity: 1;
+    background: linear-gradient(
+      135deg,
+      transparent 42%,
+      var(--color-primary, #9147ff) 42%
+    );
+  }
+
+  .video-container.editable {
+    box-shadow: 0 0 0 2px var(--color-primary, #9147ff);
+  }
+}
+
+.fov-stage,
+.video-container.editable,
+.resize-handle {
+  touch-action: none;
+}
+
+.fov-stage {
+  overscroll-behavior: contain;
 }

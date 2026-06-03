@@ -79,17 +79,40 @@ function killFFmpegProcess(streamId, process, timeout = PROCESS_GRACE_PERIOD) {
     });
 }
 
-function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
+function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
     const streamHlsDir = path.join(HLS_DIR, streamId);
     const mapArgs = [];
     const audioCodecArgs = [];
     const varStreamEntries = [];
 
-    for (let i = 0; i < videoTrackCount; i++) {
-        mapArgs.push('-map', `0:v:${i}`);
-        mapArgs.push('-map', '0:a?');
-        audioCodecArgs.push(`-c:a:${i}`, 'copy');
-        varStreamEntries.push(`v:${i},a:${i}`);
+    // 1. Map all available video tracks
+    for (let v = 0; v < videoTrackCount; v++) {
+        mapArgs.push('-map', `0:v:${v}`);
+    }
+
+    // 2. Map all available audio tracks
+    for (let a = 0; a < audioTrackCount; a++) {
+        mapArgs.push('-map', `0:a:${a}`);
+        audioCodecArgs.push(`-c:a:${a}`, 'copy');
+    }
+
+    // 3. Build Strict HLS Variant Streams (No Fallbacks)
+    const maxTracks = Math.max(videoTrackCount, audioTrackCount);
+
+    for (let i = 0; i < maxTracks; i++) {
+        const hasVideo = i < videoTrackCount;
+        const hasAudio = i < audioTrackCount;
+
+        if (hasVideo && hasAudio) {
+            // Both exist at this index: Pair them
+            varStreamEntries.push(`v:${i},a:${i}`);
+        } else if (hasVideo) {
+            // Only video exists at this index: Video alone
+            varStreamEntries.push(`v:${i}`);
+        } else if (hasAudio) {
+            // Only audio exists at this index: Audio alone
+            varStreamEntries.push(`a:${i}`);
+        }
     }
 
     const srtParams = [
@@ -130,15 +153,15 @@ function buildFfmpegArgs(videoTrackCount, streamId, srtUrl) {
     return ffmpegArgs;
 }
 
-function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
-    if (!tracks || tracks === 0) {
+function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null) {
+    if (!tracksV || tracksV === 0) {
         if (socket) {
             socket.destroy();
         }
         return;
     }
 
-    const ffmpegArgs = buildFfmpegArgs(tracks, streamId, srtUrl);
+    const ffmpegArgs = buildFfmpegArgs(tracksV, tracksA, streamId, srtUrl);
 
     console.log(`📀 Spawning FFmpeg for stream ${streamId}:`, 'ffmpeg', ffmpegArgs.join(' '));
 
@@ -198,7 +221,8 @@ function startFFmpegListener(streamId, tracks, socket, srtUrl = null) {
 
     ffmpegProcesses.set(streamId, {
         process: ffmpegProc,
-        tracks,
+        tracksV,
+        tracksA,
         socket,
         stopped: false,
         createdAt: Date.now()
@@ -241,11 +265,15 @@ function createMediaRoutes() {
 
     // POST /ffmpeg/register — register a stream and create a unique SRT listener
     router.post('/ffmpeg/register', (req, res) => {
-        const { tracks, streamId: providedStreamId } = req.body ?? {};
-        const trackNum = Number.parseInt(tracks, 10);
+        const { tracks: tracksV, audioTracks: tracksA, streamId: providedStreamId } = req.body ?? {};
+        const trackVNum = Number.parseInt(tracksV, 10);
+        const trackANum = Number.parseInt(tracksA, 10);
 
-        if (!Number.isInteger(trackNum) || trackNum <= 0) {
-            return res.status(400).json({ error: "Invalid 'tracks' parameter." });
+        if (!Number.isInteger(trackVNum) || trackVNum <= 0) {
+            return res.status(400).json({ error: "Invalid 'video tracks' parameter." });
+        }
+        if (!Number.isInteger(trackANum) || trackANum <= 0) {
+            return res.status(400).json({ error: "Invalid 'audio tracks' parameter." });
         }
 
         const streamId = providedStreamId || randomUUID();
@@ -274,20 +302,22 @@ function createMediaRoutes() {
                 '&nakreport=1'
             ].join('');
 
-            startFFmpegListener(streamId, trackNum, null, srtUrl);
+            startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl);
 
             registeredStreams.set(streamId, {
-                tracks: trackNum,
+                tracksV: trackVNum,
+                tracksA: trackANum,
                 port: srtPort,
                 srtUrl
             });
 
-            console.log(`📝 Stream registered: ${streamId} (tracks=${trackNum}, port=${srtPort})`);
+            console.log(`📝 Stream registered: ${streamId} (tracksV=${trackVNum}, (tracksA=${trackANum}, port=${srtPort})`);
 
             return res.status(200).json({
                 status: 'registered',
                 streamId,
-                tracks: trackNum,
+                tracksV: trackVNum,
+                tracksA: trackANum,
                 srtUrl: srtUrlExternal,
                 hlsUrl: `/api/hls/${streamId}/0/playlist.m3u8`
             });
