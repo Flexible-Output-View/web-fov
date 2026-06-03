@@ -85,11 +85,34 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
     const audioCodecArgs = [];
     const varStreamEntries = [];
 
-    for (let i = 0; i < videoTrackCount; i++) {
-        mapArgs.push('-map', `0:v:${i}`);
-        mapArgs.push('-map', `0:a:${i}`);
-        audioCodecArgs.push(`-c:a:${i}`, 'copy');
-        varStreamEntries.push(`v:${i},a:${i}`);
+    // 1. Map all available video tracks
+    for (let v = 0; v < videoTrackCount; v++) {
+        mapArgs.push('-map', `0:v:${v}`);
+    }
+
+    // 2. Map all available audio tracks
+    for (let a = 0; a < audioTrackCount; a++) {
+        mapArgs.push('-map', `0:a:${a}`);
+        audioCodecArgs.push(`-c:a:${a}`, 'copy');
+    }
+
+    // 3. Build Strict HLS Variant Streams (No Fallbacks)
+    const maxTracks = Math.max(videoTrackCount, audioTrackCount);
+
+    for (let i = 0; i < maxTracks; i++) {
+        const hasVideo = i < videoTrackCount;
+        const hasAudio = i < audioTrackCount;
+
+        if (hasVideo && hasAudio) {
+            // Both exist at this index: Pair them
+            varStreamEntries.push(`v:${i},a:${i}`);
+        } else if (hasVideo) {
+            // Only video exists at this index: Video alone
+            varStreamEntries.push(`v:${i}`);
+        } else if (hasAudio) {
+            // Only audio exists at this index: Audio alone
+            varStreamEntries.push(`a:${i}`);
+        }
     }
 
     const srtParams = [
@@ -198,7 +221,8 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null) 
 
     ffmpegProcesses.set(streamId, {
         process: ffmpegProc,
-        tracks,
+        tracksV,
+        tracksA,
         socket,
         stopped: false,
         createdAt: Date.now()
@@ -241,15 +265,15 @@ function createMediaRoutes() {
 
     // POST /ffmpeg/register — register a stream and create a unique SRT listener
     router.post('/ffmpeg/register', (req, res) => {
-        const { tracksV, tracksA, streamId: providedStreamId } = req.body ?? {};
+        const { tracks: tracksV, audioTracks: tracksA, streamId: providedStreamId } = req.body ?? {};
         const trackVNum = Number.parseInt(tracksV, 10);
         const trackANum = Number.parseInt(tracksA, 10);
 
         if (!Number.isInteger(trackVNum) || trackVNum <= 0) {
-            return res.status(400).json({ error: "Invalid 'tracks' parameter." });
+            return res.status(400).json({ error: "Invalid 'video tracks' parameter." });
         }
         if (!Number.isInteger(trackANum) || trackANum <= 0) {
-            return res.status(400).json({ error: "Invalid 'tracks' parameter." });
+            return res.status(400).json({ error: "Invalid 'audio tracks' parameter." });
         }
 
         const streamId = providedStreamId || randomUUID();
