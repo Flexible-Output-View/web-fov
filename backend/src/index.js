@@ -9,7 +9,6 @@ import db from './db.js';
 import apiRoutes from './routes/index.js';
 import { createMediaRoutes, startMediaServer } from './mediaServer.mjs';
 
-
 const PORT = process.env.PORT || 4000;
 
 const app = express();
@@ -34,10 +33,8 @@ app.use((err, req, res, next) => {
 
 async function start() {
     try {
-        // verify connection
-        const conn = await db.getConnection();
-        await conn.ping();
-        conn.release();
+        // verify PostgreSQL connection
+        await db.query('SELECT 1');
         console.log('✅ Connected to BDD');
 
         // initialize media server
