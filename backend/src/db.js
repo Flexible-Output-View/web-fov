@@ -1,30 +1,25 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
-import mysql from 'mysql2/promise';
+import { Pool } from 'pg';
 
-const pool = mysql.createPool({
+const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
     user: process.env.DB_USER || 'admin',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'fovwebdb',
-    connectionLimit: 5,
-    enableKeepAlive: true
+    max: 5,
+    idleTimeoutMillis: 30000,
+    keepAlive: true
 });
 
 export default {
     pool,
-    async getConnection() {
-        return pool.getConnection();
+    async query(text, params) {
+        const res = await pool.query(text, params);
+        return res.rows;
     },
-    async query(sql, params) {
-        const conn = await pool.getConnection();
-        try {
-            const res = await conn.query(sql, params);
-            return res;
-        } finally {
-            if (conn) {
-                conn.release();
-            }
-        }
+    async getClient() {
+        return pool.connect();
     }
 };
