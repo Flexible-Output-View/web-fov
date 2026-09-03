@@ -14,6 +14,7 @@ export interface Track {
   index: number;
   name: string;
   videoUrl: string;
+  isVideo: boolean;
 }
 
 export interface VideoWrapper {
@@ -33,6 +34,7 @@ export interface VideoWrapper {
   hasManifest: boolean;
   bufferEnd: number;
   bufferStart: number;
+  isVideo: boolean;
 }
 
 interface ApiTracksResponse {
@@ -195,7 +197,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const stageH = stage.offsetHeight;
 
     if (this.isMobileLayout()) {
-      const main = this.videoWrappers[0];
+      const main = this.videoWrappers.find(w => w.isVideo);
+      if (!main) return;
       const mainAspect = main.aspectRatio || 16 / 9;
       const mainFitted = this.getFittedSize(stageW, stageH * 0.68, mainAspect, 0.96);
 
@@ -210,8 +213,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
       for (let i = 1; i < this.videoWrappers.length; i++) {
         const wrapper = this.videoWrappers[i];
-        const ratio = wrapper.aspectRatio || 16 / 9;
+        if (!wrapper.isVideo) continue;
 
+        const ratio = wrapper.aspectRatio || 16 / 9;
         wrapper.height = thumbHeight;
         wrapper.width = wrapper.height * ratio;
 
@@ -222,12 +226,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
         wrapper.x = currentX;
         wrapper.y = currentY;
-
         currentX += wrapper.width + 8;
         this.clampWrapperToStage(wrapper);
       }
     } else {
       this.videoWrappers.forEach((wrapper, index) => {
+        if (!wrapper.isVideo) return;
+
         const ratio = wrapper.aspectRatio || 16 / 9;
         const fitted = this.getFittedSize(
           stageW,
@@ -464,6 +469,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       }
     }
 
+    if (!track.isVideo) {
+      initialWidth = 0;
+      initialHeight = 0;
+      initialX = 0;
+      initialY = 0;
+    }
+
     const newWrapper: VideoWrapper = {
       playerId: `player_${this.playerId}_${trackCopy.index}`,
       track: trackCopy,
@@ -481,6 +493,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       hasManifest: false,
       bufferEnd: 0,
       bufferStart: 0,
+      isVideo: track.isVideo,
     };
 
     this.videoWrappers.push(newWrapper);
@@ -866,10 +879,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     if (this.videoWrappers.length < 2) return;
     if (!this.playbackStarted) return;
 
-    const master = this.videoWrappers[0];
-    if (!master.videoElement) return;
-    if (master.videoElement.paused || master.videoElement.readyState < 3)
-      return;
+    const master = this.videoWrappers.find(w => w.playerId === this.masterPlayerId);
+    if (!master || !master.isVideo || !master.videoElement) return;
+    if (master.videoElement.paused || master.videoElement.readyState < 3) return;
 
     const masterTime = master.videoElement.currentTime;
     this.maxDrift = 0;
@@ -923,6 +935,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   startDrag(event: PointerEvent, wrapper: VideoWrapper) {
     if (!this.editMode) return;
+    if (!wrapper.isVideo) return;
     if ((event.target as HTMLElement).classList.contains('resize-handle'))
       return;
 
@@ -937,6 +950,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   startResize(event: PointerEvent, wrapper: VideoWrapper) {
     if (!this.editMode) return;
+    if (!wrapper.isVideo) return;
 
     this.activeResizeWrapper = wrapper;
     this.dragStartX = event.clientX;
@@ -1011,13 +1025,20 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const stageW = stage ? stage.offsetWidth : 800;
     const stageH = stage ? stage.offsetHeight : 450;
 
-    this.videoWrappers.sort((a, b) => {
+    const videoWrappers = this.videoWrappers.filter(w => w.isVideo);
+    videoWrappers.sort((a, b) => {
       const indexA = this.originalTrackOrder.indexOf(a.track.name.split('_')[0]);
       const indexB = this.originalTrackOrder.indexOf(b.track.name.split('_')[0]);
       return indexA - indexB;
     });
 
-    this.videoWrappers.forEach((w, i) => {
+    let videoIndex = 0;
+    this.videoWrappers.forEach(w => {
+      if (!w.isVideo) {
+        w.visible = true;
+        return;
+      }
+      const i = videoIndex++;
       if (i === 0) {
         w.x = 0;
         w.y = 0;
@@ -1065,10 +1086,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private updateMasterReference() {
-    if (this.videoWrappers.length > 0) {
-      const newMaster = this.videoWrappers[0];
-      const wasDifferentMaster = this.masterPlayerId !== newMaster.playerId;
-      this.masterPlayerId = newMaster.playerId;
+    const masterWrapper = this.videoWrappers.find(w => w.isVideo);
+    if (masterWrapper) {
+      const wasDifferentMaster = this.masterPlayerId !== masterWrapper.playerId;
+      this.masterPlayerId = masterWrapper.playerId;
       this.setupMasterListeners();
 
       if (wasDifferentMaster) {
