@@ -4,6 +4,8 @@ import {
   AfterViewInit,
   OnDestroy,
   HostListener,
+  ViewChild,
+  ElementRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -36,6 +38,10 @@ export interface VideoWrapper {
   bufferEnd: number;
   bufferStart: number;
   isVideo: boolean;
+  nx: number;
+  ny: number;
+  nw: number;
+  nh: number;
 }
 
 interface ApiTracksResponse {
@@ -115,11 +121,16 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private readonly API_URL = environment.apiUrl;
   private readonly MAX_POLL_ATTEMPTS = 60;
   private pollAttempts = 0;
+  private initGeneration = 0;
   private isInitialized = false;
   private audioUnlocked = false;
   private readonly MOBILE_BREAKPOINT = 768;
 
   readonly playerId = `fov_${Math.random().toString(36).substr(2, 9)}`;
+
+  @ViewChild('playerRoot') playerRoot?: ElementRef<HTMLElement>;
+
+  isFullscreen = false;
 
   constructor(private http: HttpClient) {}
 
@@ -128,6 +139,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     if (this.isLoading && !this.isBufferingPhase)
       return 'Connexion au serveur...';
     return 'Chargement du live...';
+  }
+
+  trackByWrapper(index: number, wrapper: VideoWrapper): string {
+    return wrapper.playerId;
   }
 
   ngAfterViewInit() {
@@ -144,6 +159,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.stopPolling();
     this.stopBufferCheck();
     this.videoWrappers.forEach((w) => w.hls?.destroy());
+    if (this.isFullscreen) {
+      document.exitFullscreen?.().catch(() => {});
+    }
   }
 
   private isMobileLayout(): boolean {
@@ -193,19 +211,58 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.fetchAvailableTracks();
   }
 
+  private captureNormalized(): void {
+    const stage = this.getStageElement();
+    if (!stage) return;
+    const stageW = stage.offsetWidth;
+    const stageH = stage.offsetHeight;
+    if (!stageW || !stageH) return;
+
+    // Skip si on est en train de changer de fullscreen (stage transitoire)
+    if (this.isFullscreen !== !!document.fullscreenElement) return;
+
+    for (const w of this.videoWrappers) {
+      if (!w.isVideo) continue;
+      // Sanity check : un wrapper ne peut pas être plus grand que le stage
+      if (w.width > stageW + 1 || w.height > stageH + 1) return;
+      w.nx = w.x / stageW;
+      w.ny = w.y / stageH;
+      w.nw = w.width / stageW;
+      w.nh = w.height / stageH;
+    }
+  }
+
+  private applyNormalizedToPixels(): void {
+    const stage = this.getStageElement();
+    if (!stage) return;
+    const stageW = stage.offsetWidth;
+    const stageH = stage.offsetHeight;
+    if (!stageW || !stageH) return;
+
+    for (const w of this.videoWrappers) {
+      if (!w.isVideo) continue;
+      w.x = w.nx * stageW;
+      w.y = w.ny * stageH;
+      w.width = w.nw * stageW;
+      w.height = w.nh * stageH;
+    }
+  }
+
   private adaptWrappersToViewport() {
     const stage = this.getStageElement();
     if (!stage || this.videoWrappers.length === 0) return;
 
     const stageW = stage.offsetWidth;
     const stageH = stage.offsetHeight;
+    if (!stageW || !stageH) return;
 
     if (this.isMobileLayout()) {
-      const main = this.videoWrappers.find(w => w.isVideo);
+      // Mobile : recalcul à neuf, puis on fige les ratios
+      const main = this.videoWrappers.find((w) => w.isVideo);
       if (!main) return;
+
       const mainAspect = main.aspectRatio || 16 / 9;
       const mainFitted = this.getFittedSize(stageW, stageH * 0.68, mainAspect, 0.96);
-
       main.width = mainFitted.width;
       main.height = mainFitted.height;
       main.x = (stageW - main.width) / 2;
@@ -233,30 +290,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         currentX += wrapper.width + 8;
         this.clampWrapperToStage(wrapper);
       }
+
+      this.captureNormalized();
     } else {
-      this.videoWrappers.forEach((wrapper, index) => {
-        if (!wrapper.isVideo) return;
-
-        const ratio = wrapper.aspectRatio || 16 / 9;
-        const fitted = this.getFittedSize(
-          stageW,
-          stageH,
-          ratio,
-          index === 0 ? 1 : this.MAX_WIDTH_RATIO,
-        );
-
-        if (wrapper.width > fitted.width) {
-          wrapper.width = fitted.width;
-          wrapper.height = wrapper.width / ratio;
-        }
-
-        if (wrapper.height > fitted.height) {
-          wrapper.height = fitted.height;
-          wrapper.width = wrapper.height * ratio;
-        }
-
-        this.clampWrapperToStage(wrapper);
-      });
+      // Desktop : on applique simplement les ratios au stage courant.
+      // C’est idempotent : entrer/sortir du fullscreen ne dérive pas.
+      this.applyNormalizedToPixels();
     }
   }
 
@@ -268,6 +307,18 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   @HostListener('window:orientationchange')
   onOrientationChange() {
     setTimeout(() => this.adaptWrappersToViewport(), 200);
+  }
+
+  @HostListener('document:fullscreenchange')
+  @HostListener('document:webkitfullscreenchange')
+  onFullscreenChange() {
+    this.isFullscreen = !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement
+    );
+    // Un seul setTimeout suffit : applyNormalizedToPixels est idempotent,
+    // donc un appel supplémentaire ne casserait rien de toute façon.
+    setTimeout(() => this.adaptWrappersToViewport(), 100);
   }
 
   private fetchAvailableTracks() {
@@ -311,10 +362,14 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         videoUrl: t.videoUrl,
         isVideo: t.isVideo ?? true,
       }));
-      console.log(
-        `[loadTracks] Stream "${this.streamId}" found with ${this.availableTracks.length} tracks`,
-      );
+      console.log('[API] availableTracks:', this.availableTracks);
       this.initializeAllTracks();
+      console.log('[DEBUG] wrappers:', this.videoWrappers.map(w => ({
+        name: w.track.name,
+        index: w.track.index,
+        isVideo: w.isVideo,
+        hasVideoEl: !!w.videoElement,
+      })));
       this.isLoading = false;
     } else {
       this.handleNoData();
@@ -401,38 +456,55 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private initializeAllTracks() {
-    if (this.videoWrappers.length > 0) {
-      console.warn(
-        '[initializeAllTracks] Destroying existing players before reinit',
-      );
-      this.videoWrappers.forEach((w) => {
-        if (w.hls) {
-          w.hls.destroy();
-          w.hls = null;
-        }
-      });
-      this.videoWrappers = [];
-    }
+  const generation = ++this.initGeneration;
 
-    this.originalTrackOrder = this.availableTracks.map((t) => t.name);
-    this.playbackStarted = false;
-    this.isBufferingPhase = true;
-
-    const stagger = this.availableTracks.length <= 2 ? 200 : 100;
-
-    this.availableTracks.forEach((track, index) => {
-      setTimeout(() => this.addTrack(track), index * stagger);
+  if (this.videoWrappers.length > 0) {
+    console.warn(
+      '[initializeAllTracks] Destroying existing players before reinit',
+    );
+    this.videoWrappers.forEach((w) => {
+      if (w.hls) {
+        w.hls.destroy();
+        w.hls = null;
+      }
     });
-
-    const totalStagger = this.availableTracks.length * stagger;
-    setTimeout(() => this.startBufferCheck(), totalStagger + 500);
+    this.videoWrappers = [];
   }
+
+  this.originalTrackOrder = this.availableTracks.map((t) => t.name);
+  this.playbackStarted = false;
+  this.isBufferingPhase = true;
+
+  const stagger = this.availableTracks.length <= 2 ? 200 : 100;
+
+  this.availableTracks.forEach((track, index) => {
+    setTimeout(() => {
+      if (generation !== this.initGeneration) return; // stale
+      this.addTrack(track);
+    }, index * stagger);
+  });
+
+  const totalStagger = this.availableTracks.length * stagger;
+  setTimeout(() => {
+    if (generation !== this.initGeneration) return;
+    this.startBufferCheck();
+    console.log(
+      '[DEBUG] wrappers finaux:',
+      this.videoWrappers.map((w) => ({
+        name: w.track.name,
+        index: w.track.index,
+        isVideo: w.isVideo,
+      })),
+    );
+  }, totalStagger + 500);
+}
 
   private getStageElement(): HTMLElement | null {
     return document.getElementById(`stageArea_${this.playerId}`);
   }
 
   private addTrack(track: Track) {
+    console.log('[addTrack]', track.name, 'isVideo =', track.isVideo);
     const uniqueId = this.trackIdCounter++;
     const trackCopy: Track = {
       ...track,
@@ -486,6 +558,11 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       initialY = 0;
     }
 
+    const initNx = stageW > 0 ? initialX / stageW : 0;
+    const initNy = stageH > 0 ? initialY / stageH : 0;
+    const initNw = stageW > 0 ? initialWidth / stageW : 1;
+    const initNh = stageH > 0 ? initialHeight / stageH : 1;
+
     const newWrapper: VideoWrapper = {
       playerId: `player_${this.playerId}_${trackCopy.index}`,
       track: trackCopy,
@@ -504,6 +581,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       bufferEnd: 0,
       bufferStart: 0,
       isVideo: track.isVideo,
+      nx: initNx,
+      ny: initNy,
+      nw: initNw,
+      nh: initNh,
     };
 
     this.videoWrappers.push(newWrapper);
@@ -559,27 +640,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const isMaster = this.videoWrappers[0] === wrapper;
 
     videoEl.onloadedmetadata = () => {
-      if (videoEl.videoWidth && videoEl.videoHeight) {
-        wrapper.aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
-        wrapper.height = wrapper.width / wrapper.aspectRatio;
+    if (videoEl.videoWidth && videoEl.videoHeight) {
+      wrapper.aspectRatio = videoEl.videoWidth / videoEl.videoHeight;      
+    }
 
-        const stage = this.getStageElement();
-        if (stage) {
-          const maxWidth = stage.offsetWidth * this.MAX_WIDTH_RATIO;
-          const maxHeight = stage.offsetHeight * this.MAX_WIDTH_RATIO;
-          if (wrapper.width > maxWidth) {
-            wrapper.width = maxWidth;
-            wrapper.height = wrapper.width / wrapper.aspectRatio;
-          }
-          if (wrapper.height > maxHeight) {
-            wrapper.height = maxHeight;
-            wrapper.width = wrapper.height * wrapper.aspectRatio;
-          }
-        }
-      }
-
-      setTimeout(() => this.adaptWrappersToViewport(), 0);
-    };
+    setTimeout(() => this.adaptWrappersToViewport(), 0);
+  };
 
     videoEl.volume = wrapper.volume;
     videoEl.muted = true;
@@ -1001,6 +1067,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   @HostListener('window:pointerup', ['$event'])
   onPointerUp(event: PointerEvent) {
+    if (this.activeDragWrapper || this.activeResizeWrapper) {
+      this.captureNormalized();
+    }
     this.activeDragWrapper = null;
     this.activeResizeWrapper = null;
   }
@@ -1016,6 +1085,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       this.adaptWrappersToViewport();
       this.refreshLayoutState();
       this.updateMasterReference();
+      this.captureNormalized();
       return;
     }
 
@@ -1127,6 +1197,29 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   toggleEditMode() {
     this.editMode = !this.editMode;
+  }
+
+  async toggleFullscreen() {
+    const el = this.playerRoot?.nativeElement;
+    if (!el) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        if (el.requestFullscreen) {
+          await el.requestFullscreen();
+        } else if ((el as any).webkitRequestFullscreen) {
+          await (el as any).webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err);
+    }
   }
 
   private applyWrapperAudio(wrapper: VideoWrapper) {

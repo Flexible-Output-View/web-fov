@@ -2,7 +2,6 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FeaturedCarouselComponent } from '../../components/featured-carousel/featured-carousel.component';
 import { CategoryCardComponent, Category } from '../../components/category-card/category-card.component';
-import { LiveStreamCardComponent } from '../../components/live-stream-card/live-stream-card.component';
 import { TwitchService } from '../../services/twitch.service';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { LiveStreamInfo } from '../../models/live-stream.model';
@@ -15,7 +14,6 @@ import { Subject, takeUntil, interval, startWith, switchMap } from 'rxjs';
     CommonModule,
     FeaturedCarouselComponent,
     CategoryCardComponent,
-    LiveStreamCardComponent
   ],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.scss']
