@@ -69,6 +69,28 @@
         [title]="isFullscreen ? 'Quitter le plein écran' : 'Plein écran'">
         {{ isFullscreen ? '✕' : '⛶' }}
       </button>
+            <button
+        *ngIf="isFullscreen"
+        class="btn-fs-audio-toggle"
+        type="button"
+        (click)="toggleFullscreenAudioPanel()"
+        [title]="fullscreenAudioPanelOpen ? 'Masquer l\'audio' : 'Afficher l\'audio'">
+        {{ fullscreenAudioPanelOpen ? '>' : '<' }}
+      </button>
+
+      <div
+        *ngIf="isFullscreen && fullscreenAudioPanelOpen"
+        class="fs-audio-panel">
+        <h4>Audio</h4>
+        <div
+          *ngFor="let wrapper of videoWrappers; trackBy: trackByWrapper"
+          class="audio-control">
+          <label>{{ wrapper.track.name }}</label>
+          <input type="range" min="0" max="1" step="0.01"
+            [value]="wrapper.volume"
+            (input)="setVolume(wrapper, $event)">
+        </div>
+      </div>
     </div>
 
     <div class="audio-sink" aria-hidden="true">
