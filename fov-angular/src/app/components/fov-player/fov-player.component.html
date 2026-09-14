@@ -1,4 +1,4 @@
-<div class="fov-player">
+<div class="fov-player" #playerRoot>
   <div class="fov-toolbar">
     <div class="toolbar-left">
       <span class="live-indicator" *ngIf="playbackStarted">🔴 LIVE</span>
@@ -22,7 +22,7 @@
   </div>
 
   <div class="fov-workspace" *ngIf="!isLoading && !errorMessage">
-    
+
     <div class="buffering-overlay" *ngIf="isBufferingPhase">
       <div class="buffering-content">
         <div class="loading-spinner large"></div>
@@ -31,13 +31,13 @@
     </div>
 
     <div class="fov-stage" [id]="'stageArea_' + playerId" (click)="unlockAudio()">
-      <ng-container *ngFor="let wrapper of videoWrappers; let i = index">
+      <ng-container *ngFor="let wrapper of videoWrappers; trackBy: trackByWrapper">
         <div
           *ngIf="wrapper.isVideo"
           [id]="'videoWrapper_' + playerId + '_' + wrapper.track.index"
           class="video-container"
           [class.editable]="editMode"
-          [class.is-master]="i === 0"
+          [class.is-master]="wrapper === videoWrappers[0]"
           [class.is-ready]="wrapper.isReady"
           [style.z-index]="wrapper.zIndex"
           [style.display]="wrapper.visible ? 'flex' : 'none'"
@@ -61,10 +61,40 @@
           </div>
         </div>
       </ng-container>
+
+      <button
+        class="btn-fullscreen"
+        type="button"
+        (click)="toggleFullscreen()"
+        [title]="isFullscreen ? 'Quitter le plein écran' : 'Plein écran'">
+        {{ isFullscreen ? '✕' : '⛶' }}
+      </button>
+            <button
+        *ngIf="isFullscreen"
+        class="btn-fs-audio-toggle"
+        type="button"
+        (click)="toggleFullscreenAudioPanel()"
+        [title]="fullscreenAudioPanelOpen ? 'Masquer l\'audio' : 'Afficher l\'audio'">
+        {{ fullscreenAudioPanelOpen ? '>' : '<' }}
+      </button>
+
+      <div
+        *ngIf="isFullscreen && fullscreenAudioPanelOpen"
+        class="fs-audio-panel">
+        <h4>Audio</h4>
+        <div
+          *ngFor="let wrapper of videoWrappers; trackBy: trackByWrapper"
+          class="audio-control">
+          <label>{{ wrapper.track.name }}</label>
+          <input type="range" min="0" max="1" step="0.01"
+            [value]="wrapper.volume"
+            (input)="setVolume(wrapper, $event)">
+        </div>
+      </div>
     </div>
 
     <div class="audio-sink" aria-hidden="true">
-      <ng-container *ngFor="let wrapper of videoWrappers">
+      <ng-container *ngFor="let wrapper of videoWrappers; trackBy: trackByWrapper">
         <video
           *ngIf="!wrapper.isVideo"
           [id]="'videoElement_' + playerId + '_' + wrapper.track.index"
@@ -77,32 +107,34 @@
       <div class="panel-section" *ngIf="editMode">
         <h4>Sources</h4>
         <ul class="source-list">
-          <li *ngFor="let wrapper of videoWrappers; let i = index" class="source-item">
-            <div class="source-info">
-              <span class="source-name" [class.is-ref]="i === 0">
-                {{ i === 0 ? '[REF] ' : '' }}{{ wrapper.track.name }}
-              </span>
-            </div>
-            <div class="source-controls">
-              <button class="icon-btn" 
-                [class.hidden]="!wrapper.visible"
-                (click)="toggleVisibility(wrapper)">
-                {{ wrapper.visible ? '👁' : '👁‍🗨' }}
-              </button>
-              <button class="icon-btn" 
-                (click)="moveUp(i)"
-                [disabled]="i === 0">▲</button>
-              <button class="icon-btn" 
-                (click)="moveDown(i)"
-                [disabled]="i === videoWrappers.length - 1">▼</button>
-            </div>
-          </li>
+          <ng-container *ngFor="let wrapper of videoWrappers; let i = index; trackBy: trackByWrapper">
+            <li *ngIf="wrapper.isVideo" class="source-item">
+              <div class="source-info">
+                <span class="source-name" [class.is-ref]="i === 0">
+                  {{ i === 0 ? '[REF] ' : '' }}{{ wrapper.track.name }}
+                </span>
+              </div>
+              <div class="source-controls">
+                <button class="icon-btn"
+                  [class.hidden]="!wrapper.visible"
+                  (click)="toggleVisibility(wrapper)">
+                  {{ wrapper.visible ? '👁' : '👁‍🗨' }}
+                </button>
+                <button class="icon-btn"
+                  (click)="moveUp(i)"
+                  [disabled]="i === 0">▲</button>
+                <button class="icon-btn"
+                  (click)="moveDown(i)"
+                  [disabled]="i === videoWrappers.length - 1">▼</button>
+              </div>
+            </li>
+          </ng-container>
         </ul>
       </div>
 
       <div class="panel-section">
         <h4>Audio</h4>
-        <div *ngFor="let wrapper of videoWrappers" class="audio-control">
+        <div *ngFor="let wrapper of videoWrappers; trackBy: trackByWrapper" class="audio-control">
           <label>{{ wrapper.track.name }}</label>
           <input type="range" min="0" max="1" step="0.01"
             [value]="wrapper.volume"
