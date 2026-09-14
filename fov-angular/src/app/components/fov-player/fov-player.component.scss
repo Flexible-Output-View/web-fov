@@ -183,6 +183,36 @@
   }
 }
 
+/* === Bouton plein écran (flottant, bas-droite de la zone vidéo) === */
+.btn-fullscreen {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 500; /* au-dessus des .video-container (z-index 100+) */
+  transition: background 0.2s ease, transform 0.1s ease, opacity 0.2s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.85);
+    transform: scale(1.05);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
 .fov-sidebar {
   width: 260px;
   background: var(--bg-secondary, #1a1a1a);
@@ -385,6 +415,31 @@
   letter-spacing: 0.5px;
 }
 
+/* === État plein écran === */
+.fov-player:fullscreen,
+.fov-player:-webkit-full-screen {
+  border-radius: 0;
+
+  .fov-toolbar,
+  .fov-sidebar {
+    display: none !important;
+  }
+
+  .fov-workspace {
+    flex-direction: row;
+  }
+
+  .fov-stage {
+    min-height: 0;
+    flex: 1;
+  }
+
+  /* On garde le bouton visible pour pouvoir sortir */
+  .btn-fullscreen {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 1024px) {
   .fov-sidebar {
     width: 220px;
@@ -466,6 +521,14 @@
 
   .video-container.editable {
     box-shadow: 0 0 0 2px var(--color-primary, #9147ff);
+  }
+
+  .btn-fullscreen {
+    width: 44px;
+    height: 44px;
+    bottom: 12px;
+    right: 12px;
+    font-size: 1.2rem;
   }
 }
 
