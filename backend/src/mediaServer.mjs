@@ -131,7 +131,7 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
     }
 
     // 3. Pair each video track with its audio at the same index (v:0,a:0).
-    // Extra audio tracks beyond the video count get their own audio-only variant (a:N).
+    // Extra audio tracks beyond the video count get their own audio-only variant.
     const maxTracks = Math.max(videoTrackCount, audioTrackCount);
 
     for (let i = 0; i < maxTracks; i++) {
@@ -147,20 +147,8 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
         }
     }
 
-    const srtParams = [
-        'mode=listener',
-        'latency=4000000',
-        'rcvbuf=134217728',
-        'sndbuf=134217728',
-        'peerlatency=4000000',
-        'tlpktdrop=0',
-        'nakreport=1',
-        'connect_timeout=5000',
-        'linger=0'
-    ].join('&');
-
     const inputSource = srtUrl
-        ? `${srtUrl}?${srtParams}`
+        ? `${srtUrl}?mode=listener&latency=4000000&rcvbuf=134217728&sndbuf=134217728&peerlatency=4000000&tlpktdrop=0&nakreport=1&connect_timeout=5000&linger=0`
         : 'pipe:';
 
     const ffmpegArgs = [
@@ -175,7 +163,11 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '15',
-        '-hls_flags', 'delete_segments+independent_segments+omit_endlist',
+        // ↓ Added: program_date_time — injects EXT-X-PROGRAM-DATE-TIME into every
+        //   playlist segment. HLS.js uses wall-clock timestamps to align tracks,
+        //   bypassing the sequence×duration arithmetic that breaks when video
+        //   segments are longer than audio segments due to keyframe-only cutting.
+        '-hls_flags', 'delete_segments+independent_segments+omit_endlist+program_date_time',
         '-hls_segment_type', 'mpegts',
         '-hls_segment_filename', path.join(streamHlsDir, '%v', 'seg%05d.ts'),
         '-var_stream_map', varStreamEntries.join(' '),
