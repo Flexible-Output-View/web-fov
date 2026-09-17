@@ -17,6 +17,7 @@ export interface Track {
   name: string;
   videoUrl: string;
   isVideo: boolean;
+  isAudio: boolean;
 }
 
 export interface VideoWrapper {
@@ -72,8 +73,10 @@ interface ApiTracksResponse {
 
 interface ApiStreamTrack {
   trackId: string;
+  name?: string;
   videoUrl: string;
   isVideo?: boolean;
+  isAudio?: boolean;
 }
 
 interface ApiLiveStream {
@@ -458,9 +461,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       this.stopPolling();
       this.availableTracks = stream.tracks.map((t: any, i: number) => ({
         index: i,
-        name: t.trackId,
+        name: t.name ?? t.trackId,
         videoUrl: t.videoUrl,
         isVideo: t.isVideo ?? true,
+        isAudio: t.isAudio ?? true,
       }));
       this.waitForPlaylistsReady(this.availableTracks).then(() => {
         this.initializeAllTracks();
@@ -479,9 +483,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       this.stopPolling();
       this.availableTracks = stream.tracks.map((t, i) => ({
         index: i,
-        name: t.trackId,
+        name: t.name ?? t.trackId,
         videoUrl: t.videoUrl,
         isVideo: t.isVideo ?? true,
+        isAudio: t.isAudio ?? true,
       }));
       this.waitForPlaylistsReady(this.availableTracks).then(() => {
         this.initializeAllTracks();
