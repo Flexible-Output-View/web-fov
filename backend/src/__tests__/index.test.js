@@ -12,6 +12,7 @@ jest.unstable_mockModule('../routes/categories.js', () => ({ default: mockRouter
 jest.unstable_mockModule('../routes/streams.js', () => ({ default: mockRouter() }));
 jest.unstable_mockModule('../routes/users.js', () => ({ default: mockRouter() }));
 jest.unstable_mockModule('../routes/twitch.js', () => ({ default: mockRouter() }));
+jest.unstable_mockModule('../routes/auth.js', () => ({ default: mockRouter() }));
 
 const { default: apiRouter } = await import('../routes/index.js');
 
@@ -30,7 +31,7 @@ describe('API router', () => {
         const app = express();
         app.use('/api', apiRouter);
 
-        for (const prefix of ['categories', 'streams', 'users', 'twitch']) {
+        for (const prefix of ['categories', 'streams', 'users', 'twitch', 'auth']) {
             const response = await request(app).get(`/api/${prefix}/sentinel`);
             expect(response.status).toBe(200);
             expect(response.body).toEqual({ mounted: true });

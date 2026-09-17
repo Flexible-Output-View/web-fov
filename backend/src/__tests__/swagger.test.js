@@ -13,7 +13,9 @@ describe('Swagger document', () => {
             required: true,
             schema: { type: 'string' }
         });
-        expect(swaggerDocument.components.schemas.CreateUserRequest.required).toEqual(['username']);
+        expect(swaggerDocument.paths['/api/auth/register'].post).toBeDefined();
+        expect(swaggerDocument.paths['/api/auth/login'].post).toBeDefined();
+        expect(swaggerDocument.components.schemas.RegisterRequest.required).toEqual(['username', 'email', 'password']);
         expect(swaggerDocument.components.responses.ServerError).toBeDefined();
     });
 });
