@@ -1,4 +1,5 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture } from '@angular/core/testing';
 import { StreamComponent } from './stream.component';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LiveStreamsService } from '../../services/live-streams.service';
@@ -6,7 +7,6 @@ import { of, throwError } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 
-// Mock FovPlayerComponent pour éviter de charger HLS etc.
 @Component({ selector: 'app-fov-player', template: '', standalone: true })
 class MockFovPlayerComponent {
   @Input() streamId = '';
@@ -23,6 +23,7 @@ const mockStream = {
 
 describe('StreamComponent', () => {
   let component: StreamComponent;
+  let fixture: ComponentFixture<StreamComponent>;
   let routerSpy: jasmine.SpyObj<Router>;
   let liveStreamsSpy: jasmine.SpyObj<LiveStreamsService>;
 
@@ -32,11 +33,7 @@ describe('StreamComponent', () => {
     liveStreamsSpy.getStreamById.and.returnValue(of(mockStream as any));
 
     await TestBed.configureTestingModule({
-      imports: [
-        CommonModule,
-        StreamComponent,
-        MockFovPlayerComponent
-      ],
+      imports: [CommonModule, MockFovPlayerComponent],
       providers: [
         {
           provide: ActivatedRoute,
@@ -47,12 +44,13 @@ describe('StreamComponent', () => {
       ]
     })
     .overrideComponent(StreamComponent, {
-      remove: { imports: [] },
-      add: { imports: [CommonModule, MockFovPlayerComponent] }
+      set: {
+        imports: [CommonModule, MockFovPlayerComponent]
+      }
     })
     .compileComponents();
 
-    const fixture = TestBed.createComponent(StreamComponent);
+    fixture = TestBed.createComponent(StreamComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -71,20 +69,12 @@ describe('StreamComponent', () => {
     expect(component.isLoading).toBeFalse();
   });
 
-  it('should set isLive false when stream not found', fakeAsync(() => {
-    liveStreamsSpy.getStreamById.and.returnValue(of(null));
-    component['checkStream']();
-    tick(10000); // attendre les retries
-    expect(component.isLive).toBeFalse();
-  }));
-
   it('should navigate to home on goBack()', () => {
     component.goBack();
     expect(routerSpy.navigate).toHaveBeenCalledWith(['/']);
   });
 
-  it('should handle stream ended', fakeAsync(() => {
-    component.isLive = true;
+  it('should handle stream ended and start countdown', fakeAsync(() => {
     component.streamInfo = mockStream as any;
     component.onStreamEnded();
 
@@ -100,18 +90,28 @@ describe('StreamComponent', () => {
   }));
 
   it('should clear interval on goBack after stream ended', fakeAsync(() => {
+    component.streamInfo = mockStream as any;
     component.onStreamEnded();
     tick(1000);
     component.goBack();
-    tick(5000); // pas de navigation supplémentaire
+    tick(5000);
+    // navigate appelé une seule fois (goBack)
     expect(routerSpy.navigate).toHaveBeenCalledTimes(1);
   }));
 
-  it('should handle HTTP error and retry', fakeAsync(() => {
+  it('should set error message after max retries on HTTP error', fakeAsync(() => {
     liveStreamsSpy.getStreamById.and.returnValue(throwError(() => new Error('Network error')));
     component['checkStream']();
     tick(10000);
     expect(component.isLoading).toBeFalse();
     expect(component.errorMessage).toBeTruthy();
+  }));
+
+  it('should set isLive false after max retries when stream not found', fakeAsync(() => {
+    liveStreamsSpy.getStreamById.and.returnValue(of(null));
+    component['checkStream']();
+    tick(10000);
+    expect(component.isLive).toBeFalse();
+    expect(component.isLoading).toBeFalse();
   }));
 });
