@@ -4,7 +4,10 @@ import path from 'path';
 import cors from 'cors';
 import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
-import { writeStreamMeta } from './streamTrackUtils.js';
+import {
+    writeStreamMeta,
+    parseNamedTrackArray
+} from './streamTrackUtils.js';
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
 const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
@@ -20,6 +23,8 @@ function parseRegisterRequest(body) {
     const { tracks: tracksV, audioTracks: tracksA, streamId: providedStreamId } = body ?? {};
     const trackVNum = Number.parseInt(tracksV, 10);
     const trackANum = Number.parseInt(tracksA, 10);
+    const videoTrackNames = parseNamedTrackArray(body?.videoTrackNames, 'videoTrackNames');
+    const audioTrackNames = parseNamedTrackArray(body?.audioTrackNames, 'audioTrackNames');
 
     if (!Number.isInteger(trackVNum) || trackVNum <= 0) {
         return { error: "Invalid 'video tracks' parameter." };
@@ -27,10 +32,18 @@ function parseRegisterRequest(body) {
     if (!Number.isInteger(trackANum) || trackANum <= 0) {
         return { error: "Invalid 'audio tracks' parameter." };
     }
+    if (videoTrackNames.error) {
+        return { error: videoTrackNames.error };
+    }
+    if (audioTrackNames.error) {
+        return { error: audioTrackNames.error };
+    }
 
     return {
         trackVNum,
         trackANum,
+        videoTrackNames,
+        audioTrackNames,
         streamId: providedStreamId || randomUUID()
     };
 }
@@ -189,7 +202,7 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
     return ffmpegArgs;
 }
 
-function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null) {
+function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, nameOptions = {}) {
     if (!tracksV || tracksV === 0) {
         if (socket) {
             socket.destroy();
@@ -259,6 +272,8 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null) 
         process: ffmpegProc,
         tracksV,
         tracksA,
+        videoTrackNames: nameOptions.videoTrackNames ?? [],
+        audioTrackNames: nameOptions.audioTrackNames ?? [],
         socket,
         stopped: false,
         createdAt: Date.now()
@@ -306,7 +321,8 @@ function createMediaRoutes() {
             return res.status(400).json({ error: parsed.error });
         }
 
-        const { trackVNum, trackANum, streamId } = parsed;
+        const { trackVNum, trackANum, videoTrackNames, audioTrackNames, streamId } = parsed;
+        const nameOptions = { videoTrackNames, audioTrackNames };
 
         if (registeredStreams.has(streamId)) {
             return res.status(409).json({ error: 'StreamId already registered', streamId });
@@ -322,12 +338,14 @@ function createMediaRoutes() {
             const srtUrl = `srt://0.0.0.0:${srtPort}`;
             const srtUrlExternal = buildSrtUrl(host, srtPort, 'caller');
 
-            writeStreamMeta(streamId, trackVNum, trackANum, HLS_DIR);
-            startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl);
+            writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
+            startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl, nameOptions);
 
             registeredStreams.set(streamId, {
                 tracksV: trackVNum,
                 tracksA: trackANum,
+                videoTrackNames,
+                audioTrackNames,
                 port: srtPort,
                 srtUrl
             });
@@ -355,7 +373,8 @@ function createMediaRoutes() {
             return res.status(400).json({ error: parsed.error });
         }
 
-        const { trackVNum, trackANum, streamId } = parsed;
+        const { trackVNum, trackANum, videoTrackNames, audioTrackNames, streamId } = parsed;
+        const nameOptions = { videoTrackNames, audioTrackNames };
 
         if (registeredStreams.has(streamId)) {
             return res.status(409).json({ error: 'StreamId already registered', streamId });
@@ -363,11 +382,13 @@ function createMediaRoutes() {
 
         try {
             const srtUrlListener = 'srt://0.0.0.0:5555?mode=listener';
-            writeStreamMeta(streamId, trackVNum, trackANum, HLS_DIR);
+            writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
 
             registeredStreams.set(streamId, {
                 tracksV: trackVNum,
                 tracksA: trackANum,
+                videoTrackNames,
+                audioTrackNames,
                 port: debugSrtPort,
                 debug: true
             });
