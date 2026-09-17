@@ -15,6 +15,7 @@ import { environment } from '../../../environments/environment';
 export interface Track {
   index: number;
   name: string;
+  trackId: string;
   videoUrl: string;
   isVideo: boolean;
   isAudio: boolean;
@@ -38,10 +39,22 @@ export interface VideoWrapper {
   bufferEnd: number;
   bufferStart: number;
   isVideo: boolean;
+  isAudio: boolean;
   nx: number;
   ny: number;
   nw: number;
   nh: number;
+}
+
+export interface AudioWrapper {
+  playerId: string;
+  track: Track;
+  hls: Hls | null;
+  audioElement: HTMLAudioElement | null;
+  volume: number;
+  isReady: boolean;
+  bufferEnd: number;
+  bufferStart: number;
 }
 
 interface SavedWrapperLayout {
@@ -112,6 +125,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   @Input() streamId: string = '';
 
   videoWrappers: VideoWrapper[] = [];
+  audioWrappers: AudioWrapper[] = [];
   availableTracks: Track[] = [];
   editMode = false;
   isLoading = true;
@@ -238,22 +252,16 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.stopSyncMonitoring();
     this.stopPolling();
     this.stopBufferCheck();
-    this.videoWrappers.forEach((w) => {
-      w.hls?.destroy();
-    });
+    this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
+    this.audioWrappers.forEach((w) => { w.hls?.destroy(); });  // ← ajouté
     if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
-    if (this.isFullscreen) {
-      document.exitFullscreen?.().catch(() => {});
-    }
+    if (this.isFullscreen) document.exitFullscreen?.().catch(() => {});
 
-    // Nettoyage click-to-unlock stage
     if (this.clickToUnlockHandler) {
       const stage = document.getElementById(`stageArea_${this.playerId}`);
       stage?.removeEventListener('click', this.clickToUnlockHandler);
       this.clickToUnlockHandler = null;
     }
-
-    // Nettoyage listener document
     if (this.documentUnlockHandler) {
       document.removeEventListener('click', this.documentUnlockHandler);
       document.removeEventListener('keydown', this.documentUnlockHandler);
@@ -461,10 +469,11 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       this.stopPolling();
       this.availableTracks = stream.tracks.map((t: any, i: number) => ({
         index: i,
-        name: t.name ?? t.trackId,
+        name: t.name || t.trackId,
+        trackId: t.trackId,
         videoUrl: t.videoUrl,
         isVideo: t.isVideo ?? true,
-        isAudio: t.isAudio ?? true,
+        isAudio: t.isAudio ?? false,
       }));
       this.waitForPlaylistsReady(this.availableTracks).then(() => {
         this.initializeAllTracks();
@@ -481,12 +490,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     );
     if (stream && stream.tracks.length > 0) {
       this.stopPolling();
-      this.availableTracks = stream.tracks.map((t, i) => ({
+      this.availableTracks = stream.tracks.map((t: any, i: number) => ({
         index: i,
-        name: t.name ?? t.trackId,
+        name: t.name || t.trackId,
+        trackId: t.trackId,
         videoUrl: t.videoUrl,
         isVideo: t.isVideo ?? true,
-        isAudio: t.isAudio ?? true,
+        isAudio: t.isAudio ?? false,
       }));
       this.waitForPlaylistsReady(this.availableTracks).then(() => {
         this.initializeAllTracks();
@@ -546,17 +556,112 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  private addAudioTrack(track: Track) {
+    const uniqueId = this.trackIdCounter++;
+    const trackCopy: Track = { ...track, index: uniqueId };
+
+    const newWrapper: AudioWrapper = {
+      playerId: `audio_${this.playerId}_${trackCopy.index}`,
+      track: trackCopy,
+      hls: null,
+      audioElement: null,
+      volume: 1,
+      isReady: false,
+      bufferEnd: 0,
+      bufferStart: 0,
+    };
+
+    this.audioWrappers.push(newWrapper);
+
+    setTimeout(() => {
+      this.initHlsForAudioWrapper(newWrapper, track.videoUrl);
+    }, 100);
+  }
+
+  private initHlsForAudioWrapper(wrapper: AudioWrapper, videoUrl: string, attempt = 0) {
+    const audioEl = document.getElementById(
+      `audioElement_${wrapper.playerId}`,
+    ) as HTMLAudioElement;
+
+    if (!audioEl) {
+      if (attempt < 20) {
+        setTimeout(() => this.initHlsForAudioWrapper(wrapper, videoUrl, attempt + 1), 50);
+      } else {
+        console.error(`[FOV] [${wrapper.track.name}] Audio element NOT FOUND`);
+      }
+      return;
+    }
+
+    wrapper.audioElement = audioEl;
+    audioEl.volume = wrapper.volume;
+    audioEl.muted = true;
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        liveSyncDuration: 10,
+        liveMaxLatencyDuration: 30,
+        liveDurationInfinity: true,
+        liveBackBufferLength: 30,
+        maxBufferLength: 60,
+        maxMaxBufferLength: 90,
+        fragLoadingMaxRetry: 10,
+        fragLoadingRetryDelay: 1000,
+        manifestLoadingMaxRetry: 10,
+        manifestLoadingRetryDelay: 1000,
+        xhrSetup: (xhr: XMLHttpRequest) => {
+          xhr.setRequestHeader('Cache-Control', 'no-cache');
+        },
+      });
+
+      wrapper.hls = hls;
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        wrapper.isReady = true;
+        audioEl.pause();
+      });
+
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        if (audioEl.buffered.length > 0) {
+          wrapper.bufferStart = audioEl.buffered.start(0);
+          wrapper.bufferEnd = audioEl.buffered.end(audioEl.buffered.length - 1);
+        }
+        wrapper.isReady = true;
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          console.error(`[FOV] [${wrapper.track.name}] Audio HLS FATAL: ${data.details}`);
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            setTimeout(() => wrapper.hls?.startLoad(), 2000);
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError();
+          }
+        }
+      });
+
+      hls.loadSource(videoUrl);
+      hls.attachMedia(audioEl as any);
+      console.log(`[FOV] [${wrapper.track.name}] Audio wrapper initialized — volume: ${wrapper.volume}`);
+    } else {
+      audioEl.src = videoUrl;
+      wrapper.isReady = true;
+    }
+
+    console.log(`[FOV] [${wrapper.track.name}] Audio wrapper initialized`);
+  }
+
   private initializeAllTracks() {
     const generation = ++this.initGeneration;
 
     if (this.videoWrappers.length > 0) {
-      this.videoWrappers.forEach((w) => {
-        if (w.hls) {
-          w.hls.destroy();
-          w.hls = null;
-        }
-      });
+      this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
       this.videoWrappers = [];
+    }
+    if (this.audioWrappers.length > 0) {
+      this.audioWrappers.forEach((w) => { w.hls?.destroy(); });
+      this.audioWrappers = [];
     }
 
     this.originalTrackOrder = this.availableTracks.map((t) => t.name);
@@ -564,13 +669,23 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.isBufferingPhase = true;
     this.bufferCheckCount = 0;
 
+    const videoTracks = this.availableTracks.filter((t) => t.isVideo);
+    const audioTracks = this.availableTracks.filter((t) => t.isAudio);
+
     const stagger = this.availableTracks.length <= 2 ? 200 : 100;
 
-    this.availableTracks.forEach((track, index) => {
+    videoTracks.forEach((track, index) => {
       setTimeout(() => {
         if (generation !== this.initGeneration) return;
         this.addTrack(track);
       }, index * stagger);
+    });
+
+    audioTracks.forEach((track, index) => {
+      setTimeout(() => {
+        if (generation !== this.initGeneration) return;
+        this.addAudioTrack(track);
+      }, (videoTracks.length + index) * stagger);
     });
 
     const totalStagger = this.availableTracks.length * stagger;
@@ -660,6 +775,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       bufferEnd: 0,
       bufferStart: 0,
       isVideo: track.isVideo,
+      isAudio: track.isAudio,
       nx: initNx,
       ny: initNy,
       nw: initNw,
@@ -725,7 +841,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       setTimeout(() => this.adaptWrappersToViewport(), 0);
     };
 
-    videoEl.volume = wrapper.volume;
+    videoEl.volume = 0;
     videoEl.muted = true;
 
     if (Hls.isSupported()) {
@@ -813,6 +929,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
       hls.loadSource(videoUrl);
       hls.attachMedia(videoEl);
+      console.log(`[FOV] [${wrapper.track.name}] Video wrapper — audio MUTED (sound from AudioWrappers only)`);
     } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
       videoEl.src = videoUrl;
       wrapper.isReady = true;
@@ -1030,7 +1147,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     await this.waitForAllReady();
     await this.playAllWrappers();
 
-    // Tenter le déverrouillage audio après que les vidéos ont démarré
     await this.tryAutoUnlockAudio();
 
     requestAnimationFrame(() => {
@@ -1070,10 +1186,29 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     let blockedByBrowser = false;
 
     for (const w of this.videoWrappers) {
+      if (w.videoElement) { w.videoElement.muted = true; w.videoElement.volume = 0; }
+    }
+
+    for (const w of this.audioWrappers) {
+      if (!w.audioElement) continue;
+      try {
+        w.audioElement.volume = w.volume;
+        w.audioElement.muted = false;
+        if (w.audioElement.paused && w.volume > 0) {
+          blockedByBrowser = true;
+          w.audioElement.muted = true;
+        }
+      } catch {
+        blockedByBrowser = true;
+        w.audioElement.muted = true;
+      }
+    }
+
+    for (const w of this.videoWrappers) {
       if (!w.videoElement) continue;
       try {
-        w.videoElement.volume = w.volume;
-        w.videoElement.muted = (w.volume === 0);
+        w.videoElement.volume = 0;
+        w.videoElement.muted = true;
         // Détecter si le navigateur a mis en pause silencieusement
         if (w.videoElement.paused && w.volume > 0) {
           blockedByBrowser = true;
@@ -1113,8 +1248,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     for (const w of this.videoWrappers) {
       if (!w.videoElement) continue;
       try {
-        w.videoElement.volume = w.volume;
-        w.videoElement.muted = (w.volume === 0);
+        w.videoElement.volume = 0;
+        w.videoElement.muted = true;
         if (w.videoElement.paused && w.volume > 0) {
           blockedByBrowser = true;
           w.videoElement.muted = true;
@@ -1145,8 +1280,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   for (const w of this.videoWrappers) {
     if (!w.videoElement) continue;
     try {
-      w.videoElement.volume = w.volume;
-      w.videoElement.muted = (w.volume === 0);
+      w.videoElement.volume = 0;
+      w.videoElement.muted = true;
       if (w.videoElement.paused || (w.videoElement.muted && w.volume > 0)) {
         anyBlocked = true;
         w.videoElement.muted = true;
@@ -1178,11 +1313,14 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     for (const w of this.videoWrappers) {
       if (!w.videoElement) continue;
       w.videoElement.muted = true;
-      if (w.videoElement.paused) {
-        w.videoElement.play().catch(() => {});
-      }
+      if (w.videoElement.paused) w.videoElement.play().catch(() => {});
     }
-    console.log('[FOV] Resumed all wrappers muted — waiting for click to unmute');
+    for (const w of this.audioWrappers) {
+      if (!w.audioElement) continue;
+      w.audioElement.muted = true;
+      if (w.audioElement.paused) w.audioElement.play().catch(() => {});
+    }
+    console.log('[FOV] Resumed all wrappers muted');
   }
 
   // ── registerClickToUnlock ─────────────────────────────────────────────────
@@ -1227,33 +1365,33 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   unlockAudio(): void {
     if (this.audioUnlocked) return;
     this.audioUnlocked = true;
-    this.setSessionAudioUnlocked(); // Persiste dans la session (survit à F5/Ctrl+R)
+    this.setSessionAudioUnlocked();
 
+    // Vidéos
     for (const w of this.videoWrappers) {
       if (!w.videoElement) continue;
-      w.videoElement.volume = w.volume;
+      w.videoElement.volume = 0;
       w.videoElement.muted = w.volume === 0;
-      if (w.videoElement.paused) {
-        w.videoElement.play().catch(() => {});
-      }
+      if (w.videoElement.paused) w.videoElement.play().catch(() => {});
+    }
+    // Audio
+    for (const w of this.audioWrappers) {
+      if (!w.audioElement) continue;
+      w.audioElement.volume = w.volume;
+      w.audioElement.muted = w.volume === 0;
+      if (w.audioElement.paused) w.audioElement.play().catch(() => {});
     }
 
-    // Nettoyage des listeners restants
+    // Nettoyage listeners
     if (this.clickToUnlockHandler) {
       const stage = document.getElementById(`stageArea_${this.playerId}`);
       stage?.removeEventListener('click', this.clickToUnlockHandler);
       this.clickToUnlockHandler = null;
     }
     if (this.documentUnlockHandler) {
-      document.removeEventListener('click', this.documentUnlockHandler, {
-        capture: true,
-      });
-      document.removeEventListener('keydown', this.documentUnlockHandler, {
-        capture: true,
-      });
-      document.removeEventListener('touchstart', this.documentUnlockHandler, {
-        capture: true,
-      });
+      document.removeEventListener('click', this.documentUnlockHandler, { capture: true });
+      document.removeEventListener('keydown', this.documentUnlockHandler, { capture: true });
+      document.removeEventListener('touchstart', this.documentUnlockHandler, { capture: true });
       this.documentUnlockHandler = null;
     }
 
@@ -1593,7 +1731,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   private applyWrapperAudio(wrapper: VideoWrapper) {
     if (!wrapper.videoElement) return;
-    wrapper.videoElement.volume = wrapper.volume;
+    wrapper.videoElement.volume = 0;
     wrapper.videoElement.muted = wrapper.volume === 0;
   }
 
@@ -1633,48 +1771,73 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private async playAllWrappers() {
-    // Toutes les vidéos démarrent en muet — unlockAudio() ou tryAutoUnlockAudio()
-    // appliquera le volume réel après avoir vérifié les permissions du navigateur.
+    // Vidéos
     for (const w of this.videoWrappers) {
       if (w.videoElement) {
         w.videoElement.playbackRate = 1;
         w.videoElement.muted = true;
-        w.videoElement.volume = w.volume;
+        w.videoElement.volume = 0;
+      }
+    }
+    // Audio
+    for (const w of this.audioWrappers) {
+      if (w.audioElement) {
+        w.audioElement.muted = true;
+        w.audioElement.volume = w.volume;
       }
     }
 
-    const playResults = await Promise.all(
+    const videoResults = await Promise.all(
       this.videoWrappers.map(async (w) => {
         if (!w.videoElement) return 'no-element';
         try {
           await w.videoElement.play();
           return 'ok';
-        } catch (err: any) {
+        } catch {
           w.videoElement.muted = true;
-          try {
-            await w.videoElement.play();
-            return 'ok-muted';
-          } catch (err2: any) {
-            console.error(`[FOV] [${w.track.name}] play() failed:`, err2.message);
-            return 'failed';
-          }
+          try { await w.videoElement.play(); return 'ok-muted'; }
+          catch (err2: any) { return 'failed'; }
+        }
+      }),
+    );
+
+    const audioResults = await Promise.all(
+      this.audioWrappers.map(async (w) => {
+        if (!w.audioElement) return 'no-element';
+        try {
+          await w.audioElement.play();
+          return 'ok';
+        } catch {
+          w.audioElement.muted = true;
+          try { await w.audioElement.play(); return 'ok-muted'; }
+          catch { return 'failed'; }
         }
       }),
     );
 
     console.log(
-      '[FOV] Play results:',
-      this.videoWrappers.map((w, i) => `${w.track.name}:${playResults[i]}`).join(', '),
+      '[FOV] Play results video:',
+      this.videoWrappers.map((w, i) => `${w.track.name}:${videoResults[i]}`).join(', '),
+    );
+    console.log(
+      '[FOV] Play results audio:',
+      this.audioWrappers.map((w, i) => `${w.track.name}:${audioResults[i]}`).join(', '),
     );
 
-    // Mettre à jour le volume (sans démuetter — c'est tryAutoUnlockAudio qui décide)
     for (const w of this.videoWrappers) {
-      if (w.videoElement) w.videoElement.volume = w.volume;
+      if (w.videoElement) {
+        w.videoElement.volume = 0;
+        w.videoElement.muted = true;
+      }
+    }
+    for (const w of this.audioWrappers) {
+      if (w.audioElement) w.audioElement.volume = w.volume;
     }
   }
 
   setVolume(wrapper: VideoWrapper, event: Event) {
     const val = parseFloat((event.target as HTMLInputElement).value);
+    console.warn(`[FOV] setVolume called on video wrapper ${wrapper.track.name} — ignored, video is always muted`);
     wrapper.volume = val;
     // L'utilisateur interagit manuellement → audio déverrouillé
     if (!this.audioUnlocked) {
@@ -1844,6 +2007,19 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     localStorage.removeItem(this.layoutStorageKey);
   }
 
+  setAudioVolume(wrapper: AudioWrapper, event: Event) {
+    const val = parseFloat((event.target as HTMLInputElement).value);
+    wrapper.volume = val;
+    console.log(`[FOV] [${wrapper.track.name}] Audio volume → ${(val * 100).toFixed(0)}%`);
+    if (!this.audioUnlocked) {
+      this.unlockAudio();
+    } else if (wrapper.audioElement) {
+      wrapper.audioElement.volume = val;
+      wrapper.audioElement.muted = val === 0;
+      console.log(`[FOV] [${wrapper.track.name}] Audio element volume applied: ${val}`);
+    }
+  }
+
   // ── refreshStream ─────────────────────────────────────────────────────────
   // IMPORTANT : ne PAS effacer sessionStorage ici.
   // Le consentement audio doit survivre à un refresh manuel dans le même onglet.
@@ -1851,13 +2027,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.stopSyncMonitoring();
     this.stopPolling();
     this.stopBufferCheck();
-    this.videoWrappers.forEach((w) => {
-      if (w.hls) {
-        w.hls.destroy();
-        w.hls = null;
-      }
-    });
+    this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
+    this.audioWrappers.forEach((w) => { w.hls?.destroy(); });
     this.videoWrappers = [];
+    this.audioWrappers = [];
     this.syncStats.clear();
     this.maxDrift = 0;
     this.playbackStarted = false;
