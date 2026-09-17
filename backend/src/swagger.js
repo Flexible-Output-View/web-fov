@@ -194,7 +194,27 @@ const swaggerDocument = {
             RegisterStreamRequest: {
                 type: 'object',
                 required: ['tracks', 'audioTracks'],
-                properties: { tracks: { type: 'integer', minimum: 1 }, audioTracks: { type: 'integer', minimum: 1 }, streamId: { type: 'string' } }
+                properties: {
+                    tracks: { type: 'integer', minimum: 1 },
+                    audioTracks: { type: 'integer', minimum: 1 },
+                    streamId: { type: 'string' },
+                    videoTrackNames: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: { name: { type: 'string' } }
+                        },
+                        description: 'OBS video track names'
+                    },
+                    audioTrackNames: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: { name: { type: 'string' } }
+                        },
+                        description: 'OBS audio track names'
+                    }
+                }
             },
             StopStreamRequest: {
                 type: 'object',

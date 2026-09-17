@@ -1,8 +1,11 @@
 export interface LiveStreamTrack {
   trackId: string;
+  name: string;
   videoUrl: string;
-  /** true when the track carries video (usually with paired audio); false for audio-only */
+  /** true for video-only HLS variants */
   isVideo: boolean;
+  /** true for audio-only HLS variants */
+  isAudio: boolean;
 }
 
 export interface LiveStreamInfo {
