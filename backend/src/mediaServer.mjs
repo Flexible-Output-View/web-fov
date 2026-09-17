@@ -147,8 +147,20 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
         }
     }
 
+    const srtParams = [
+        'mode=listener',
+        'latency=4000000',
+        'rcvbuf=134217728',
+        'sndbuf=134217728',
+        'peerlatency=4000000',
+        'tlpktdrop=0',
+        'nakreport=1',
+        'connect_timeout=5000',
+        'linger=0'
+    ].join('&');
+
     const inputSource = srtUrl
-        ? `${srtUrl}?mode=listener&latency=4000000&rcvbuf=134217728&sndbuf=134217728&peerlatency=4000000&tlpktdrop=0&nakreport=1&connect_timeout=5000&linger=0`
+        ? `${srtUrl}?${srtParams}`
         : 'pipe:';
 
     const ffmpegArgs = [
