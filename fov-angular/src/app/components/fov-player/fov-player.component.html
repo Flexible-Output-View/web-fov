@@ -4,10 +4,32 @@
       <span class="live-indicator" *ngIf="playbackStarted">🔴 LIVE</span>
     </div>
     <div class="toolbar-right">
-      <button (click)="toggleEditMode()" [class.active]="editMode" class="btn-edit" [disabled]="isBufferingPhase">
-        {{ editMode ? 'Sauvegarder' : 'Modifier' }}
+
+      <button
+        *ngIf="!editMode"
+        class="btn-edit"
+        (click)="toggleEditMode()"
+        [disabled]="isBufferingPhase"
+        title="Modifier la disposition">
+        ✏️ Modifier
       </button>
-      <button (click)="resetLayout()" *ngIf="editMode" class="btn-reset">Réinitialiser</button>
+
+      <ng-container *ngIf="editMode">
+        <button class="btn-reset" (click)="resetLayout()" title="Réinitialiser la disposition">
+          🔄 Réinitialiser
+        </button>
+        <button class="btn-edit" (click)="toggleEditMode()" title="Annuler sans sauvegarder">
+          ✕ Annuler
+        </button>
+        <button class="btn-edit ctrl-btn--save" (click)="saveLayout()" title="Sauvegarder la disposition">
+          💾 Enregistrer
+        </button>
+      </ng-container>
+
+      <span class="save-feedback" *ngIf="layoutSaved">
+        ✓ Disposition sauvegardée
+      </span>
+
     </div>
   </div>
 
@@ -30,7 +52,11 @@
       </div>
     </div>
 
-    <div class="fov-stage" [id]="'stageArea_' + playerId" (click)="unlockAudio()">
+    <div class="fov-stage"
+         [id]="'stageArea_' + playerId"
+         [class.edit-mode]="editMode"
+         (click)="unlockAudio()">
+
       <ng-container *ngFor="let wrapper of videoWrappers; trackBy: trackByWrapper">
         <div
           *ngIf="wrapper.isVideo"
@@ -49,6 +75,23 @@
 
           <div class="drag-bar" *ngIf="editMode">
             <span class="drag-label">{{ wrapper.track.name }}</span>
+
+            <div class="drag-bar-actions">
+              <button
+                class="drag-action-btn"
+                *ngIf="!isWrapperMaximized(wrapper)"
+                (click)="$event.stopPropagation(); maximizeWrapper(wrapper)"
+                title="Plein écran dans le stage">
+                ⛶
+              </button>
+              <button
+                class="drag-action-btn"
+                *ngIf="isWrapperMaximized(wrapper)"
+                (click)="$event.stopPropagation(); minimizeWrapper(wrapper)"
+                title="Réduire">
+                ⊡
+              </button>
+            </div>
           </div>
 
           <video
@@ -56,11 +99,28 @@
             playsinline>
           </video>
 
-          <div class="resize-handle" *ngIf="editMode"
-            (pointerdown)="startResize($event, wrapper)">
+          <div class="resize-handle"
+               *ngIf="editMode"
+               (pointerdown)="startResize($event, wrapper)">
           </div>
         </div>
       </ng-container>
+
+      <div class="audio-unlock-overlay"
+          *ngIf="!audioUnlocked && playbackStarted && !isBufferingPhase"
+          (click)="unlockAudio()">
+        <div class="audio-unlock-content">
+          <span class="audio-unlock-icon">🔇</span>
+          <p class="audio-unlock-title">Son désactivé</p>
+          <p class="audio-unlock-subtitle">
+            Le navigateur bloque la lecture automatique avec son.<br>
+            Cliquez n'importe où pour continuer.
+          </p>
+          <button class="audio-unlock-btn" type="button" (click)="$event.stopPropagation(); unlockAudio()">
+            🔊 Activer le son
+          </button>
+        </div>
+      </div>
 
       <button
         class="btn-fullscreen"
@@ -69,7 +129,8 @@
         [title]="isFullscreen ? 'Quitter le plein écran' : 'Plein écran'">
         {{ isFullscreen ? '✕' : '⛶' }}
       </button>
-            <button
+
+      <button
         *ngIf="isFullscreen"
         class="btn-fs-audio-toggle"
         type="button"
@@ -144,3 +205,4 @@
     </div>
   </div>
 </div>
+  
