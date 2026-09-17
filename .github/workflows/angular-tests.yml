@@ -41,9 +41,11 @@ jobs:
           EOF
 
       - name: Run tests with coverage
+        env:
+          CHROME_FLAGS: "--no-sandbox --disable-gpu --disable-dev-shm-usage"
         run: |
           cd fov-angular
-          npm test -- --watch=false --browsers=ChromeHeadlessCI --code-coverage
+          npm test -- --watch=false --browsers=ChromeHeadless --code-coverage
 
       - name: Upload test results
         if: always()
