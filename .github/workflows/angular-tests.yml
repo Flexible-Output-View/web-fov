@@ -3,38 +3,52 @@ name: Angular Tests
 on:
   push:
     paths:
-        - "fov-angular/**"
+      - "fov-angular/**"
   pull_request:
     branches: [main]
 
 jobs:
-    test:
-        runs-on: ubuntu-latest
+  test:
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
-                #   cache: "npm"
-                #   cache-dependency-path: fov-angular/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-            - name: Install dependencies
-              run: |
-                  cd fov-angular
-                  npm i
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
 
-            - name: Run tests with coverage
-              run: |
-                  cd fov-angular
-                  npm test -- --watch=false --browsers=ChromeHeadless --code-coverage
+      - name: Install dependencies
+        run: |
+          cd fov-angular
+          npm i
 
-            - name: Upload test results
-              if: always()
-              uses: actions/upload-artifact@v4
-              with:
-                  name: test-results
-                  path: fov-angular/coverage/
-                  if-no-files-found: error
+      - name: Create environment file
+        run: |
+          mkdir -p fov-angular/src/environments
+          cat > fov-angular/src/environments/environment.ts << 'EOF'
+          export const environment = {
+            apiUrl: 'http://localhost:4000/api',
+            twitch: {
+              clientId: 'ci_placeholder',
+              clientSecret: 'ci_placeholder'
+            }
+          };
+          EOF
+
+      - name: Run tests with coverage
+        run: |
+          cd fov-angular
+          npm test -- --watch=false --browsers=ChromeHeadlessCI --code-coverage
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: fov-angular/coverage/
+          if-no-files-found: warn

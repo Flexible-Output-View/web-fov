@@ -1,30 +1,37 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { AppComponent } from './app.component';
+import { RouterModule } from '@angular/router';
+import { routes } from './app.routes';
 
 describe('AppComponent', () => {
-  let component: AppComponent;
-  let fixture: ComponentFixture<AppComponent>;
-
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AppComponent],
+      imports: [
+        AppComponent,
+        RouterModule.forRoot(routes)
+      ],
     }).compileComponents();
-
-    fixture = TestBed.createComponent(AppComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
+  it('should create the app', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const app = fixture.componentInstance;
+    expect(app).toBeTruthy();
   });
 
-  it(`should have title 'Hello World'`, () => {
-    expect(component.title).toEqual('Hello World');
+  it('should have correct title', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const app = fixture.componentInstance;
+    expect(app.title).toBe('FOV - Flexible Output View');
   });
 
-  it('should render title', () => {
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello World');
+  it('should toggle sidebar', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const app = fixture.componentInstance;
+    expect(app.isSidebarCollapsed).toBeTrue();
+    app.onSidebarToggle();
+    expect(app.isSidebarCollapsed).toBeFalse();
+    app.onSidebarToggle();
+    expect(app.isSidebarCollapsed).toBeTrue();
   });
 });
