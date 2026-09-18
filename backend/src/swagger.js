@@ -18,6 +18,7 @@ const swaggerDocument = {
         { name: 'Categories' },
         { name: 'Streams' },
         { name: 'Users' },
+        { name: 'Auth' },
         { name: 'Twitch' },
         { name: 'FFmpeg' }
     ],
@@ -110,17 +111,34 @@ const swaggerDocument = {
                 }
             }
         },
-        '/api/users': {
+        '/api/auth/register': {
             post: {
-                tags: ['Users'],
-                summary: 'Create a user',
+                tags: ['Auth'],
+                summary: 'Register a new user',
                 requestBody: {
                     required: true,
-                    content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateUserRequest' } } }
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterRequest' } } }
                 },
                 responses: {
-                    201: { description: 'Created user ID' },
-                    400: { $ref: '#/components/responses/BadRequest' },
+                    201: { description: 'User registered', content: { 'application/json': { schema: { $ref: '#/components/schemas/AuthResponse' } } } },
+                    400: { description: 'Validation error' },
+                    409: { description: 'Username or email already exists' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/auth/login': {
+            post: {
+                tags: ['Auth'],
+                summary: 'Login with username or email',
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginRequest' } } }
+                },
+                responses: {
+                    200: { description: 'Login successful', content: { 'application/json': { schema: { $ref: '#/components/schemas/AuthResponse' } } } },
+                    400: { description: 'Validation error' },
+                    401: { description: 'Invalid credentials' },
                     500: { $ref: '#/components/responses/ServerError' }
                 }
             }
@@ -186,10 +204,38 @@ const swaggerDocument = {
         },
         schemas: {
             Error: errorResponse,
-            CreateUserRequest: {
+            RegisterRequest: {
                 type: 'object',
-                required: ['username'],
-                properties: { username: { type: 'string' }, display_name: { type: 'string' } }
+                required: ['username', 'email', 'password'],
+                properties: {
+                    username: { type: 'string', minLength: 3, maxLength: 30 },
+                    email: { type: 'string', format: 'email' },
+                    password: { type: 'string', minLength: 8 }
+                }
+            },
+            LoginRequest: {
+                type: 'object',
+                required: ['login', 'password'],
+                properties: {
+                    login: { type: 'string', description: 'Username or email' },
+                    password: { type: 'string' }
+                }
+            },
+            AuthUser: {
+                type: 'object',
+                properties: {
+                    id: { type: 'integer' },
+                    username: { type: 'string' },
+                    email: { type: 'string', format: 'email' },
+                    created_at: { type: 'string', format: 'date-time' }
+                }
+            },
+            AuthResponse: {
+                type: 'object',
+                properties: {
+                    token: { type: 'string' },
+                    user: { $ref: '#/components/schemas/AuthUser' }
+                }
             },
             RegisterStreamRequest: {
                 type: 'object',
