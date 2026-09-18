@@ -358,7 +358,7 @@ function createMediaRoutes() {
         }
 
         try {
-            const srtUrlListener = 'srt://0.0.0.0:5555?mode=listener';
+            const srtUrlListener = 'http://localhost:4443';
             writeStreamMeta(streamId, trackVNum, trackANum, HLS_DIR);
 
             registeredStreams.set(streamId, {
