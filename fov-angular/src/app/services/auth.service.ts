@@ -32,7 +32,7 @@ export class AuthService {
   );
   public currentUser$ = this.currentUserSubject.asObservable();
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   // ---------- API ----------
 
@@ -111,11 +111,11 @@ export class AuthService {
       ? res.user
       : res.username && res.email
         ? {
-            id: res.id,
-            username: res.username,
-            email: res.email,
-            avatarUrl: res.avatarUrl,
-          }
+          id: res.id,
+          username: res.username,
+          email: res.email,
+          avatarUrl: res.avatarUrl,
+        }
         : null;
 
     localStorage.setItem(TOKEN_KEY, token);
@@ -141,7 +141,13 @@ export class AuthService {
     if (err.status === 0) {
       message = 'Impossible de contacter le serveur.';
     } else if (err.status === 400) {
-      message = err.error?.error || err.error?.message || 'Requête invalide.';
+      const validationErrors = err.error?.errors;
+      message =
+        err.error?.error ||
+        err.error?.message ||
+        (validationErrors && typeof validationErrors === 'object'
+          ? Object.values(validationErrors).join(' ')
+          : 'Requête invalide.');
     } else if (err.status === 401) {
       message = err.error?.error || 'Identifiants incorrects.';
     } else if (err.status === 409) {

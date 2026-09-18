@@ -47,9 +47,9 @@ export class RegisterComponent {
       return;
     }
 
-    if (this.password.length < 6) {
+    if (this.password.length < 8) {
       this.errorMessage =
-        'Le mot de passe doit contenir au moins 6 caractères.';
+        'Le mot de passe doit contenir au moins 8 caractères.';
       return;
     }
 
