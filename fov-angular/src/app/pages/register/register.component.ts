@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -9,16 +10,9 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './register.component.html',
-  styleUrls: ['./register.component.scss']
+  styleUrls: ['./register.component.scss'],
 })
-//TODO : the 2 passwords should be the same
-//TODO : verify the email format
-//TODO : verify password strength and length
-//TODO : verify than username is unique
-//TODO : verify than email is unique
-//TODO : verify special characters in username
 export class RegisterComponent {
-
   username: string = '';
   email: string = '';
   password: string = '';
@@ -28,17 +22,22 @@ export class RegisterComponent {
 
   constructor(
     private authService: AuthService,
-    private router: Router
+    private router: Router,
   ) {
     if (this.authService.isAuthenticated()) {
       this.router.navigate(['/profile']);
     }
   }
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     this.errorMessage = '';
 
-    if (!this.username || !this.email || !this.password || !this.confirmPassword) {
+    if (
+      !this.username.trim() ||
+      !this.email.trim() ||
+      !this.password ||
+      !this.confirmPassword
+    ) {
       this.errorMessage = 'Veuillez remplir tous les champs.';
       return;
     }
@@ -48,23 +47,28 @@ export class RegisterComponent {
       return;
     }
 
-    if (this.password.length < 6) {
-      this.errorMessage = 'Le mot de passe doit contenir au moins 6 caractères.';
+    if (this.password.length < 8) {
+      this.errorMessage =
+        'Le mot de passe doit contenir au moins 8 caractères.';
       return;
     }
 
     this.isLoading = true;
 
-    setTimeout(() => {
-      const success = this.authService.register(this.username, this.email, this.password);
-      
-      if (success) {
-        this.router.navigate(['/profile']);
-      } else {
-        this.errorMessage = 'Une erreur est survenue lors de l\'inscription.';
-      }
-      
+    try {
+      await firstValueFrom(
+        this.authService.register(
+          this.username.trim(),
+          this.email.trim(),
+          this.password,
+        ),
+      );
+      this.router.navigate(['/profile']);
+    } catch (err: any) {
+      this.errorMessage =
+        err?.message || "Une erreur est survenue lors de l'inscription.";
+    } finally {
       this.isLoading = false;
-    }, 500);
+    }
   }
 }

@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -9,46 +10,42 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './login.component.html',
-  styleUrls: ['./login.component.scss']
+  styleUrls: ['./login.component.scss'],
 })
-//TODO : verify than the fields are not empty
-//TODO : remember me ?
 export class LoginComponent {
-
-  email: string = '';
+  login: string = '';
   password: string = '';
   errorMessage: string = '';
   isLoading: boolean = false;
 
   constructor(
     private authService: AuthService,
-    private router: Router
+    private router: Router,
   ) {
     if (this.authService.isAuthenticated()) {
       this.router.navigate(['/profile']);
     }
   }
 
-  onSubmit(): void {
+  async onSubmit(): Promise<void> {
     this.errorMessage = '';
 
-    if (!this.email || !this.password) {
+    if (!this.login.trim() || !this.password) {
       this.errorMessage = 'Veuillez remplir tous les champs.';
       return;
     }
 
     this.isLoading = true;
 
-    setTimeout(() => {
-      const success = this.authService.login(this.email, this.password);
-      
-      if (success) {
-        this.router.navigate(['/profile']);
-      } else {
-        this.errorMessage = 'Email ou mot de passe incorrect.';
-      }
-      
+    try {
+      await firstValueFrom(
+        this.authService.login(this.login.trim(), this.password),
+      );
+      this.router.navigate(['/profile']);
+    } catch (err: any) {
+      this.errorMessage = err?.message || 'Email ou mot de passe incorrect.';
+    } finally {
       this.isLoading = false;
-    }, 500);
+    }
   }
 }

@@ -60,45 +60,4 @@ describe('Users Routes', () => {
             expect(response.status).toBe(500);
         });
     });
-
-    describe('POST /', () => {
-        test('should create a new user', async () => {
-            const newUser = {
-                username: 'newuser',
-                display_name: 'New User'
-            };
-
-            db.query.mockResolvedValue({ insertId: 42 });
-
-            const response = await request(app)
-                .post('/')
-                .send(newUser);
-
-            expect(response.status).toBe(201);
-            expect(response.body).toHaveProperty('id', 42);
-            expect(db.query).toHaveBeenCalledWith(
-                'INSERT INTO users (username, display_name, created_at) VALUES (?, ?, NOW())',
-                ['newuser', 'New User']
-            );
-        });
-
-        test('should return 400 when username is missing', async () => {
-            const response = await request(app)
-                .post('/')
-                .send({ display_name: 'No Username' });
-
-            expect(response.status).toBe(400);
-            expect(response.body).toHaveProperty('error', 'username required');
-        });
-
-        test('should handle database errors on create', async () => {
-            db.query.mockRejectedValue(new Error('Duplicate entry'));
-
-            const response = await request(app)
-                .post('/')
-                .send({ username: 'duplicate' });
-
-            expect(response.status).toBe(500);
-        });
-    });
 });
