@@ -14,18 +14,21 @@ This document outlines security practices, vulnerabilities, and the roadmap for 
 - Environment variable separation (no hardcoded secrets)
 - Connection pooling (prevents connection exhaustion)
 - Basic error handling (avoids stack trace leaks)
+- User registration and login (`POST /api/auth/register`, `POST /api/auth/login`)
+- JWT issuance (`jsonwebtoken`, `JWT_SECRET` / `JWT_EXPIRES_IN`)
+- Password hashing (bcrypt, 10 rounds; hash never returned)
+- Auth input validation (username, email, password rules)
 
 ### ⚠️ Partially Implemented
-- Input validation (basic, not comprehensive)
+- Input validation (comprehensive for auth via `src/utils/auth.js`, basic elsewhere)
 - Error messages (may expose internals in some cases)
 
 ### ❌ NOT Implemented (High Priority)
-- Authentication (JWT, OAuth2)
-- Input sanitization (SQL injection prevention)
+- Global auth guard / protected routes (tokens are issued but not yet enforced everywhere)
+- Input sanitization (broader SQL injection prevention review)
 - Rate limiting
-- Password hashing
 - HTTPS enforcement
-- CORS proper configuration
+- CORS strict allowlist in production
 - Security headers (HSTS, CSP, etc.)
 
 ---
@@ -34,20 +37,26 @@ This document outlines security practices, vulnerabilities, and the roadmap for 
 
 ### High Risk 🔴
 
-#### 1. No Authentication
-**Impact**: Anyone can access all endpoints
-**Current Mitigation**: VPC/firewall in production
-**Fix**: Implement JWT authentication
+#### 1. No Global Authentication Guard
+**Impact**: Tokens are issued by `/api/auth/*`, but not all endpoints require them yet
+**Current Mitigation**: VPC/firewall in production; auth endpoints themselves validate + hash + sign
+**Fix**: Implement JWT verification middleware and apply to protected routes
 ```javascript
-// Planned in v0.2.0
+// Next step (v0.2.0)
+import jwt from 'jsonwebtoken';
 const verifyToken = (req, res, next) => {
-    const token = req.headers.authorization;
-    // Validate JWT
+    const token = (req.headers.authorization || '').replace('Bearer ', '');
+    try {
+        req.user = jwt.verify(token, process.env.JWT_SECRET);
+        next();
+    } catch {
+        res.status(401).json({ error: 'Invalid credentials' });
+    }
 };
 ```
 
 #### 2. SQL Injection Risk (Low due to parameterized queries)
-**Current Status**: Using parameterized queries `?`
+**Current Status**: Using parameterized queries with `?` placeholders rewritten to Postgres `$n` in `src/db.js`
 **Review Needed**: Audit all queries for string concatenation
 
 ```javascript
@@ -69,9 +78,9 @@ app.use(rateLimit({windowMs: 15*60*1000, max: 100}));
 
 ### Medium Risk 🟡
 
-#### 1. Basic Input Validation
-**Current**: Only checks for required fields
-**Needed**: Type validation, length limits, sanitization
+#### 1. Auth Input Validation (done) + Broader Coverage (needed)
+**Current**: `src/utils/auth.js` validates username (`^[a-zA-Z0-9_]{3,30}$`), email format, password length; login requires non-empty fields
+**Needed**: Same rigor for streams/categories/media inputs
 ```javascript
 // Planned
 import joi from 'joi';
@@ -82,12 +91,11 @@ const userSchema = joi.object({
 });
 ```
 
-#### 2. No Password Hashing
-**Current**: Passwords stored in database (if implemented)
-**Fix**: Use bcrypt
+#### 2. Password Hashing (Implemented)
+**Current**: Passwords hashed with bcrypt (10 rounds) in `src/utils/auth.js`; only `password_hash` stored; `sanitizeUser()` strips it from responses
 ```javascript
-import bcrypt from 'bcrypt';
-const hashedPassword = await bcrypt.hash(password, 10);
+import bcrypt from 'bcryptjs';
+const passwordHash = await bcrypt.hash(password, 10);
 ```
 
 #### 3. Error Messages Expose System Details
@@ -134,13 +142,13 @@ app.use(cors({
 **❌ DON'T:**
 - Hardcode credentials in code
 - Commit `.env` files
-- Use default MySQL root password
+- Use default Postgres password
 - Share database password in Slack/email
 
 ### 2. API Authentication
 
-**Current**: None (TO DO)
-**Recommended**: JWT + Refresh Tokens
+**Current**: JWT issued at register/login (`POST /api/auth/register`, `POST /api/auth/login`); global route guard still TODO
+**Implemented**: JWT creation with expiry
 
 ```javascript
 // Planned implementation
@@ -159,19 +167,19 @@ function verifyToken(token) {
 
 **Example Attack:**
 ```
-POST /api/users
-{"username": "'; DROP TABLE users; --"}
+POST /api/auth/register
+{"username": "'; DROP TABLE users; --", "email": "x@y.z", "password": "secret123"}
 ```
 
 **Prevention:**
 ```javascript
-// Validate before use
-if (!username || username.length > 30 || !/^[a-zA-Z0-9_]+$/.test(username)) {
-    return res.status(400).json({ error: 'Invalid username' });
+// Implemented in src/utils/auth.js
+if (!username || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+    return res.status(400).json({ errors: { username: '...' } });
 }
 
-// And use parameterized queries
-db.query('INSERT INTO users (username) VALUES (?)', [username])
+// And use parameterized queries (rewritten to $n for Postgres)
+db.query('INSERT INTO users (username, email, password_hash, created_at) VALUES (?, ?, ?, NOW())', [username, email, passwordHash])
 ```
 
 ### 4. Logging & Monitoring
@@ -382,6 +390,6 @@ Include:
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: April 2026 
+**Document Version**: 1.1  
+**Last Updated**: September 2026 
 **Status**: Active Review Required Before Production

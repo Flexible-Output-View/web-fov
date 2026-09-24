@@ -38,7 +38,8 @@ docker buildx build --platform linux/amd64 -t fov-backend:1.0.0 .
 ```bash
 docker run -d \
   -p 4000:4000 \
-  -e DB_HOST=mysql-server \
+  -e DB_HOST=postgres-server \
+  -e DB_PORT=5432 \
   -e DB_USER=admin \
   -e DB_PASSWORD=secure_password \
   -e DB_NAME=fovwebdb \
@@ -53,7 +54,8 @@ docker run -d \
   -p 4000:4000 \
   -p 9999:9999/udp \
   -v /var/fov/media:/app/media \
-  -e DB_HOST=mysql-server \
+  -e DB_HOST=postgres-server \
+  -e DB_PORT=5432 \
   -e DB_USER=admin \
   -e DB_PASSWORD=secure_password \
   -e DB_NAME=fovwebdb \
@@ -104,7 +106,7 @@ docker-compose down
 
 **File: `docker-compose.prod.yml` (already exists)**
 
-For deployments where MySQL runs separately (e.g., AWS RDS):
+For deployments where Postgres runs separately (e.g., AWS RDS):
 
 **Edit environment in compose:**
 ```yaml
@@ -187,12 +189,11 @@ docker-compose up
 
 ### Initial Database Creation
 
-**On production MySQL server:**
+**On production Postgres server:**
 ```sql
-CREATE DATABASE IF NOT EXISTS fovwebdb;
-CREATE USER 'produser'@'%' IDENTIFIED BY 'secure_password';
-GRANT ALL PRIVILEGES ON fovwebdb.* TO 'produser'@'%';
-FLUSH PRIVILEGES;
+CREATE DATABASE fovwebdb;
+CREATE USER produser WITH PASSWORD 'secure_password';
+GRANT ALL PRIVILEGES ON DATABASE fovwebdb TO produser;
 ```
 
 ### Schema Migration
@@ -204,7 +205,7 @@ npm run migrate
 
 **Manual setup (current):**
 ```bash
-mysql -h your-db.com -u produser -p fovwebdb < schema.sql
+psql -h your-db.com -U produser -d fovwebdb -f schema.sql
 ```
 
 ### Backup Strategy
@@ -220,7 +221,7 @@ aws rds modify-db-instance \
 
 **Manual backup to S3:**
 ```bash
-mysqldump -h your-db.com -u produser -p fovwebdb | \
+pg_dump -h your-db.com -U produser fovwebdb | \
   gzip | \
   aws s3 cp - s3://fov-backups/db-$(date +%Y%m%d).sql.gz
 ```
@@ -228,7 +229,7 @@ mysqldump -h your-db.com -u produser -p fovwebdb | \
 **Restore from backup:**
 ```bash
 aws s3 cp s3://fov-backups/db-20240101.sql.gz - | gunzip | \
-  mysql -h your-db.com -u produser -p fovwebdb
+  psql -h your-db.com -U produser -d fovwebdb
 ```
 
 ---
@@ -276,9 +277,9 @@ docker run ... fov-backend:1.0.0 > /var/log/fov-backend.log 2>&1 &
 
 **Database query monitoring:**
 ```sql
--- Enable slow query log
-SET GLOBAL slow_query_log = 'ON';
-SET GLOBAL long_query_time = 2;
+-- Log slow queries (requires reload)
+ALTER SYSTEM SET log_min_duration_statement = 2000;
+SELECT pg_reload_conf();
 ```
 
 **Memory usage:**
@@ -350,7 +351,7 @@ docker service create \
   --name fov-backend \
   --replicas 3 \
   -p 4000:4000 \
-  -e DB_HOST=mysql-server \
+  -e DB_HOST=postgres-server \
   fov-backend:1.0.0
 ```
 
@@ -377,7 +378,7 @@ spec:
         - containerPort: 4000
         env:
         - name: DB_HOST
-          value: mysql-service
+          value: postgres-service
 ```
 
 ### Load Balancing
@@ -421,8 +422,8 @@ docker logs fov-backend
 # Identify bottleneck
 docker stats fov-backend
 
-# Check slow queries
-mysql -h $DB_HOST -u $DB_USER -p $DB_NAME -e "SHOW PROCESSLIST;"
+# Check active queries
+psql -h $DB_HOST -U $DB_USER -d $DB_NAME -c "SELECT pid, query, state FROM pg_stat_activity;"
 ```
 
 ### Media Files Not Accessible
@@ -440,4 +441,4 @@ docker exec fov-backend ls -la /app/media/
 
 ---
 
-**Last Updated:** April 2026
+**Last Updated:** September 2026

@@ -11,8 +11,5 @@ export default {
     testMatch: [
         '**/__tests__/**/*.test.js',
         '**/src/**/*.test.js'
-    ],
-    transformIgnorePatterns: [
-        'node_modules/(?!(mysql2)/)'
     ]
 };

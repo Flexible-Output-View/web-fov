@@ -32,7 +32,7 @@ curl http://localhost:4000/
 
 ---
 
-## Users Endpoints
+## Users & Auth Endpoints
 
 ### Get User by ID (GET)
 
@@ -60,39 +60,90 @@ curl http://localhost:4000/api/users/1
 }
 ```
 
-### Create User (POST)
+### Register (POST)
+
+Creates a new user, hashes the password with bcrypt, and returns a JWT.
 
 **Request:**
 ```bash
-curl -X POST http://localhost:4000/api/users \
+curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "jane_smith",
-    "display_name": "Jane Smith"
+    "email": "jane@example.com",
+    "password": "secret123"
   }'
 ```
+
+**Validation rules:**
+- `username`: 3-30 characters, letters/numbers/underscores only
+- `email`: valid email address (stored lowercase)
+- `password`: at least 8 characters
 
 **Response (201 Created):**
 ```json
 {
-  "id": 42
+  "token": "<jwt>",
+  "user": {
+    "id": 42,
+    "username": "jane_smith",
+    "email": "jane@example.com",
+    "created_at": "2026-01-15T10:30:00Z"
+  }
 }
 ```
 
 **Error (400 Bad Request):**
-```bash
-# Missing username
-curl -X POST http://localhost:4000/api/users \
-  -H "Content-Type: application/json" \
-  -d '{"display_name": "No Username"}'
-```
-
-**Response:**
 ```json
 {
-  "error": "username required"
+  "errors": {
+    "password": "Password must be at least 8 characters"
+  }
 }
 ```
+
+**Error (409 Conflict):**
+```json
+{
+  "error": "Username or email already exists"
+}
+```
+
+### Login (POST)
+
+Accepts a username **or** an email in the `login` field (email match is case-insensitive).
+
+**Request:**
+```bash
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "login": "jane_smith",
+    "password": "secret123"
+  }'
+```
+
+**Response (200 OK):**
+```json
+{
+  "token": "<jwt>",
+  "user": {
+    "id": 42,
+    "username": "jane_smith",
+    "email": "jane@example.com",
+    "created_at": "2026-01-15T10:30:00Z"
+  }
+}
+```
+
+**Error (401 Unauthorized):**
+```json
+{
+  "error": "Invalid credentials"
+}
+```
+
+The token is a JWT signed with `JWT_SECRET` (expiry `JWT_EXPIRES_IN`, default `7d`). The Angular client stores it as `fov_auth_token` / `fov_auth_user`. Interactive reference: `http://localhost:4000/api-docs`.
 
 ---
 
@@ -273,10 +324,15 @@ seg
 ```bash
 BASE_URL="http://localhost:4000"
 
-# Create user
-curl -X POST $BASE_URL/api/users \
+# Register
+curl -X POST $BASE_URL/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser"}'
+  -d '{"username":"testuser","email":"test@example.com","password":"secret123"}'
+
+# Login
+curl -X POST $BASE_URL/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"testuser","password":"secret123"}'
 
 # Get user
 curl $BASE_URL/api/users/1
@@ -301,18 +357,19 @@ curl -i http://localhost:4000/api/users/1
 ### Using Fetch API
 
 ```javascript
-// Create user
-const response = await fetch('http://localhost:4000/api/users', {
+// Register
+const response = await fetch('http://localhost:4000/api/auth/register', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     username: 'testuser',
-    display_name: 'Test User'
+    email: 'test@example.com',
+    password: 'secret123'
   })
 });
 
 const data = await response.json();
-console.log('Created user ID:', data.id);
+console.log('Token:', data.token);
 
 // Get user
 const userResponse = await fetch('http://localhost:4000/api/users/1');
@@ -329,12 +386,13 @@ const api = axios.create({
   baseURL: 'http://localhost:4000'
 });
 
-// Create user
-const createResponse = await api.post('/api/users', {
+// Register
+const createResponse = await api.post('/api/auth/register', {
   username: 'testuser',
-  display_name: 'Test User'
+  email: 'test@example.com',
+  password: 'secret123'
 });
-console.log('User ID:', createResponse.data.id);
+console.log('Token:', createResponse.data.token);
 
 // Get user
 const getUserResponse = await api.get('/api/users/1');
@@ -372,20 +430,19 @@ $ npm test
       ✓ should return user by id (45ms)
       ✓ should return 404 when user not found (12ms)
       ✓ should handle database errors (8ms)
-    POST /
-      ✓ should create a new user (38ms)
-      ✓ should return 400 when username is missing (5ms)
-      ✓ should handle database errors on create (6ms)
 
-Test Suites: 1 passed, 1 total
-Tests:       6 passed, 6 total
-Time:        2.345s
+ PASS  src/__tests__/auth.test.js
+  Auth Routes
+    POST /register
+      ✓ should register a new user and return a token
+      ✓ should return 400 for invalid registration input
+      ✓ should return 409 when username or email already exists
+    POST /login
+      ✓ should login with username and return a token
+      ✓ should return 401 for unknown user
+      ✓ should return 401 for wrong password
 
-Coverage summary:
-  Statements   : 62% ( 123/198 )
-  Branches     : 48% ( 72/150 )
-  Functions    : 70% ( 35/50 )
-  Lines        : 65% ( 128/197 )
+Test Suites: 2 passed, 2 total
 ```
 
 
@@ -397,12 +454,20 @@ Coverage summary:
 
 ```bash
 # Missing required field
-curl -X POST http://localhost:4000/api/users \
+curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{}'
 
 # Response (400)
-# {"error":"username required"}
+# {"errors":{"username":"...","email":"...","password":"..."}}
+
+# Wrong credentials
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"testuser","password":"wrong"}'
+
+# Response (401)
+# {"error":"Invalid credentials"}
 
 # Non-existent resource
 curl http://localhost:4000/api/users/99999
@@ -444,13 +509,11 @@ time curl -s http://localhost:4000/api/users/1 > /dev/null
 
 ### Database Query Performance
 
-Enable MySQL slow query log:
+Enable Postgres slow query logging:
 ```sql
-SET GLOBAL slow_query_log = 'ON';
-SET GLOBAL long_query_time = 0.5;  -- 500ms threshold
-
--- Tail the log
-TAIL /var/log/mysql/slow.log
+ALTER SYSTEM SET log_min_duration_statement = 500;
+SELECT pg_reload_conf();
+-- Then tail the Postgres log
 ```
 
 ---
@@ -489,7 +552,10 @@ curl -v http://localhost:4000/api/users/1
 Before considering API ready:
 
 - [ ] **Health Check**: `GET /` returns 200
-- [ ] **Create User**: `POST /api/users` returns 201 with ID
+- [ ] **Register**: `POST /api/auth/register` returns 201 with token + user
+- [ ] **Login**: `POST /api/auth/login` returns 200 with token + user
+- [ ] **Duplicate register**: returns 409
+- [ ] **Wrong credentials**: returns 401
 - [ ] **Get User**: `GET /api/users/:id` returns 200
 - [ ] **Not Found**: `GET /api/users/999` returns 404
 - [ ] **Validation**: Missing fields return 400
@@ -502,4 +568,4 @@ Before considering API ready:
 
 ---
 
-**Last Updated**: April 2026
+**Last Updated**: September 2026

@@ -30,8 +30,9 @@ Visual representations of the FOV Backend system architecture and workflows.
 │  Routes Layer:                                                  │
 │  ├─ GET  /                    (Health check)                   │
 │  ├─ GET  /api/                (API status)                     │
+│  ├─ POST /api/auth/register   (Register)                      │
+│  ├─ POST /api/auth/login      (Login)                         │
 │  ├─ GET  /api/users/:id       (Fetch user)                    │
-│  ├─ POST /api/users           (Create user)                    │
 │  ├─ GET  /api/categories      (List categories)                │
 │  ├─ POST /api/categories      (Create category)                │
 │  ├─ GET  /api/streams         (List streams)                   │
@@ -77,7 +78,11 @@ app (index.js)
 │  ├─ Router (routes/index.js)
 │  │  ├─ Users Route (routes/users.js)
 │  │  │  └─ Database (db.js)
-│  │  │     └─ MySQL Pool (mysql2/promise)
+│  │  │     └─ Postgres Pool (pg)
+│  │  ├─ Auth Route (routes/auth.js)
+│  │  │  ├─ Database (db.js)
+│  │  │  ├─ bcryptjs (password hashing)
+│  │  │  └─ jsonwebtoken (JWT issuance)
 │  │  ├─ Streams Route (routes/streams.js)
 │  │  │  ├─ Database (db.js)
 │  │  │  ├─ File System (fs)
@@ -104,7 +109,7 @@ app (index.js)
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ CLIENT                                                          │
-│ curl -X POST /api/users -d {username: 'john'}                 │
+│ curl -X POST /api/auth/register -d {username, email, password}  │
 └────────────────┬────────────────────────────────────────────────┘
                  │
                  ▼
@@ -130,7 +135,7 @@ app (index.js)
 │ DATABASE OPERATION                                              │
 │ ├─ Get connection from pool                                    │
 │ ├─ Execute parameterized query                                │
-│ │  └─ INSERT INTO users (username) VALUES (?)                 │
+│ │  └─ INSERT INTO users (username, email, password_hash) ...  │
 │ └─ Release connection back to pool                             │
 └────────────────┬────────────────────────────────────────────────┘
                  │
@@ -139,11 +144,12 @@ app (index.js)
         ▼                 ▼
     SUCCESS           ERROR
     └─ Catch           └─ Catch Error
-       ├─ Get insertId  ├─ Log error internally
-       ├─ res.status    ├─ Generic message to client
-       │  (201)         ├─ res.status(500)
+       ├─ Get user row  ├─ Log error internally
+       ├─ Sign JWT      ├─ Generic message to client
+       ├─ res.status    ├─ res.status(500)
+       │  (201/200)     ├─ next(error)
        └─ Send JSON     └─ next(error)
-          {id: 42}           │
+          {token, user}      │
                              ▼
                    ┌──────────────────────┐
                    │ Global Error Handler │
@@ -160,10 +166,10 @@ app (index.js)
 ┌──────────────────────────────────────────────────────────────┐
 │ DEVELOPER WRITES TEST                                        │
 │                                                              │
-│ describe('Users', () => {                                   │
-│   test('should create user', async () => {                 │
-│     db.query.mockResolveValue({insertId: 42})             │
-│     const res = await request(app).post('/api/users')     │
+│ describe('Auth', () => {                                     │
+│   test('should register user', async () => {                │
+│     db.query.mockResolvedValue([{id: 1}])                  │
+│     const res = await request(app).post('/api/auth/register')│
 │     expect(res.status).toBe(201)                          │
 │   })                                                        │
 │ })                                                          │
@@ -526,4 +532,4 @@ Database Connection:
 
 ---
 
-**Last Updated**: April 2026
+**Last Updated**: September 2026
