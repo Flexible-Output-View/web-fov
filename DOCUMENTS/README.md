@@ -6,7 +6,8 @@ The **FOV Backend** is an Express.js-based REST API and media streaming server t
 
 **Key Features:**
 - RESTful API for users, streams, and categories
-- MySQL database integration with connection pooling
+- User registration and login with JWT (`POST /api/auth/register`, `POST /api/auth/login`)
+- Postgres database integration with connection pooling (`pg` Pool)
 - HLS streaming support via SRT ingest
 - CORS-enabled for multi-origin requests
 - Comprehensive error handling and logging
@@ -35,7 +36,7 @@ The **FOV Backend** is an Express.js-based REST API and media streaming server t
 
 - **Node.js**: v18+ (v20 recommended)
 - **npm**: v8+
-- **MySQL**: v8.0+ (for development and production)
+- **Postgres**: v18+ (for development and production)
 - **FFmpeg**: Required for media transcoding (optional, if using media server features)
 
 ### Steps
@@ -73,10 +74,13 @@ Create a `.env` file in the `backend/` directory. See `.env.example` for templat
 |----------|------|---------|-------------|
 | `PORT` | int | 4000 | Express server port |
 | `NODE_ENV` | string | development | Environment (development/production) |
-| `DB_HOST` | string | localhost | MySQL host |
-| `DB_USER` | string | admin | MySQL user |
-| `DB_PASSWORD` | string | (required) | MySQL password |
+| `DB_HOST` | string | localhost | Postgres host |
+| `DB_PORT` | int | 5432 | Postgres port |
+| `DB_USER` | string | admin | Postgres user |
+| `DB_PASSWORD` | string | (required) | Postgres password |
 | `DB_NAME` | string | fovwebdb | Database name |
+| `JWT_SECRET` | string | (required) | Secret used to sign JWTs |
+| `JWT_EXPIRES_IN` | string | 7d | JWT expiry |
 | `MEDIA_ROOT` | string | ./media | Path to HLS and media files |
 | `FFMPEG_PATH` | string | auto-detected | Path to FFmpeg binary |
 | `CORS_ORIGIN` | string | * | CORS allowed origin |
@@ -98,11 +102,12 @@ cp .env.production.example .env.production
 backend/
 ├── src/
 │   ├── index.js                 # Express app initialization & server startup
-│   ├── db.js                    # MySQL connection pool & helper methods
+│   ├── db.js                    # Postgres connection pool (pg) & helper methods
 │   ├── mediaServer.mjs          # SRT server & HLS transcoding setup
 │   └── routes/
 │       ├── index.js             # Route aggregator
-│       ├── users.js             # User CRUD operations
+│       ├── auth.js              # Registration & login (JWT, bcrypt)
+│       ├── users.js             # User profile lookup
 │       ├── streams.js           # Stream metadata & HLS playlists
 │       └── categories.js        # Category management
 ├── src/__tests__/               # Unit tests
@@ -151,20 +156,28 @@ Ensure environment variables are properly set in `.env` or the environment.
 
 ## API Endpoints
 
-### Users
-- `GET /api/users/:id` - Get user by ID
-- `POST /api/users` - Create new user
+### Auth
+- `POST /api/auth/register` - Register (`username`, `email`, `password`) → `201 {token, user}`
+- `POST /api/auth/login` - Login (`login`, `password`, username or email) → `200 {token, user}`
 
 **Example:**
 ```bash
-# Create user
-curl -X POST http://localhost:4000/api/users \
+# Register
+curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"john_doe","display_name":"John Doe"}'
+  -d '{"username":"john_doe","email":"john@example.com","password":"secret123"}'
+
+# Login
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"john_doe","password":"secret123"}'
 
 # Get user
 curl http://localhost:4000/api/users/1
 ```
+
+### Users
+- `GET /api/users/:id` - Get user by ID
 
 ### Streams
 - `GET /api/streams` - List all streams
@@ -253,7 +266,8 @@ docker build -t fov-backend:latest .
 
 # Run container
 docker run -p 4000:4000 \
-  -e DB_HOST=mysql-host \
+  -e DB_HOST=postgres-host \
+  -e DB_PORT=5432 \
   -e DB_USER=admin \
   -e DB_PASSWORD=xxxx \
   -e DB_NAME=fovwebdb \
@@ -337,5 +351,5 @@ For issues, improvements, or questions:
 
 ---
 
-**Last Updated**: April 2026
+**Last Updated**: September 2026
 **Maintainer**: FOV Development Team

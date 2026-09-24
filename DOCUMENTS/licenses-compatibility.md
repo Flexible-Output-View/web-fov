@@ -23,7 +23,6 @@ All 42 direct dependencies use permissive licenses (`MIT`, `BSD-2-Clause`, `BSD-
 | express | 4.22.1 | MIT | Yes | Verified. |
 | jsonwebtoken | 9.0.3 | MIT | Yes | Not installed locally; resolved via registry (`npm view`). |
 | morgan | 1.10.1 | MIT | Yes | Verified. |
-| mysql2 | 3.20.0 | MIT | Yes | Verified. |
 | node-av | 5.2.3 | MIT | Yes | Verified. |
 | node-fetch | 3.3.2 | MIT | Yes | Verified. Native `fetch` exists in Node 18+, but license is fine. |
 | node-media-server | 2.2.0 (pinned) | MIT | Yes | Verified. |
@@ -102,7 +101,7 @@ Frontend total: 18× MIT, 4× Apache-2.0, 1× 0BSD.
 ```bash
 # backend
 cd backend
-node -e "for (const p of ['bcryptjs','cors','dotenv','express','jsonwebtoken','morgan','mysql2','node-av','node-fetch','node-media-server','pg','srt','swagger-ui-express','@types/pg','eslint','jest','jest-mock-extended','nodemon','supertest']) { try { const j=require('./node_modules/'+p+'/package.json'); console.log(p+'|'+j.version+'|'+(j.license||JSON.stringify(j.licenses))) } catch(e){ console.log(p+'|NOT INSTALLED') } }"
+node -e "for (const p of ['bcryptjs','cors','dotenv','express','jsonwebtoken','morgan','node-av','node-fetch','node-media-server','pg','srt','swagger-ui-express','@types/pg','eslint','jest','jest-mock-extended','nodemon','supertest']) { try { const j=require('./node_modules/'+p+'/package.json'); console.log(p+'|'+j.version+'|'+(j.license||JSON.stringify(j.licenses))) } catch(e){ console.log(p+'|NOT INSTALLED') } }"
 npm view bcryptjs version license
 npm view jsonwebtoken version license
 npm view pg version license
