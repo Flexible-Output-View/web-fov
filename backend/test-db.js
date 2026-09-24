@@ -1,20 +1,22 @@
-require('dotenv').config();
-const mysql = require('mysql2/promise');
+import * as dotenv from 'dotenv';
+dotenv.config();
+import { Pool } from 'pg';
 
-(async () => {
-    try {
-        const conn = await mysql.createConnection({
-            host: '217.182.104.153',
-            user: 'fov-admin',
-            password: 'Admin-FOV@EIP-Epitech',
-            database: 'fovwebdb',
-        });
-        console.log('✅ Connected!');
-        const res = await conn.query('SELECT 1');
-        console.log('✅ Query result:', res);
-        await conn.end();
-    } catch (err) {
-        console.error('❌ Error:', err.message);
-        console.error('Code:', err.code);
-    }
-})();
+const pool = new Pool({
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    user: process.env.DB_USER || 'admin',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'fovwebdb'
+});
+
+try {
+    const res = await pool.query('SELECT 1 AS ok');
+    console.log('✅ Connected!');
+    console.log('✅ Query result:', res.rows);
+} catch (err) {
+    console.error('❌ Error:', err.message);
+    console.error('Code:', err.code);
+} finally {
+    await pool.end();
+}

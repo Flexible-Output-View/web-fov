@@ -40,10 +40,10 @@ FOV is a complete video streaming solution composed of two main components:
     │ • HLS Stream Distribution           │
     └────┬──────────────────┬─────────────┘
          │                  │
-    ┌────▼─────┐      ┌─────▼──────────┐
-    │ MySQL DB │      │ HLS Media Files│
-    │ fovwebdb │      │ /media/hls/    │
-    └──────────┘      └────────────────┘
+     ┌────▼─────┐      ┌─────▼──────────┐
+     │ Postgres │      │ HLS Media Files│
+     │ fovwebdb │      │ /media/hls/    │
+     └──────────┘      └────────────────┘
 ```
 
 ---
@@ -55,7 +55,7 @@ web-fov/
 ├── backend/                    # Node.js REST API & Media Server
 │   ├── src/
 │   │   ├── index.js           # Express app entry point
-│   │   ├── db.js              # MySQL connection pool
+│   │   ├── db.js              # Postgres connection pool (pg)
 │   │   ├── mediaServer.mjs    # SRT server & HLS transcoding
 │   │   └── routes/            # API endpoints
 │   │       ├── users.js       # User management
@@ -90,7 +90,7 @@ web-fov/
 ### Prerequisites
 
 - **Docker** & **Docker Compose** (recommended)
-- OR manually: Node.js v18+, npm v8+, MySQL 8.0+
+- OR manually: Node.js v18+, npm v8+, Postgres 18+
 
 ### Option 1: Docker Compose (Recommended)
 
@@ -98,7 +98,7 @@ web-fov/
 # Clone repository
 git clone <repo> && cd web-fov
 
-# Start all services (backend, frontend, MySQL)
+# Start all services (backend, frontend, Postgres)
 docker-compose up --build
 
 # Services will be available at:
@@ -170,14 +170,37 @@ Encoders should use these settings:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/auth/register` | POST | Register a new user (`username`, `email`, `password`) → `201 {token, user}` |
+| `/auth/login` | POST | Login with username or email (`login`, `password`) → `200 {token, user}` |
 | `/users/:id` | GET | Get user profile |
-| `/users` | POST | Create new user |
 | `/streams` | GET | List all streams |
 | `/streams/available` | GET | Get active streams with HLS URLs |
 | `/streams/:id` | GET | Get stream details |
 | `/streams/:id/hls` | GET | Get HLS playlist URL |
 | `/categories` | GET | List categories |
 | `/categories/:id` | GET | Get category details |
+
+### Authentication
+
+**Register:**
+
+```bash
+curl -X POST http://localhost:4000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"jane_smith","email":"jane@example.com","password":"secret123"}'
+```
+
+Validation rules: username `3-30 chars, letters/numbers/underscores only`; valid email (stored lowercase); password `>= 8 chars`. Passwords are hashed with bcrypt (10 rounds) and never returned. Success returns `201 {token, user}` where `user` is `{id, username, email, created_at}`. Duplicate username/email returns `409`. Invalid input returns `400 {errors}`.
+
+**Login:**
+
+```bash
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"jane_smith","password":"secret123"}'
+```
+
+`login` accepts a username or an email (email match is case-insensitive). Wrong credentials return `401 {error: "Invalid credentials"}`. The JWT (`JWT_SECRET`, expiry `JWT_EXPIRES_IN`, default `7d`) is returned as `token` and persisted by the Angular client (`fov_auth_token` / `fov_auth_user`). Interactive docs: `http://localhost:4000/api-docs`.
 
 See [DOCUMENTS/API-TESTING.md](DOCUMENTS/API-TESTING.md) for detailed examples.
 
@@ -247,12 +270,16 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Implemented
 - CORS configuration
-- Connection pooling
+- Connection pooling (Postgres `pg` Pool)
 - Environment variable separation
+- User registration and login (`POST /api/auth/register`, `POST /api/auth/login`)
+- JWT issuance (`JWT_SECRET` / `JWT_EXPIRES_IN`, default `7d`)
+- Password hashing with bcrypt
+- Input validation for auth (username, email, password rules)
 
 ### TODO (High Priority)
-- JWT authentication
-- Input validation & sanitization
+- Global auth guard / protected routes (tokens are issued but endpoints are not yet all protected)
+- Input validation & sanitization (broader coverage beyond auth)
 - Rate limiting
 - HTTPS enforcement
 
@@ -288,7 +315,7 @@ See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Last Updated:** April 2026  
+**Last Updated:** September 2026  
 **Current Version:** 0.1.0 (Beta)
 
 Set up OBS
