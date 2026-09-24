@@ -29,6 +29,8 @@ jobs:
             API_URL=${{ vars.API_FULL_URL }}
             TWITCH_ID=${{ secrets.TWITCH_ID }}
             TWITCH_SECRET=${{ secrets.TWITCH_SECRET }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_EXPIRES_IN=${{ vars.JWT_EXPIRES_IN }}
             EOF
 
         - name: "Stop previous container"
