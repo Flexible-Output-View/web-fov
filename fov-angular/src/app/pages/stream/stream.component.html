@@ -47,9 +47,16 @@
   </div>
 
   <div class="player-wrapper" *ngIf="!isLoading && isLive && !errorMessage && !streamEndedMessage">
-    <app-fov-player
-      [streamId]="streamId"
-      (streamEnded)="onStreamEnded()">
-    </app-fov-player>
+    <div class="stream-content">
+      <div class="player-pane">
+        <app-fov-player
+          [streamId]="streamId"
+          (streamEnded)="onStreamEnded()">
+        </app-fov-player>
+      </div>
+      <div class="chat-pane">
+        <app-stream-chat [streamId]="streamId"></app-stream-chat>
+      </div>
+    </div>
   </div>
 </div>

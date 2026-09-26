@@ -72,6 +72,29 @@
   overflow: hidden;
 }
 
+.stream-content {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.player-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.chat-pane {
+  width: 340px;
+  flex-shrink: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .loading-state,
 .error-state,
 .offline-state,
@@ -161,6 +184,38 @@
   &:hover {
     border-color: var(--text-secondary, #888);
     color: var(--text-primary, #fff);
+  }
+}
+
+@media (max-width: 1024px) {
+  .stream-content {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .player-pane {
+    flex: none;
+    height: 55dvh;
+    min-height: 300px;
+  }
+
+  .chat-pane {
+    width: 100%;
+    flex: none;
+    height: 45dvh;
+    min-height: 320px;
+    border-top: 1px solid var(--border-color, #2a2a2a);
+  }
+
+  .player-wrapper {
+    height: auto;
+    min-height: calc(100dvh - 56px);
+    overflow: visible;
+  }
+
+  .stream-content {
+    height: auto;
+    min-height: calc(100dvh - 56px);
   }
 }
 
