@@ -5,11 +5,14 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
+import { createServer } from 'http';
 
 import db from './db.js';
 import apiRoutes from './routes/index.js';
 import { createMediaRoutes, startMediaServer, clearHLSFiles } from './mediaServer.mjs';
 import swaggerDocument from './swagger.js';
+import { initChatSocket } from './chatSocket.js';
+import { ensureChatTable } from './routes/chat.js';
 
 const PORT = process.env.PORT || 4000;
 
@@ -41,15 +44,27 @@ async function start() {
         // verify PostgreSQL connection
         await db.query('SELECT 1');
         console.log('✅ Connected to BDD');
+        // Ensure chat persistence table exists (safe on existing DBs)
+        try {
+            await ensureChatTable();
+            console.log('✅ Chat table ready');
+        } catch (err) {
+            console.error('⚠️ Unable to ensure chat table', err?.message || err);
+        }
         // Clear HLS files on server start
         clearHLSFiles();
 
         // initialize media server
         await startMediaServer(app);
 
-        const server = app.listen(PORT, () => {
+        const httpServer = createServer(app);
+        const io = initChatSocket(httpServer);
+        app.set('io', io);
+
+        const server = httpServer.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);
             console.log(`📺 HLS available at http://localhost:${PORT}/api/hls`);
+            console.log(`💬 Chat realtime ready (Socket.IO)`);
         });
 
         // Handle server errors

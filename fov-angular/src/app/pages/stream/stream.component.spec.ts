@@ -13,6 +13,11 @@ class MockFovPlayerComponent {
   @Output() streamEnded = new EventEmitter<void>();
 }
 
+@Component({ selector: 'app-stream-chat', template: '', standalone: true })
+class MockStreamChatComponent {
+  @Input() streamId = '';
+}
+
 const mockStream = {
   streamId: 'test-stream',
   title: 'Test Stream',
@@ -33,7 +38,7 @@ describe('StreamComponent', () => {
     liveStreamsSpy.getStreamById.and.returnValue(of(mockStream as any));
 
     await TestBed.configureTestingModule({
-      imports: [CommonModule, MockFovPlayerComponent],
+      imports: [CommonModule, MockFovPlayerComponent, MockStreamChatComponent],
       providers: [
         {
           provide: ActivatedRoute,
@@ -45,7 +50,7 @@ describe('StreamComponent', () => {
     })
     .overrideComponent(StreamComponent, {
       set: {
-        imports: [CommonModule, MockFovPlayerComponent]
+        imports: [CommonModule, MockFovPlayerComponent, MockStreamChatComponent]
       }
     })
     .compileComponents();
