@@ -69,10 +69,16 @@ interface SavedWrapperLayout {
   orderIndex: number;
 }
 
+interface SavedAudioLayout {
+  trackName: string;
+  volume: number;
+}
+
 interface SavedLayout {
   streamId: string;
   savedAt: number;
   wrappers: SavedWrapperLayout[];
+  audioWrappers?: SavedAudioLayout[];
 }
 
 interface ApiTracksResponse {
@@ -104,6 +110,7 @@ interface ApiAvailableStreamsResponse {
 }
 
 interface TrackBufferInfo {
+  playerId: string;
   name: string;
   start: number;
   end: number;
@@ -175,10 +182,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private readonly MOBILE_BREAKPOINT = 768;
   private bufferCheckCount = 0;
 
-  // Handler click-to-unlock, stocké pour pouvoir le retirer dans ngOnDestroy
   private clickToUnlockHandler: (() => void) | null = null;
-
-  // Listener document pour déverrouiller l'audio sur n'importe quelle interaction
   private documentUnlockHandler: (() => void) | null = null;
 
   readonly playerId = `fov_${Math.random().toString(36).substr(2, 9)}`;
@@ -194,7 +198,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     return `fov_layout_${this.streamId}`;
   }
 
-  // ── Helpers sessionStorage audio ─────────────────────────────────────────
   private getSessionAudioUnlocked(): boolean {
     try {
       return sessionStorage.getItem(AUDIO_UNLOCKED_SESSION_KEY) === '1';
@@ -209,9 +212,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     } catch {}
   }
 
-  // ── canAutoplayWithSound ──────────────────────────────────────────────────
-  // Probe silencieuse : crée une micro-vidéo en mémoire et tente play() sans mute.
-  // Retourne true si le navigateur autorise l'autoplay avec son (MEI élevé).
   private async canAutoplayWithSound(): Promise<boolean> {
     try {
       const v = document.createElement('video');
@@ -253,7 +253,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.stopPolling();
     this.stopBufferCheck();
     this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
-    this.audioWrappers.forEach((w) => { w.hls?.destroy(); });  // ← ajouté
+    this.audioWrappers.forEach((w) => { w.hls?.destroy(); });
     if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
     if (this.isFullscreen) document.exitFullscreen?.().catch(() => {});
 
@@ -973,31 +973,54 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private collectBufferInfos(): TrackBufferInfo[] {
-    return this.videoWrappers.map((w) => {
-      const vid = w.videoElement;
-      let start = 0,
-        end = 0,
-        length = 0;
-      if (vid && vid.buffered.length > 0) {
-        start = vid.buffered.start(0);
-        end = vid.buffered.end(vid.buffered.length - 1);
+    const videoInfos: TrackBufferInfo[] = this.videoWrappers.map((w) => {
+      const el = w.videoElement;
+      let start = 0, end = 0, length = 0;
+      if (el && el.buffered.length > 0) {
+        start = el.buffered.start(0);
+        end   = el.buffered.end(el.buffered.length - 1);
         length = end - start;
       }
-      const startPdt = this.getTrackStartPdt(w);
-      return { name: w.track.name, start, end, length, startPdt };
+      
+      return {
+        playerId: w.playerId,
+        name:     w.track.name,
+        start, end, length,
+        startPdt: this.getTrackStartPdt(w),
+      };
+      
     });
+
+    const audioInfos: TrackBufferInfo[] = this.audioWrappers.map((w) => {
+      const el = w.audioElement;
+      let start = 0, end = 0, length = 0;
+      if (el && el.buffered.length > 0) {
+        start = el.buffered.start(0);
+        end   = el.buffered.end(el.buffered.length - 1);
+        length = end - start;
+      }
+      return {
+        playerId: w.playerId,
+        name:     w.track.name,
+        start, end, length,
+        startPdt: this.getTrackStartPdt(w),
+      };
+    });
+
+    return [...videoInfos, ...audioInfos];
   }
 
   private computeSyncTargets(
     infos: TrackBufferInfo[],
-  ): { name: string; target: number }[] | null {
+  ): { playerId: string; name: string; target: number }[] | null {
+
     const allHavePdt = infos.every((i) => i.startPdt !== null);
 
     if (allHavePdt) {
       const wallClockStarts = infos.map((i) => i.startPdt! + i.start * 1000);
-      const wallClockEnds = infos.map((i) => i.startPdt! + i.end * 1000);
+      const wallClockEnds   = infos.map((i) => i.startPdt! + i.end   * 1000);
       const commonWallStart = Math.max(...wallClockStarts);
-      const commonWallEnd = Math.min(...wallClockEnds);
+      const commonWallEnd   = Math.min(...wallClockEnds);
 
       if (commonWallEnd - commonWallStart < 3000) {
         console.log('[FOV] PDT overlap < 3s — waiting');
@@ -1007,17 +1030,18 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       const targets = infos.map((inf) => {
         const t = (commonWallStart - inf.startPdt!) / 1000 + 0.1;
         return {
-          name: inf.name,
-          target: Math.max(inf.start + 0.1, Math.min(t, inf.end - 1)),
+          playerId: inf.playerId,
+          name:     inf.name,
+          target:   Math.max(inf.start + 0.1, Math.min(t, inf.end - 1)),
         };
       });
 
       for (let i = 0; i < infos.length; i++) {
-        const inf = infos[i];
+        const inf    = infos[i];
         const target = targets[i].target;
         if (target < inf.start || target > inf.end - 0.5) {
           console.log(
-            `[FOV] Track ${inf.name}: target ${target.toFixed(2)}s outside buffer — waiting`,
+            `[FOV] ${inf.name} (${inf.playerId}): target ${target.toFixed(2)}s outside buffer — waiting`,
           );
           return null;
         }
@@ -1025,27 +1049,25 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
       const overlapSec = (commonWallEnd - commonWallStart) / 1000;
       console.log(
-        `[FOV] PDT overlap: ${overlapSec.toFixed(1)}s — targets: ${targets.map((t) => `${t.name}→${t.target.toFixed(2)}s`).join(', ')}`,
+        `[FOV] PDT overlap: ${overlapSec.toFixed(1)}s — targets: ` +
+        targets.map((t) => `${t.name}→${t.target.toFixed(2)}s`).join(', '),
       );
       return targets;
     }
 
     console.log('[FOV] No PDT — fallback sync');
-    const ends = infos.map((i) => i.end);
-    const starts = infos.map((i) => i.start);
-    const syncPoint = Math.min(...ends) - 3;
-    const maxStart = Math.max(...starts);
+    const syncPoint = Math.min(...infos.map((i) => i.end)) - 3;
+    const maxStart  = Math.max(...infos.map((i) => i.start));
 
     if (syncPoint <= maxStart) {
-      console.log(
-        `[FOV] Fallback syncPoint ${syncPoint.toFixed(1)}s <= maxStart — waiting`,
-      );
+      console.log(`[FOV] Fallback syncPoint ${syncPoint.toFixed(1)}s <= maxStart — waiting`);
       return null;
     }
 
-    const targets = infos.map((i) => ({
-      name: i.name,
-      target: Math.max(i.start + 0.1, Math.min(syncPoint, i.end - 1)),
+    const targets = infos.map((inf) => ({
+      playerId: inf.playerId,
+      name:     inf.name,
+      target:   Math.max(inf.start + 0.1, Math.min(syncPoint, inf.end - 1)),
     }));
     console.log(`[FOV] Fallback syncPoint: ${syncPoint.toFixed(2)}s`);
     return targets;
@@ -1055,14 +1077,14 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.bufferCheckCount = 0;
 
     const check = () => {
-      // Guard : si la lecture a déjà démarré, on arrête
       if (this.playbackStarted) return;
 
-      if (this.videoWrappers.length === 0) {
+      // Attendre que tous les éléments soient attachés
+      if (this.videoWrappers.some((w) => !w.videoElement)) {
         setTimeout(check, 500);
         return;
       }
-      if (this.videoWrappers.some((w) => !w.videoElement)) {
+      if (this.audioWrappers.some((w) => !w.audioElement)) {
         setTimeout(check, 500);
         return;
       }
@@ -1076,14 +1098,19 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         const summary = infos
           .map(
             (i) =>
-              `${i.name}: ${i.length.toFixed(1)}s [${i.start.toFixed(1)}-${i.end.toFixed(1)}]${i.startPdt ? ' PDT:' + new Date(i.startPdt).toISOString().substr(11, 8) : ' (no PDT)'}`,
+              `${i.name}: ${i.length.toFixed(1)}s [${i.start.toFixed(1)}-${i.end.toFixed(1)}]` +
+              (i.startPdt
+                ? ' PDT:' + new Date(i.startPdt).toISOString().substr(11, 8)
+                : ' (no PDT)'),
           )
           .join(' | ');
         console.log(
-          `[FOV] Buffer check #${this.bufferCheckCount}: ${summary} | min: ${Math.min(...infos.map((i) => i.length)).toFixed(1)}s`,
+          `[FOV] Buffer check #${this.bufferCheckCount}: ${summary} | min: ` +
+          `${Math.min(...infos.map((i) => i.length)).toFixed(1)}s`,
         );
       }
 
+      // Toutes les pistes (vidéo + audio) doivent avoir assez de buffer
       const minBuffered = Math.min(...infos.map((i) => i.length));
       if (minBuffered < this.MIN_BUFFER_FOR_START) {
         setTimeout(check, 500);
@@ -1097,7 +1124,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       }
 
       console.log(
-        `%c[FOV] ✓ Buffer ready — starting synchronized playback`,
+        '%c[FOV] ✓ Buffer ready — starting synchronized playback',
         'color: #16a34a; font-weight: bold',
       );
       this.startSynchronizedPlayback(syncTargets);
@@ -1114,25 +1141,24 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private async startSynchronizedPlayback(
-    targets: { name: string; target: number }[],
+    targets: { playerId: string; name: string; target: number }[],
   ): Promise<void> {
     if (this.playbackStarted) return;
 
     console.log(
-      `[FOV] startSynchronizedPlayback — ${targets.map((t) => `${t.name}→${t.target.toFixed(2)}s`).join(', ')}`,
+      `[FOV] startSynchronizedPlayback — ` +
+      targets.map((t) => `${t.name}→${t.target.toFixed(2)}s`).join(', '),
     );
 
-    for (const w of this.videoWrappers) {
-      if (w.videoElement) w.videoElement.pause();
-    }
+    // Pause tout
+    for (const w of this.videoWrappers) w.videoElement?.pause();
+    for (const w of this.audioWrappers) w.audioElement?.pause();
 
-    const seekPromises = this.videoWrappers.map((w) => {
-      return new Promise<void>((resolve) => {
-        if (!w.videoElement) {
-          resolve();
-          return;
-        }
-        const t = targets.find((t) => t.name === w.track.name);
+    // Seek vidéos
+    const videoSeeks = this.videoWrappers.map((w) =>
+      new Promise<void>((resolve) => {
+        if (!w.videoElement) { resolve(); return; }
+        const t = targets.find((t) => t.playerId === w.playerId);
         const seekTarget = t?.target ?? w.bufferStart;
         const onSeeked = () => {
           w.videoElement!.removeEventListener('seeked', onSeeked);
@@ -1140,13 +1166,33 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         };
         w.videoElement.addEventListener('seeked', onSeeked);
         w.videoElement.currentTime = seekTarget;
-      });
-    });
+      }),
+    );
 
-    await Promise.all(seekPromises);
+    // Seek audios
+    const audioSeeks = this.audioWrappers.map((w) =>
+      new Promise<void>((resolve) => {
+        if (!w.audioElement) { resolve(); return; }
+        const t = targets.find((t) => t.playerId === w.playerId);
+        const seekTarget = t?.target ?? w.bufferStart;
+
+        // Si déjà à la bonne position → pas besoin d'attendre 'seeked'
+        if (Math.abs(w.audioElement.currentTime - seekTarget) < 0.05) {
+          resolve();
+          return;
+        }
+        const onSeeked = () => {
+          w.audioElement!.removeEventListener('seeked', onSeeked);
+          resolve();
+        };
+        w.audioElement.addEventListener('seeked', onSeeked);
+        w.audioElement.currentTime = seekTarget;
+      }),
+    );
+
+    await Promise.all([...videoSeeks, ...audioSeeks]);
     await this.waitForAllReady();
     await this.playAllWrappers();
-
     await this.tryAutoUnlockAudio();
 
     requestAnimationFrame(() => {
@@ -1156,7 +1202,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       for (const w of this.videoWrappers) {
         this.updateBufferInfo(w);
         console.log(
-          `[FOV] [${w.track.name}] Post-play ct:${w.videoElement?.currentTime.toFixed(2)} buf:${w.bufferStart.toFixed(1)}-${w.bufferEnd.toFixed(1)}`,
+          `[FOV] [${w.track.name}] Post-play ct:${w.videoElement?.currentTime.toFixed(2)} ` +
+          `buf:${w.bufferStart.toFixed(1)}-${w.bufferEnd.toFixed(1)}`,
         );
       }
 
@@ -1169,146 +1216,80 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  // ── tryAutoUnlockAudio ────────────────────────────────────────────────────
-  // Ordre de priorité :
-  //   1. sessionStorage dit que l'utilisateur a déjà consenti → démuette directement
-  //   2. Probe canAutoplayWithSound() → navigateur autorise l'autoplay avec son
-  //   3. Tente de démuetter et vérifie si le navigateur a mis en pause silencieusement
-  //   4. Sinon : lecture muette + overlay + listeners
   private async tryAutoUnlockAudio(): Promise<void> {
-  if (this.audioUnlocked) return;
+    if (this.audioUnlocked) return;
 
-  // ── Priorité 1 : consentement sessionStorage ──────────────────────────
-  // On tente de démuetter. Si le navigateur bloque quand même (vidéo pausée
-  // silencieusement), on bascule vers l'overlay sans mettre audioUnlocked=true.
-  if (this.getSessionAudioUnlocked()) {
-    console.log('[FOV] sessionStorage consent found — attempting unmute');
-    let blockedByBrowser = false;
-
+    // Vidéos : toujours muted, sans exception
     for (const w of this.videoWrappers) {
-      if (w.videoElement) { w.videoElement.muted = true; w.videoElement.volume = 0; }
+      if (w.videoElement) {
+        w.videoElement.volume = 0;
+        w.videoElement.muted = true;
+      }
     }
 
+    if (this.getSessionAudioUnlocked()) {
+      console.log('[FOV] sessionStorage consent found — attempting unmute');
+
+      let blockedByBrowser = false;
+      for (const w of this.audioWrappers) {
+        if (!w.audioElement) continue;
+        try {
+          w.audioElement.muted = false;
+          w.audioElement.volume = w.volume;
+          // Si l'élément est en pause après unmute → bloqué
+          if (w.audioElement.paused) {
+            blockedByBrowser = true;
+            w.audioElement.muted = true;
+          }
+        } catch {
+          blockedByBrowser = true;
+          if (w.audioElement) w.audioElement.muted = true;
+        }
+      }
+
+      if (!blockedByBrowser) {
+        this.audioUnlocked = true;
+        console.log('[FOV] Audio auto-unlocked via sessionStorage consent');
+        return;
+      }
+
+      console.warn('[FOV] sessionStorage consent present but browser still blocks — showing overlay');
+      try { sessionStorage.removeItem(AUDIO_UNLOCKED_SESSION_KEY); } catch {}
+      // Pas besoin de resumeAllMuted — les audios jouent déjà muted
+      this.registerClickToUnlock();
+      this.registerDocumentUnlock();
+      return;
+    }
+
+    // Pas de consentement sessionStorage — tenter directement
+    let blockedByBrowser = false;
     for (const w of this.audioWrappers) {
       if (!w.audioElement) continue;
       try {
-        w.audioElement.volume = w.volume;
         w.audioElement.muted = false;
-        if (w.audioElement.paused && w.volume > 0) {
+        w.audioElement.volume = w.volume;
+        if (w.audioElement.paused) {
           blockedByBrowser = true;
           w.audioElement.muted = true;
         }
       } catch {
         blockedByBrowser = true;
-        w.audioElement.muted = true;
-      }
-    }
-
-    for (const w of this.videoWrappers) {
-      if (!w.videoElement) continue;
-      try {
-        w.videoElement.volume = 0;
-        w.videoElement.muted = true;
-        // Détecter si le navigateur a mis en pause silencieusement
-        if (w.videoElement.paused && w.volume > 0) {
-          blockedByBrowser = true;
-          w.videoElement.muted = true;
-        }
-      } catch {
-        blockedByBrowser = true;
-        w.videoElement.muted = true;
-      }
-    }
-
-    if (!blockedByBrowser) {
-      this.audioUnlocked = true;
-      console.log('[FOV] Audio auto-unlocked via sessionStorage consent');
-      return;
-    }
-
-    // Le navigateur a bloqué malgré le consentement mémorisé
-    // → on efface la clé (état incohérent) et on bascule vers l'overlay
-    console.warn(
-      '[FOV] sessionStorage consent present but browser still blocks — ' +
-      'clearing key, showing overlay',
-    );
-    try { sessionStorage.removeItem(AUDIO_UNLOCKED_SESSION_KEY); } catch {}
-    this.resumeAllMuted();
-    this.registerClickToUnlock();
-    this.registerDocumentUnlock();
-    return;
-  }
-
-  // ── Priorité 2 : probe canAutoplayWithSound ───────────────────────────
-  const canAutoplay = await this.canAutoplayWithSound();
-  if (canAutoplay) {
-    console.log('[FOV] canAutoplayWithSound probe passed — unmuting directly');
-    let blockedByBrowser = false;
-
-    for (const w of this.videoWrappers) {
-      if (!w.videoElement) continue;
-      try {
-        w.videoElement.volume = 0;
-        w.videoElement.muted = true;
-        if (w.videoElement.paused && w.volume > 0) {
-          blockedByBrowser = true;
-          w.videoElement.muted = true;
-        }
-      } catch {
-        blockedByBrowser = true;
-        w.videoElement.muted = true;
+        if (w.audioElement) w.audioElement.muted = true;
       }
     }
 
     if (!blockedByBrowser) {
       this.audioUnlocked = true;
       this.setSessionAudioUnlocked();
-      console.log('[FOV] Auto audio unlock succeeded via probe');
+      console.log('[FOV] Audio auto-unlocked');
       return;
     }
 
-    console.warn('[FOV] probe passed but browser blocked unmute — showing overlay');
-    this.resumeAllMuted();
+    console.warn('[FOV] Auto audio unlock blocked — waiting for user interaction');
     this.registerClickToUnlock();
     this.registerDocumentUnlock();
-    return;
   }
 
-  // ── Priorité 3 : tentative directe ───────────────────────────────────
-  let anyBlocked = false;
-
-  for (const w of this.videoWrappers) {
-    if (!w.videoElement) continue;
-    try {
-      w.videoElement.volume = 0;
-      w.videoElement.muted = true;
-      if (w.videoElement.paused || (w.videoElement.muted && w.volume > 0)) {
-        anyBlocked = true;
-        w.videoElement.muted = true;
-      }
-    } catch {
-      anyBlocked = true;
-      w.videoElement.muted = true;
-    }
-  }
-
-  if (!anyBlocked) {
-    this.audioUnlocked = true;
-    this.setSessionAudioUnlocked();
-    console.log('[FOV] Auto audio unlock succeeded');
-    return;
-  }
-
-  // ── Priorité 4 : overlay + listeners ─────────────────────────────────
-  console.warn(
-    '[FOV] Auto audio unlock blocked by browser — waiting for user interaction',
-  );
-  this.resumeAllMuted();
-  this.registerClickToUnlock();
-  this.registerDocumentUnlock();
-}
-
-  // ── resumeAllMuted ────────────────────────────────────────────────────────
   private resumeAllMuted(): void {
     for (const w of this.videoWrappers) {
       if (!w.videoElement) continue;
@@ -1323,7 +1304,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     console.log('[FOV] Resumed all wrappers muted');
   }
 
-  // ── registerClickToUnlock ─────────────────────────────────────────────────
   private registerClickToUnlock(): void {
     if (this.clickToUnlockHandler) return;
     this.clickToUnlockHandler = () => this.unlockAudio();
@@ -1337,7 +1317,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // ── registerDocumentUnlock ────────────────────────────────────────────────
   private registerDocumentUnlock(): void {
     if (this.documentUnlockHandler) return;
     this.documentUnlockHandler = () => this.unlockAudio();
@@ -1359,24 +1338,47 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     console.log('[FOV] Document-wide unlock listener registered');
   }
 
-  // ── unlockAudio ───────────────────────────────────────────────────────────
-  // Point d'entrée unique pour déverrouiller l'audio.
-  // Appelé par : overlay click, listener stage, listener document, setVolume()
   unlockAudio(): void {
     if (this.audioUnlocked) return;
     this.audioUnlocked = true;
     this.setSessionAudioUnlocked();
 
-    // Vidéos
+    // Vidéos : toujours muted
     for (const w of this.videoWrappers) {
       if (!w.videoElement) continue;
       w.videoElement.volume = 0;
-      w.videoElement.muted = w.volume === 0;
+      w.videoElement.muted = true;
       if (w.videoElement.paused) w.videoElement.play().catch(() => {});
     }
-    // Audio
+
+    // Trouver le master pour la resynchronisation
+    const master = this.videoWrappers.find((w) => w.playerId === this.masterPlayerId);
+    const masterTime = master?.videoElement?.currentTime ?? null;
+    const masterPdt = master ? this.getTrackStartPdt(master) : null;
+
+    // Audio : unmute ET resynchroniser sur le master
     for (const w of this.audioWrappers) {
       if (!w.audioElement) continue;
+
+      // Calculer la position attendue de cet audio par rapport au master
+      if (masterTime !== null) {
+        const audioPdt = this.getTrackStartPdt(w);
+        let targetTime: number;
+
+        if (masterPdt !== null && audioPdt !== null) {
+          targetTime = (masterPdt + masterTime * 1000 - audioPdt) / 1000;
+        } else {
+          targetTime = masterTime;
+        }
+
+        // Vérifier que la position est dans le buffer
+        const inBuffer = targetTime >= w.bufferStart && targetTime <= w.bufferEnd - 0.3;
+        if (inBuffer && Math.abs(w.audioElement.currentTime - targetTime) > 0.2) {
+          console.log(`[FOV] [${w.track.name}] Resync on unlock → ${targetTime.toFixed(2)}s`);
+          w.audioElement.currentTime = targetTime;
+        }
+      }
+
       w.audioElement.volume = w.volume;
       w.audioElement.muted = w.volume === 0;
       if (w.audioElement.paused) w.audioElement.play().catch(() => {});
@@ -1403,15 +1405,25 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       let waitCount = 0;
       const check = () => {
         waitCount++;
-        const allReady = this.videoWrappers.every(
+
+        const videosReady = this.videoWrappers.every(
           (w) => w.videoElement && w.videoElement.readyState >= 3,
         );
+        const audiosReady = this.audioWrappers.every(
+          (w) => w.audioElement && w.audioElement.readyState >= 2,
+        );
+        // readyState >= 2 pour audio (HAVE_CURRENT_DATA suffit)
+
         if (waitCount % 20 === 1) {
           console.log(
-            `[FOV] waitForAllReady #${waitCount}: ${this.videoWrappers.map((w) => `${w.track.name}:${w.videoElement?.readyState ?? '?'}`).join(', ')}`,
+            `[FOV] waitForAllReady #${waitCount}: ` +
+            this.videoWrappers.map((w) => `${w.track.name}:${w.videoElement?.readyState ?? '?'}`).join(', ') +
+            ' | audio: ' +
+            this.audioWrappers.map((w) => `${w.track.name}:${w.audioElement?.readyState ?? '?'}`).join(', '),
           );
         }
-        if (allReady) {
+
+        if (videosReady && audiosReady) {
           resolve();
         } else if (waitCount > 100) {
           console.warn('[FOV] waitForAllReady timeout');
@@ -1437,7 +1449,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private syncAllToMaster() {
-    if (this.videoWrappers.length < 2 || !this.playbackStarted) return;
+    if (!this.playbackStarted) return;
 
     const master = this.videoWrappers.find((w) => w.playerId === this.masterPlayerId);
     if (!master || !master.isVideo || !master.videoElement) return;
@@ -1456,37 +1468,29 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         w.videoElement.paused ||
         w.videoElement.seeking ||
         w.videoElement.readyState < 3
-      )
-        return;
+      ) return;
 
       const slaveTime = w.videoElement.currentTime;
       const slavePdt = this.getTrackStartPdt(w);
-
-      let drift: number;
-      if (masterPdt !== null && slavePdt !== null) {
-        const expectedSlaveTime = (masterPdt + masterTime * 1000 - slavePdt) / 1000;
-        drift = slaveTime - expectedSlaveTime;
-      } else {
-        drift = slaveTime - masterTime;
-      }
-
+      const expectedSlaveTime =
+        masterPdt !== null && slavePdt !== null
+          ? (masterPdt + masterTime * 1000 - slavePdt) / 1000
+          : masterTime;
+      const drift = slaveTime - expectedSlaveTime;
       const absDrift = Math.abs(drift);
+
       this.syncStats.set(w.track.name, drift * 1000);
       if (absDrift > this.maxDrift) this.maxDrift = absDrift;
 
       if (absDrift > this.HARD_SYNC_THRESHOLD) {
-        const expectedSlaveTime =
-          masterPdt !== null && slavePdt !== null
-            ? (masterPdt + masterTime * 1000 - slavePdt) / 1000
-            : masterTime;
-        if (expectedSlaveTime >= w.bufferStart && expectedSlaveTime <= w.bufferEnd) {
-          console.warn(
-            `[FOV] [${w.track.name}] Hard resync: ${(drift * 1000).toFixed(0)}ms → ${expectedSlaveTime.toFixed(2)}s`,
-          );
+        const forwardBuffer = w.bufferEnd - expectedSlaveTime;
+        const inBuffer = expectedSlaveTime >= w.bufferStart && forwardBuffer > 1.0;
+        if (inBuffer) {
+          console.warn(`[FOV] [${w.track.name}] Hard resync: ${(drift*1000).toFixed(0)}ms → ${expectedSlaveTime.toFixed(2)}s`);
           w.videoElement.currentTime = expectedSlaveTime;
           w.videoElement.playbackRate = 1;
         } else {
-          w.videoElement.playbackRate = drift > 0 ? 0.95 : 1.05;
+          w.videoElement.playbackRate = drift > 0 ? 0.92 : 1.08;
         }
       } else if (absDrift > this.SYNC_THRESHOLD) {
         w.videoElement.playbackRate = drift > 0 ? 0.98 : 1.02;
@@ -1494,6 +1498,38 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         if (w.videoElement.playbackRate !== 1) w.videoElement.playbackRate = 1;
       }
     });
+
+    if (!this.audioUnlocked) return;
+
+    for (const w of this.audioWrappers) {
+      if (!w.audioElement || w.audioElement.paused || w.audioElement.seeking) continue;
+
+      // Mettre à jour bufferStart/bufferEnd de l'audio
+      if (w.audioElement.buffered.length > 0) {
+        w.bufferStart = w.audioElement.buffered.start(0);
+        w.bufferEnd = w.audioElement.buffered.end(w.audioElement.buffered.length - 1);
+      }
+
+      const audioTime = w.audioElement.currentTime;
+      const audioPdt = this.getTrackStartPdt(w);
+      const expectedAudioTime =
+        masterPdt !== null && audioPdt !== null
+          ? (masterPdt + masterTime * 1000 - audioPdt) / 1000
+          : masterTime;
+
+      const drift = audioTime - expectedAudioTime;
+      const absDrift = Math.abs(drift);
+
+      if (absDrift > this.HARD_SYNC_THRESHOLD) {
+        const inBuffer =
+          expectedAudioTime >= w.bufferStart &&
+          expectedAudioTime <= w.bufferEnd - 0.5;
+        if (inBuffer) {
+          console.warn(`[FOV] [${w.track.name}] Audio hard resync: ${(drift*1000).toFixed(0)}ms → ${expectedAudioTime.toFixed(2)}s`);
+          w.audioElement.currentTime = expectedAudioTime;
+        }
+      }
+    }
   }
 
   startSyncMonitoring() {
@@ -1735,7 +1771,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     wrapper.videoElement.muted = wrapper.volume === 0;
   }
 
-  // ── maximizeWrapper ───────────────────────────────────────────────────────
   maximizeWrapper(wrapper: VideoWrapper): void {
     const stage = this.getStageElement();
     if (!stage) return;
@@ -1749,7 +1784,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     wrapper.nh = 1;
   }
 
-  // ── minimizeWrapper ───────────────────────────────────────────────────────
   minimizeWrapper(wrapper: VideoWrapper): void {
     const stage = this.getStageElement();
     if (!stage) return;
@@ -1765,13 +1799,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     wrapper.nh = wrapper.height / stage.offsetHeight;
   }
 
-  // ── isWrapperMaximized ────────────────────────────────────────────────────
   isWrapperMaximized(wrapper: VideoWrapper): boolean {
     return wrapper.nw > 0.9 && wrapper.nh > 0.9 && wrapper.x < 10 && wrapper.y < 10;
   }
 
   private async playAllWrappers() {
-    // Vidéos
+    // Vidéos : toujours muted
     for (const w of this.videoWrappers) {
       if (w.videoElement) {
         w.videoElement.playbackRate = 1;
@@ -1779,7 +1812,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         w.videoElement.volume = 0;
       }
     }
-    // Audio
+    // Audios : muted=true pour le premier play() — tryAutoUnlockAudio s'en charge ensuite
     for (const w of this.audioWrappers) {
       if (w.audioElement) {
         w.audioElement.muted = true;
@@ -1796,7 +1829,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         } catch {
           w.videoElement.muted = true;
           try { await w.videoElement.play(); return 'ok-muted'; }
-          catch (err2: any) { return 'failed'; }
+          catch { return 'failed'; }
         }
       }),
     );
@@ -1804,13 +1837,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const audioResults = await Promise.all(
       this.audioWrappers.map(async (w) => {
         if (!w.audioElement) return 'no-element';
+        // Premier play toujours muted — autoplay muted est toujours permis
+        w.audioElement.muted = true;
         try {
           await w.audioElement.play();
           return 'ok';
         } catch {
-          w.audioElement.muted = true;
-          try { await w.audioElement.play(); return 'ok-muted'; }
-          catch { return 'failed'; }
+          return 'failed';
         }
       }),
     );
@@ -1824,14 +1857,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       this.audioWrappers.map((w, i) => `${w.track.name}:${audioResults[i]}`).join(', '),
     );
 
+    // Garantir video toujours muted après play
     for (const w of this.videoWrappers) {
       if (w.videoElement) {
         w.videoElement.volume = 0;
         w.videoElement.muted = true;
       }
-    }
-    for (const w of this.audioWrappers) {
-      if (w.audioElement) w.audioElement.volume = w.volume;
     }
   }
 
@@ -1873,10 +1904,16 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       orderIndex: i,
     }));
 
+    const audioWrappers: SavedAudioLayout[] = this.audioWrappers.map((w) => ({
+      trackName: w.track.name,
+      volume: w.volume,
+    }));
+
     const layout: SavedLayout = {
       streamId: this.streamId,
       savedAt: Date.now(),
       wrappers,
+      audioWrappers,
     };
 
     try {
@@ -1884,9 +1921,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       console.log('[FOV] ✓ Layout saved');
       this.layoutSaved = true;
       if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
-      this.savedLayoutTimeout = setTimeout(() => {
-        this.layoutSaved = false;
-      }, 2500);
+      this.savedLayoutTimeout = setTimeout(() => { this.layoutSaved = false; }, 2500);
     } catch (e) {
       console.error('[FOV] Failed to save layout:', e);
     }
@@ -1914,7 +1949,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const stage = this.getStageElement();
     if (!stage) return;
 
-    // ── 1. Réordonner ─────────────────────────────────────────────────────
     const ordered: VideoWrapper[] = [];
     const unmatched: VideoWrapper[] = [...this.videoWrappers];
     const sortedSaved = [...layout.wrappers].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -1926,7 +1960,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     ordered.push(...unmatched);
     this.videoWrappers = ordered;
 
-    // ── 2. Appliquer les propriétés ───────────────────────────────────────
     for (const w of this.videoWrappers) {
       const saved = layout.wrappers.find((s) => s.trackName === w.track.name);
       if (!saved) continue;
@@ -1938,23 +1971,19 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       w.volume = saved.volume;
     }
 
-    // ── 3. Pixels (sans clamper la taille) ────────────────────────────────
     this.applyNormalizedToPixels();
 
     const stageW = stage.offsetWidth;
     const stageH = stage.offsetHeight;
     for (const w of this.videoWrappers) {
       if (!w.isVideo) continue;
-      // Clamper uniquement la position, PAS la taille
       w.x = Math.max(0, Math.min(w.x, stageW - 20));
       w.y = Math.max(0, Math.min(w.y, stageH - 20));
     }
 
-    // ── 4. zIndex + master ─────────────────────────────────────────────────
     this.refreshLayoutState();
     this.updateMasterReference();
 
-    // ── 5. Resync immédiat des slaves ──────────────────────────────────────
     if (this.playbackStarted) {
       const master = this.videoWrappers.find((w) => w.playerId === this.masterPlayerId);
       if (master?.videoElement) {
@@ -1991,9 +2020,19 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    // ── 6. Appliquer les volumes sauvegardés (si audio déjà déverrouillé) ─
-    // Ne pas appeler applyWrapperAudio si l'audio n'est pas encore déverrouillé
-    // pour ne pas déclencher la politique d'autoplay du navigateur.
+    if (layout.audioWrappers && layout.audioWrappers.length > 0) {
+      for (const w of this.audioWrappers) {
+        const saved = layout.audioWrappers.find((s) => s.trackName === w.track.name);
+        if (!saved) continue;
+        w.volume = saved.volume;
+        if (this.audioUnlocked && w.audioElement) {
+          w.audioElement.volume = saved.volume;
+          w.audioElement.muted = saved.volume === 0;
+          console.log(`[FOV] [${w.track.name}] Audio volume restored: ${(saved.volume * 100).toFixed(0)}%`);
+        }
+      }
+    }
+
     if (this.audioUnlocked) {
       for (const w of this.videoWrappers) {
         this.applyWrapperAudio(w);
@@ -2020,9 +2059,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  // ── refreshStream ─────────────────────────────────────────────────────────
-  // IMPORTANT : ne PAS effacer sessionStorage ici.
-  // Le consentement audio doit survivre à un refresh manuel dans le même onglet.
   refreshStream() {
     this.stopSyncMonitoring();
     this.stopPolling();
@@ -2039,8 +2075,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.isInitialized = false;
     this.bufferCheckCount = 0;
 
-    // Restaurer le consentement audio depuis sessionStorage
-    // (survit à F5/Ctrl+R mais pas à Ctrl+Shift+R)
     this.audioUnlocked = this.getSessionAudioUnlocked();
     if (this.audioUnlocked) {
       console.log('[FOV] refreshStream: audio consent restored from sessionStorage');
