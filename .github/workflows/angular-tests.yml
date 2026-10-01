@@ -4,12 +4,17 @@ on:
   push:
     paths:
       - "fov-angular/**"
+      - ".github/workflows/angular-tests.yml"
+      - "codecov.yml"
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +53,15 @@ jobs:
         run: |
           cd fov-angular
           npm test -- --watch=false --browsers=ChromeHeadless --code-coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          disable_search: true
+          fail_ci_if_error: true
+          files: fov-angular/coverage/lcov.info
+          flags: frontend
+          use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
 
       - name: Upload test results
         if: always()

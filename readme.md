@@ -1,5 +1,8 @@
 # FOV - Flexible Output View
 
+[![Backend coverage](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev/graph/badge.svg?flag=backend)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev)
+[![Frontend coverage](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev/graph/badge.svg?flag=frontend)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev)
+
 A flexible, customizable video streaming platform that allows streamers to broadcast multi-track video/audio streams and viewers to personalize their viewing experience.
 
 ## 📋 Project Overview
