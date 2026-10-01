@@ -1,16 +1,16 @@
-FROM node:22-slim AS build
+FROM node:22.12.0-bookworm-slim AS build
 
 WORKDIR /app
 
 ARG API_URL
 
-# Install Angular CLI globally
-RUN npm install -g @angular/cli@latest
+# Angular CLI aligné sur fov-angular/package-lock.json (node_modules/@angular/cli).
+# Ne pas utiliser @latest : casserait la reproductibilité.
+RUN npm install -g @angular/cli@20.3.24
 
 # Copy package files and install deps
-COPY package*.json ./
-
-RUN npm i --package-lock-only
+# NOTE: ne pas régénérer le lock ici — npm ci utilise fov-angular/package-lock.json versionné
+COPY package.json package-lock.json ./
 
 RUN npm ci
 
@@ -28,7 +28,7 @@ RUN sed -i "s|API_URL_HERE|$API_URL|g" src/environments/environment.ts
 # Production server
 RUN npx ng build --configuration production
 
-FROM nginx:stable-alpine
+FROM nginx:1.27.4-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist/fov-angular/browser /usr/share/nginx/html
 
