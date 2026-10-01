@@ -85,12 +85,38 @@ web-fov/
 
 ---
 
+## 📌 Versions (figées)
+
+> Les versions JS sont figées via `backend/package-lock.json` et `fov-angular/package-lock.json` (versionnés). Installer avec `npm ci`, jamais `npm i` en CI/Docker.
+
+| Software | Version exigée / figée | Source de vérité |
+|----------|------------------------|------------------|
+| **Node.js** | `22.12.0` | `.nvmrc`, `engines`, `Dockerfile`, CI |
+| **npm** | `>=10 <11` (`engine-strict=true`) | `engines`, `.npmrc` |
+| **Angular** | `20.3.18` | `fov-angular/package-lock.json` (`^20.3.16` dans `package.json`) |
+| **Angular CLI** | `20.3.24` | `fov-angular/package-lock.json` + `fov-angular/Dockerfile` (`npm install -g @angular/cli@20.3.24`) |
+| **TypeScript** | `5.9.3` | `fov-angular/package-lock.json` (`~5.9.3`) |
+| **RxJS** | `7.8.2` | `fov-angular/package-lock.json` (`~7.8.0`) |
+| **hls.js** | `1.6.15` | `fov-angular/package-lock.json` (`^1.6.15`) |
+| **zone.js** | `0.15.1` | `fov-angular/package-lock.json` (`~0.15.0`) |
+| **Express** | `4.22.1` | `backend/package-lock.json` (`^4.22.1`) |
+| **pg (Postgres driver)** | `8.23.0` | `backend/package-lock.json` (`^8.23.0`) |
+| **jsonwebtoken** | `9.0.3` | `backend/package-lock.json` (`^9.0.3`) |
+| **bcryptjs** | `3.0.3` | `backend/package-lock.json` (`^3.0.3`) |
+| **Jest / Supertest (dev)** | `29.7.0` / `6.3.4` | `backend/package-lock.json` |
+| **Image Node (Docker)** | `node:22.12.0-bookworm-slim` | `backend/Dockerfile`, `fov-angular/Dockerfile` |
+| **Postgres (Docker)** | `postgres:18-bookworm` | `docker-compose.yml` |
+| **Nginx (prod frontend)** | `nginx:1.27.4-alpine` | `fov-angular/Dockerfile` |
+| **FFmpeg** | via `apt` sur base `bookworm` (non pinné côté apt) | `backend/Dockerfile` — `which ffmpeg` pour vérifier |
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Docker** & **Docker Compose** (recommended)
-- OR manually: Node.js v18+, npm v8+, Postgres 18+
+- OR manually: Node.js `22.12.0` (voir `.nvmrc`), npm `10.x`, Postgres `18`
 
 ### Option 1: Docker Compose (Recommended)
 
@@ -112,7 +138,7 @@ docker-compose up --build
 **Backend:**
 ```bash
 cd backend
-npm install
+npm ci
 cp .env.example .env
 # Edit .env with your database credentials
 npm run dev  # Runs on http://localhost:4000
@@ -121,7 +147,7 @@ npm run dev  # Runs on http://localhost:4000
 **Frontend:**
 ```bash
 cd fov-angular
-npm install
+npm ci
 npm start  # Runs on http://localhost:4200
 ```
 
@@ -213,8 +239,8 @@ See [DOCUMENTS/API-TESTING.md](DOCUMENTS/API-TESTING.md) for detailed examples.
 ```bash
 cd backend
 
-# Install dependencies
-npm install
+# Install dependencies (reproducible, utilise backend/package-lock.json)
+npm ci
 
 # Development mode (auto-reload)
 npm run dev
@@ -234,8 +260,8 @@ See [DOCUMENTS/DEVELOPMENT.md](DOCUMENTS/DEVELOPMENT.md) for details.
 ```bash
 cd fov-angular
 
-# Install dependencies
-npm install
+# Install dependencies (reproducible, utilise fov-angular/package-lock.json)
+npm ci
 
 # Start development server
 npm start
