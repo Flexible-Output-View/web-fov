@@ -17,15 +17,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22.12.0"
+          cache: npm
+          cache-dependency-path: fov-angular/package-lock.json
 
       - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
 
-      - name: Install dependencies
+      - name: Install dependencies (reproducible)
         run: |
           cd fov-angular
-          npm i
+          npm ci
 
       - name: Create environment file
         run: |
