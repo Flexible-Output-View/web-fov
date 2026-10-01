@@ -14,7 +14,6 @@ updates:
       - "LucasLoustalot"
     commit-message:
       prefix: "UPDATE"
-      include: "scope"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -33,7 +32,6 @@ updates:
       - "LucasLoustalot"
     commit-message:
       prefix: "UPDATE"
-      include: "scope"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
