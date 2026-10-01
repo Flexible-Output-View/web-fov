@@ -1,6 +1,6 @@
-FROM node:latest
+FROM node:22.12.0-bookworm-slim
 
-# install ffmpeg for media processing
+# install ffmpeg for media processing (pinné via base bookworm ; JS deps figées via package-lock.json)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
@@ -8,11 +8,10 @@ RUN apt-get update \
 WORKDIR /usr/src/app
 
 # copy package files first to leverage Docker cache
-COPY package*.json ./
+# NOTE: ne pas régénérer le lock ici — npm ci utilise backend/package-lock.json versionné
+COPY package.json package-lock.json ./
 
-RUN npm i --package-lock-only
-
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # copy source
 COPY . .

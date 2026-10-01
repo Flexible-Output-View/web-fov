@@ -1,5 +1,6 @@
 -- Drop existing tables
 DROP TABLE IF EXISTS streams;
+DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS categories;
 
 -- Table structure for categories
@@ -18,6 +19,18 @@ INSERT INTO categories (id, name, viewers, image_url) VALUES
 (4, 'Fortnite', 76000, 'assets/category/fortnite.png'),
 (5, 'Minecraft', 65000, 'assets/category/minecraft.png'),
 (6, 'Music', 0, 'assets/category/music.png');
+
+-- Table structure for users
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(30) NOT NULL UNIQUE,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  display_name VARCHAR(100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_users_email ON users (LOWER(email));
 
 -- Table structure for streams
 CREATE TABLE streams (

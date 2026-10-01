@@ -40,10 +40,10 @@ FOV is a complete video streaming solution composed of two main components:
     │ • HLS Stream Distribution           │
     └────┬──────────────────┬─────────────┘
          │                  │
-    ┌────▼─────┐      ┌─────▼──────────┐
-    │ MySQL DB │      │ HLS Media Files│
-    │ fovwebdb │      │ /media/hls/    │
-    └──────────┘      └────────────────┘
+     ┌────▼─────┐      ┌─────▼──────────┐
+     │ Postgres │      │ HLS Media Files│
+     │ fovwebdb │      │ /media/hls/    │
+     └──────────┘      └────────────────┘
 ```
 
 ---
@@ -55,7 +55,7 @@ web-fov/
 ├── backend/                    # Node.js REST API & Media Server
 │   ├── src/
 │   │   ├── index.js           # Express app entry point
-│   │   ├── db.js              # MySQL connection pool
+│   │   ├── db.js              # Postgres connection pool (pg)
 │   │   ├── mediaServer.mjs    # SRT server & HLS transcoding
 │   │   └── routes/            # API endpoints
 │   │       ├── users.js       # User management
@@ -85,12 +85,38 @@ web-fov/
 
 ---
 
+## 📌 Versions (figées)
+
+> Les versions JS sont figées via `backend/package-lock.json` et `fov-angular/package-lock.json` (versionnés). Installer avec `npm ci`, jamais `npm i` en CI/Docker.
+
+| Software | Version exigée / figée | Source de vérité |
+|----------|------------------------|------------------|
+| **Node.js** | `22.12.0` | `.nvmrc`, `engines`, `Dockerfile`, CI |
+| **npm** | `>=10 <11` (`engine-strict=true`) | `engines`, `.npmrc` |
+| **Angular** | `20.3.18` | `fov-angular/package-lock.json` (`^20.3.16` dans `package.json`) |
+| **Angular CLI** | `20.3.24` | `fov-angular/package-lock.json` + `fov-angular/Dockerfile` (`npm install -g @angular/cli@20.3.24`) |
+| **TypeScript** | `5.9.3` | `fov-angular/package-lock.json` (`~5.9.3`) |
+| **RxJS** | `7.8.2` | `fov-angular/package-lock.json` (`~7.8.0`) |
+| **hls.js** | `1.6.15` | `fov-angular/package-lock.json` (`^1.6.15`) |
+| **zone.js** | `0.15.1` | `fov-angular/package-lock.json` (`~0.15.0`) |
+| **Express** | `4.22.1` | `backend/package-lock.json` (`^4.22.1`) |
+| **pg (Postgres driver)** | `8.23.0` | `backend/package-lock.json` (`^8.23.0`) |
+| **jsonwebtoken** | `9.0.3` | `backend/package-lock.json` (`^9.0.3`) |
+| **bcryptjs** | `3.0.3` | `backend/package-lock.json` (`^3.0.3`) |
+| **Jest / Supertest (dev)** | `29.7.0` / `6.3.4` | `backend/package-lock.json` |
+| **Image Node (Docker)** | `node:22.12.0-bookworm-slim` | `backend/Dockerfile`, `fov-angular/Dockerfile` |
+| **Postgres (Docker)** | `postgres:18-bookworm` | `docker-compose.yml` |
+| **Nginx (prod frontend)** | `nginx:1.27.4-alpine` | `fov-angular/Dockerfile` |
+| **FFmpeg** | via `apt` sur base `bookworm` (non pinné côté apt) | `backend/Dockerfile` — `which ffmpeg` pour vérifier |
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Docker** & **Docker Compose** (recommended)
-- OR manually: Node.js v18+, npm v8+, MySQL 8.0+
+- OR manually: Node.js `22.12.0` (voir `.nvmrc`), npm `10.x`, Postgres `18`
 
 ### Option 1: Docker Compose (Recommended)
 
@@ -98,7 +124,7 @@ web-fov/
 # Clone repository
 git clone <repo> && cd web-fov
 
-# Start all services (backend, frontend, MySQL)
+# Start all services (backend, frontend, Postgres)
 docker-compose up --build
 
 # Services will be available at:
@@ -112,7 +138,7 @@ docker-compose up --build
 **Backend:**
 ```bash
 cd backend
-npm install
+npm ci
 cp .env.example .env
 # Edit .env with your database credentials
 npm run dev  # Runs on http://localhost:4000
@@ -121,7 +147,7 @@ npm run dev  # Runs on http://localhost:4000
 **Frontend:**
 ```bash
 cd fov-angular
-npm install
+npm ci
 npm start  # Runs on http://localhost:4200
 ```
 
@@ -170,14 +196,37 @@ Encoders should use these settings:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/auth/register` | POST | Register a new user (`username`, `email`, `password`) → `201 {token, user}` |
+| `/auth/login` | POST | Login with username or email (`login`, `password`) → `200 {token, user}` |
 | `/users/:id` | GET | Get user profile |
-| `/users` | POST | Create new user |
 | `/streams` | GET | List all streams |
 | `/streams/available` | GET | Get active streams with HLS URLs |
 | `/streams/:id` | GET | Get stream details |
 | `/streams/:id/hls` | GET | Get HLS playlist URL |
 | `/categories` | GET | List categories |
 | `/categories/:id` | GET | Get category details |
+
+### Authentication
+
+**Register:**
+
+```bash
+curl -X POST http://localhost:4000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"jane_smith","email":"jane@example.com","password":"secret123"}'
+```
+
+Validation rules: username `3-30 chars, letters/numbers/underscores only`; valid email (stored lowercase); password `>= 8 chars`. Passwords are hashed with bcrypt (10 rounds) and never returned. Success returns `201 {token, user}` where `user` is `{id, username, email, created_at}`. Duplicate username/email returns `409`. Invalid input returns `400 {errors}`.
+
+**Login:**
+
+```bash
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"jane_smith","password":"secret123"}'
+```
+
+`login` accepts a username or an email (email match is case-insensitive). Wrong credentials return `401 {error: "Invalid credentials"}`. The JWT (`JWT_SECRET`, expiry `JWT_EXPIRES_IN`, default `7d`) is returned as `token` and persisted by the Angular client (`fov_auth_token` / `fov_auth_user`). Interactive docs: `http://localhost:4000/api-docs`.
 
 See [DOCUMENTS/API-TESTING.md](DOCUMENTS/API-TESTING.md) for detailed examples.
 
@@ -190,8 +239,8 @@ See [DOCUMENTS/API-TESTING.md](DOCUMENTS/API-TESTING.md) for detailed examples.
 ```bash
 cd backend
 
-# Install dependencies
-npm install
+# Install dependencies (reproducible, utilise backend/package-lock.json)
+npm ci
 
 # Development mode (auto-reload)
 npm run dev
@@ -211,8 +260,8 @@ See [DOCUMENTS/DEVELOPMENT.md](DOCUMENTS/DEVELOPMENT.md) for details.
 ```bash
 cd fov-angular
 
-# Install dependencies
-npm install
+# Install dependencies (reproducible, utilise fov-angular/package-lock.json)
+npm ci
 
 # Start development server
 npm start
@@ -247,12 +296,16 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ### Implemented
 - CORS configuration
-- Connection pooling
+- Connection pooling (Postgres `pg` Pool)
 - Environment variable separation
+- User registration and login (`POST /api/auth/register`, `POST /api/auth/login`)
+- JWT issuance (`JWT_SECRET` / `JWT_EXPIRES_IN`, default `7d`)
+- Password hashing with bcrypt
+- Input validation for auth (username, email, password rules)
 
 ### TODO (High Priority)
-- JWT authentication
-- Input validation & sanitization
+- Global auth guard / protected routes (tokens are issued but endpoints are not yet all protected)
+- Input validation & sanitization (broader coverage beyond auth)
 - Rate limiting
 - HTTPS enforcement
 
@@ -282,13 +335,23 @@ See [DOCUMENTS/SECURITY.md](DOCUMENTS/SECURITY.md) for full security policy.
 
 ---
 
+## 👥 Maintainers
+
+| Name | GitHub |
+|------|--------|
+| Raphael Scandella | [@RaphxelS](https://github.com/RaphxelS) |
+| Samy Nasset | [@Slymoz](https://github.com/Slymoz) |
+| Lucas Loustalot | [@LucasLoustalot](https://github.com/LucasLoustalot) |
+
+---
+
 ## 📝 License
 
 See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Last Updated:** April 2026  
+**Last Updated:** September 2026  
 **Current Version:** 0.1.0 (Beta)
 
 Set up OBS

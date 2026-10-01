@@ -4,7 +4,12 @@ import db from '../db.js';
 import fs from 'fs';
 import path from 'path';
 import { ffmpegProcesses } from '../mediaServer.mjs';
-import { resolveTrackIsVideo, sortTrackIds } from '../streamTrackUtils.js';
+import {
+    buildSeparatedAvailableTracks,
+    probeTrackHasVideo,
+    probeTrackHasAudio,
+    sortTrackIds
+} from '../streamTrackUtils.js';
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
 const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
@@ -132,21 +137,43 @@ const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
 }*/
 
 async function buildTracks(streamId, trackDirs, url) {
+    const trackOptions = { hlsDir: HLS_DIR, ffmpegProcesses };
+    const separated = buildSeparatedAvailableTracks(streamId, trackDirs, url, trackOptions);
+    if (separated && separated.length > 0) {
+        return separated;
+    }
+
     const sortedTrackIds = sortTrackIds(trackDirs);
     const tracks = [];
+    let videoIndex = 0;
+    let audioIndex = 0;
 
-    for (const trackId of sortedTrackIds) {
-        const trackPath = path.join(HLS_DIR, streamId, trackId);
-        const isVideo = await resolveTrackIsVideo(streamId, trackId, trackPath, {
-            hlsDir: HLS_DIR,
-            ffmpegProcesses
-        });
+    for (const variantId of sortedTrackIds) {
+        const trackPath = path.join(HLS_DIR, streamId, variantId);
+        const hasVideo = await probeTrackHasVideo(trackPath);
+        const hasAudio = await probeTrackHasAudio(trackPath);
 
-        tracks.push({
-            trackId,
-            videoUrl: `${url}/api/hls/${streamId}/${trackId}/playlist.m3u8`,
-            isVideo
-        });
+        if (hasVideo) {
+            tracks.push({
+                trackId: `v:${videoIndex}`,
+                name: `Video ${videoIndex}`,
+                videoUrl: `${url}/api/hls/${streamId}/${variantId}/playlist.m3u8`,
+                isVideo: true,
+                isAudio: false
+            });
+            videoIndex++;
+        }
+
+        if (hasAudio) {
+            tracks.push({
+                trackId: `a:${audioIndex}`,
+                name: `Audio ${audioIndex}`,
+                videoUrl: `${url}/api/hls/${streamId}/${variantId}/playlist.m3u8`,
+                isVideo: false,
+                isAudio: true
+            });
+            audioIndex++;
+        }
     }
 
     return tracks;

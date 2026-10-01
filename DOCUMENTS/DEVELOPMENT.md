@@ -5,7 +5,7 @@
 ### Prerequisites
 - Node.js v20+
 - npm v8+
-- MySQL 8.0+ (for testing against real DB)
+- Postgres 18+ (for testing against real DB)
 - Git
 - A code editor (VS Code recommended)
 
@@ -242,9 +242,9 @@ kill -9 <PID>
 ```
 
 **Database connection hangs**
-- Check MySQL is running: `mysql -u admin -p`
+- Check Postgres is running: `pg_isready -h localhost -p 5432`
 - Verify credentials in `.env`
-- Check MySQL version: `mysql --version`
+- Check Postgres version: `psql --version`
 
 **Tests fail with "Cannot find module"**
 ```bash
@@ -439,20 +439,20 @@ CREATE INDEX idx_created_at ON comments(created_at DESC);
 ```
 
 **Monitor slow queries:**
-```bash
-# In MySQL
-SET GLOBAL slow_query_log='ON';
-SET GLOBAL long_query_time=2;
+```sql
+-- In Postgres (requires appropriate logging config)
+ALTER SYSTEM SET log_min_duration_statement = 2000;
+SELECT pg_reload_conf();
 ```
 
 ### Connection Pooling Tuning
 
 Adjust in `src/db.js`:
 ```javascript
-const pool = mysql.createPool({
-    connectionLimit: 10,  // Increase if hitting limits
-    enableKeepAlive: true,
-    keepAliveInitialDelayMs: 0,
+const pool = new Pool({
+    max: 10, // Increase if hitting limits
+    idleTimeoutMillis: 30000,
+    keepAlive: true
 });
 ```
 
@@ -475,11 +475,11 @@ const pool = mysql.createPool({
 ## Resources
 
 - [Express.js Docs](https://expressjs.com/)
-- [MySQL 2 Documentation](https://github.com/sidorares/node-mysql2)
+- [node-postgres (pg) Documentation](https://node-postgres.com/)
 - [Jest Testing Framework](https://jestjs.io/)
 - [ESLint Rules](https://eslint.org/docs/rules/)
 - [RESTful API Best Practices](https://restfulapi.net/)
 
 ---
 
-**Last Updated:** April 2026
+**Last Updated:** September 2026
