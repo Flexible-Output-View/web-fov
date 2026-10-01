@@ -55,6 +55,7 @@ jobs:
           npm test -- --watch=false --browsers=ChromeHeadless --code-coverage
 
       - name: Upload coverage to Codecov
+        if: github.event_name == 'pull_request' || (github.ref == 'refs/heads/dev' && !github.event.repository.fork)
         uses: codecov/codecov-action@v5
         with:
           disable_search: true

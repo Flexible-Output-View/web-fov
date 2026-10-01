@@ -31,17 +31,13 @@ jobs:
           cd backend
           npm ci
 
-      - name: Run linter
-        run: |
-          cd backend
-          npm run lint
-
       - name: Run tests with coverage
         run: |
           cd backend
           npm run test:coverage
 
       - name: Upload coverage to Codecov
+        if: github.event_name == 'pull_request' || (github.ref == 'refs/heads/dev' && !github.event.repository.fork)
         uses: codecov/codecov-action@v5
         with:
           disable_search: true
@@ -57,3 +53,8 @@ jobs:
           name: coverage-report
           path: backend/coverage/
           if-no-files-found: warn
+
+      - name: Run linter
+        run: |
+          cd backend
+          npm run lint
