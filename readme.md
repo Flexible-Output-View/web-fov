@@ -335,6 +335,16 @@ See [DOCUMENTS/SECURITY.md](DOCUMENTS/SECURITY.md) for full security policy.
 
 ---
 
+## 👥 Maintainers
+
+| Name | GitHub |
+|------|--------|
+| Raphael Scandella | [@RaphxelS](https://github.com/RaphxelS) |
+| Samy Nasset | [@Slymoz](https://github.com/Slymoz) |
+| Lucas Loustalot | [@LucasLoustalot](https://github.com/LucasLoustalot) |
+
+---
+
 ## 📝 License
 
 See [LICENSE](LICENSE) file for details.
