@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Paris"
+    target-branch: "dev"
+    reviewers:
+      - "RaphxelS"
+      - "Slymoz"
+      - "LucasLoustalot"
+    commit-message:
+      prefix: "UPDATE"
+      include: "scope"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "npm"
+    directory: "/fov-angular"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Paris"
+    target-branch: "dev"
+    reviewers:
+      - "RaphxelS"
+      - "Slymoz"
+      - "LucasLoustalot"
+    commit-message:
+      prefix: "UPDATE"
+      include: "scope"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
