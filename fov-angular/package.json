@@ -16,7 +16,7 @@
     "@angular/forms": "^20.3.16",
     "@angular/platform-browser": "^20.3.16",
     "@angular/platform-browser-dynamic": "^20.3.16",
-    "@angular/router": "^20.3.16",
+    "@angular/router": "^20.3.32",
     "hls.js": "^1.6.15",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
