@@ -36,26 +36,21 @@ services:
   frontend:
     build:
       context: ./fov-angular
-      args:
-        - API_URL=${API_URL}
 
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_started
-    # volumes: #DEV ONLY
-    #  - ./fov-angular:/app
-    #  - /app/node_modules
     ports:
       - "4200:80"
     networks:
       - frontend
+    environment:
+      - API_URL=http://backend:4000
 
   fov-db:
     image: postgres:18-bookworm
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     volumes:
       - fov-db:/var/lib/postgresql
       - ./fovwebdb.sql:/docker-entrypoint-initdb.d/init.sql
@@ -75,9 +70,9 @@ services:
 
 networks:
   frontend:
-    driver: bridge
+    #driver: bridge
   backend:
-    driver: bridge
+    #driver: bridge
     internal: true
 
 volumes:
