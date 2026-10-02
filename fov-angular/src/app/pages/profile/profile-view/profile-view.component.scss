@@ -138,9 +138,21 @@
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
 
   &:hover {
     opacity: 0.85;
+  }
+
+  &.following {
+    background-color: transparent;
+    color: var(--text-secondary, #aaa);
+    border: 1px solid var(--border-color, #2a2a2a);
+
+    &:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+    }
   }
 }
 
@@ -159,6 +171,17 @@
   &:hover {
     background-color: #ef4444;
     color: white;
+  }
+}
+
+.not-found {
+  max-width: 600px;
+  margin: 60px auto;
+  text-align: center;
+  color: var(--text-secondary, #aaa);
+
+  h2 {
+    color: var(--text-primary, #fff);
   }
 }
 

@@ -1,0 +1,174 @@
+<div class="settings-page" *ngIf="profile">
+  <div class="settings-header">
+    <h1>Paramètres personnels</h1>
+    <button class="btn-back" (click)="cancel()">← Retour au profil</button>
+  </div>
+
+  <div class="settings-section">
+    <h2>Profil public</h2>
+    <p class="hint">Ces informations sont visibles par les autres utilisateurs.</p>
+
+    <!-- Photo de profil -->
+    <div class="form-group">
+      <label>Photo de profil</label>
+      <div class="image-uploader">
+        <div class="image-preview avatar-preview">
+          <img *ngIf="avatarUrlDraft" [src]="avatarUrlDraft" alt="Aperçu avatar">
+          <span *ngIf="!avatarUrlDraft">Aucun</span>
+        </div>
+        <div class="image-actions">
+          <label class="btn-file">
+            Choisir une image
+            <input type="file" accept="image/*" (change)="onAvatarSelected($event)" hidden>
+          </label>
+          <button *ngIf="avatarUrlDraft" type="button" class="btn-remove" (click)="removeAvatar()">
+            Retirer
+          </button>
+        </div>
+      </div>
+      <span class="help">JPG ou PNG. L'upload sera disponible prochainement.</span>
+    </div>
+
+    <!-- Bannière -->
+    <div class="form-group">
+      <label>Bannière</label>
+      <div class="image-uploader">
+        <div class="image-preview banner-preview"
+             [style.background-image]="bannerUrlDraft ? 'url(' + bannerUrlDraft + ')' : null">
+          <span *ngIf="!bannerUrlDraft">Aucune</span>
+        </div>
+        <div class="image-actions">
+          <label class="btn-file">
+            Choisir une image
+            <input type="file" accept="image/*" (change)="onBannerSelected($event)" hidden>
+          </label>
+          <button *ngIf="bannerUrlDraft" type="button" class="btn-remove" (click)="removeBanner()">
+            Retirer
+          </button>
+        </div>
+      </div>
+      <span class="help">JPG ou PNG. L'upload sera disponible prochainement.</span>
+    </div>
+
+    <!-- Bio -->
+    <div class="form-group">
+      <label for="bio">Biographie</label>
+      <textarea
+        id="bio"
+        [(ngModel)]="bioDraft"
+        rows="4"
+        maxlength="300"
+        placeholder="Parlez-nous de vous...">
+      </textarea>
+      <span class="char-count">{{ bioDraft.length }} / 300</span>
+    </div>
+
+    <button class="btn-primary" (click)="saveProfile()">
+      Enregistrer le profil public
+    </button>
+  </div>
+
+  <div class="settings-section">
+    <h2>Informations personnelles</h2>
+    <p class="hint">Ces informations ne sont visibles que par vous.</p>
+
+    <div class="form-group">
+        <label for="username">Nom d'utilisateur</label>
+        <input
+        id="username"
+        type="text"
+        [value]="profile.username"
+        disabled
+        class="input-readonly"
+        />
+    </div>
+
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input
+        id="email"
+        type="email"
+        [value]="profile.email"
+        disabled
+        class="input-readonly"
+        />
+    </div>
+
+    <h3 class="subsection-title">Changer le mot de passe</h3>
+
+    <div class="form-group">
+        <label for="currentPassword">Mot de passe actuel</label>
+        <div class="password-input">
+        <input
+            id="currentPassword"
+            [type]="showCurrentPassword ? 'text' : 'password'"
+            [(ngModel)]="currentPassword"
+            placeholder="••••••••"
+            autocomplete="current-password"
+        />
+        <button
+            type="button"
+            class="btn-toggle-password"
+            (click)="showCurrentPassword = !showCurrentPassword"
+            [title]="showCurrentPassword ? 'Masquer' : 'Afficher'">
+            {{ showCurrentPassword ? '🙈' : '👁' }}
+        </button>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="newPassword">Nouveau mot de passe</label>
+        <div class="password-input">
+        <input
+            id="newPassword"
+            [type]="showNewPassword ? 'text' : 'password'"
+            [(ngModel)]="newPassword"
+            placeholder="••••••••"
+            autocomplete="new-password"
+        />
+        <button
+            type="button"
+            class="btn-toggle-password"
+            (click)="showNewPassword = !showNewPassword"
+            [title]="showNewPassword ? 'Masquer' : 'Afficher'">
+            {{ showNewPassword ? '🙈' : '👁' }}
+        </button>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="confirmNewPassword">Confirmer le nouveau mot de passe</label>
+        <div class="password-input">
+        <input
+            id="confirmNewPassword"
+            [type]="showConfirmPassword ? 'text' : 'password'"
+            [(ngModel)]="confirmNewPassword"
+            placeholder="••••••••"
+            autocomplete="new-password"
+        />
+        <button
+            type="button"
+            class="btn-toggle-password"
+            (click)="showConfirmPassword = !showConfirmPassword"
+            [title]="showConfirmPassword ? 'Masquer' : 'Afficher'">
+            {{ showConfirmPassword ? '🙈' : '👁' }}
+        </button>
+        </div>
+    </div>
+
+    <button class="btn-primary" (click)="savePassword()">
+        Changer le mot de passe
+    </button>
+    </div>
+
+  <div class="settings-section danger-zone">
+    <h2>Zone de danger</h2>
+    <p class="hint">Cette action est irréversible.</p>
+    <button class="btn-danger" disabled title="Bientôt disponible">
+      Supprimer mon compte
+    </button>
+  </div>
+
+  <div class="toast error" *ngIf="errorMessage">{{ errorMessage }}</div>
+  <div class="toast success" *ngIf="successMessage">{{ successMessage }}</div>
+</div>

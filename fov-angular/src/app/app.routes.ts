@@ -3,6 +3,8 @@ import { HomeComponent } from './pages/home/home.component';
 import { FollowedComponent } from './pages/followed/followed.component';
 import { DiscoverComponent } from './pages/discover/discover.component';
 import { ProfileComponent } from './pages/profile/profile.component';
+import { PersonalSettingsComponent } from './pages/profile/personal-settings/personal-settings.component';
+import { PublicProfileComponent } from './pages/profile/public-profile/public-profile.component';
 import { LoginComponent } from './pages/login/login.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { StreamComponent } from './pages/stream/stream.component';
@@ -14,6 +16,8 @@ export const routes: Routes = [
   { path: 'discover/:name', component: DiscoverComponent },
   { path: 'followed', component: FollowedComponent },
   { path: 'profile', component: ProfileComponent },
+  { path: 'profile/personal_settings', component: PersonalSettingsComponent },
+  { path: ':username', component: PublicProfileComponent },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
   { path: 'stream/:streamId', component: StreamComponent },

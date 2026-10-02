@@ -12,7 +12,7 @@
   
   <div class="nav-center">
     <div class="search-container">
-      <input type="text" placeholder="Rechercher" class="search-input">
+      <input type="text" placeholder="Rechercher" class="search-input" autocomplete="off">
       <button class="search-button">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"></circle>
@@ -26,10 +26,21 @@
     <button class="theme-toggle" (click)="toggleTheme()">
       {{ isDarkTheme ? '☀️' : '🌙' }}
     </button>
-    <a routerLink="/profile" class="profile-link">
+
+    <a *ngIf="isAuthenticated" routerLink="/profile" class="profile-link">
       <div class="profile-avatar">
-          <img src="assets/profile-avatar.png" alt="Profil" class="avatar-img">
+        <img
+          *ngIf="avatarUrl"
+          [src]="avatarUrl"
+          [alt]="profile?.username || 'Profil'"
+          class="avatar-img"
+        >
+        <span *ngIf="!avatarUrl" class="avatar-initial">{{ initial }}</span>
       </div>
+    </a>
+
+    <a *ngIf="!isAuthenticated" routerLink="/login" class="login-link">
+      Se connecter
     </a>
   </div>
 </nav>

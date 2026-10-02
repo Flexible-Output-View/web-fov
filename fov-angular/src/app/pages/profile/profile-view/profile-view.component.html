@@ -1,4 +1,5 @@
 <div class="profile-page" *ngIf="profile">
+
   <div class="profile-banner"
        [style.background-image]="profile.bannerUrl ? 'url(' + profile.bannerUrl + ')' : null"
        [class.empty]="!profile.bannerUrl">
@@ -19,8 +20,12 @@
         <button *ngIf="isOwnProfile" class="btn-primary" (click)="goToSettings()">
           Modifier mon profil
         </button>
-        <button *ngIf="!isOwnProfile" class="btn-follow">
-          Suivre
+
+        <button *ngIf="!isOwnProfile && isAuthenticated"
+                class="btn-follow"
+                [class.following]="following"
+                (click)="toggleFollow()">
+          {{ following ? '✓ Abonné' : 'Suivre' }}
         </button>
       </div>
     </div>
@@ -36,10 +41,9 @@
       <span class="stat-label">Abonnements</span>
     </div>
   </div>
+</div>
 
-  <div class="profile-content" *ngIf="isOwnProfile">
-    <button class="btn-logout" (click)="logout()">
-      Se déconnecter
-    </button>
-  </div>
+<div class="not-found" *ngIf="notFound">
+  <h2>Utilisateur introuvable</h2>
+  <p>Aucun profil ne correspond à « {{ username }} ».</p>
 </div>
