@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import db from './db.js';
 import { verifyToken } from './middleware/auth.js';
-import { appendMemoryMessage, buildMessage, insertMessageRow, lookupUsername } from './routes/chat.js';
+import { buildMessage, lookupUsername } from './routes/chat.js';
 
 let ioInstance = null;
 
@@ -120,20 +120,17 @@ export function initChatSocket(httpServer) {
                     return;
                 }
 
-                let message;
-                try {
-                    const row = await insertMessageRow(streamId, userId, text);
-                    message = buildMessage(row, username);
-                } catch {
-                    message = buildMessage(
-                        { id: `mem-${Date.now()}-${Math.round(Math.random() * 1e6)}`, stream_id: streamId, created_at: new Date().toISOString() },
-                        username,
-                        text,
-                        userId
-                    );
-                }
+                const message = buildMessage(
+                    {
+                        id: `mem-${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+                        stream_id: streamId,
+                        user_id: userId,
+                        message: text,
+                        created_at: new Date().toISOString()
+                    },
+                    username
+                );
 
-                appendMemoryMessage(streamId, message);
                 io.to(roomName(streamId)).emit('chat-message', message);
                 if (typeof ack === 'function') {
                     ack({ ok: true, message });

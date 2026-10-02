@@ -15,7 +15,7 @@ jest.unstable_mockModule('jsonwebtoken', () => ({
 process.env.JWT_SECRET = 'test-secret';
 process.env.NODE_ENV = 'test';
 
-const { default: chatRouter, clearMemoryMessages } = await import('../routes/chat.js');
+const { default: chatRouter } = await import('../routes/chat.js');
 const jwt = (await import('jsonwebtoken')).default;
 
 function createApp(ioMock) {
@@ -35,25 +35,13 @@ function createApp(ioMock) {
 describe('Chat Routes', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        clearMemoryMessages();
     });
 
-    test('GET /:streamId returns history without auth', async () => {
-        dbQuery.mockResolvedValue([
-            { id: 1, stream_id: '1', user_id: 7, username: 'alice', message: 'hello', created_at: new Date('2026-01-01T00:00:00Z') }
-        ]);
-
+    test('GET /:streamId returns 404 — no chat history is stored', async () => {
         const response = await request(createApp()).get('/1?limit=10');
 
-        expect(response.status).toBe(200);
-        expect(response.body.streamId).toBe('1');
-        expect(response.body.messages).toHaveLength(1);
-        expect(response.body.messages[0]).toMatchObject({ username: 'alice', message: 'hello' });
-    });
-
-    test('GET /:streamId rejects invalid stream id', async () => {
-        const response = await request(createApp()).get('/%20');
-        expect(response.status).toBe(400);
+        expect(response.status).toBe(404);
+        expect(dbQuery).not.toHaveBeenCalled();
     });
 
     test('POST /:streamId requires authentication', async () => {
@@ -73,11 +61,9 @@ describe('Chat Routes', () => {
         expect(response.status).toBe(400);
     });
 
-    test('POST /:streamId stores, caches and broadcasts an authenticated message', async () => {
+    test('POST /:streamId broadcasts an authenticated message without persisting it', async () => {
         jwt.verify.mockReturnValue({ userId: 7 });
-        dbQuery
-            .mockResolvedValueOnce([{ username: 'alice' }])
-            .mockResolvedValueOnce([{ id: 42, stream_id: '1', user_id: 7, message: 'hello chat', created_at: new Date('2026-01-01T00:00:00Z') }]);
+        dbQuery.mockResolvedValueOnce([{ username: 'alice' }]);
 
         const emitted = [];
         const ioMock = {
@@ -90,13 +76,26 @@ describe('Chat Routes', () => {
             .send({ message: 'hello chat' });
 
         expect(response.status).toBe(201);
-        expect(response.body.message).toMatchObject({ username: 'alice', message: 'hello chat', streamId: '1' });
+        expect(response.body.message).toMatchObject({
+            username: 'alice',
+            message: 'hello chat',
+            streamId: '1',
+            userId: 7
+        });
+        expect(String(response.body.message.id)).toMatch(/^mem-/);
         expect(ioMock.to).toHaveBeenCalledWith('stream:1');
         expect(emitted[0].event).toBe('chat-message');
+        expect(emitted[0].payload).toEqual(response.body.message);
+
+        const queries = dbQuery.mock.calls.map((call) => String(call[0]));
+        expect(queries.some((q) => /INSERT/i.test(q))).toBe(false);
+        expect(queries.every((q) => /SELECT username FROM users/i.test(q))).toBe(true);
     });
 
     test('POST /:streamId rejects invalid token', async () => {
-        jwt.verify.mockImplementation(() => { throw new Error('invalid'); });
+        jwt.verify.mockImplementation(() => {
+            throw new Error('invalid');
+        });
 
         const response = await request(createApp())
             .post('/1')

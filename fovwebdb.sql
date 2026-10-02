@@ -60,14 +60,3 @@ INSERT INTO streams (id, streamer, title, category_id, viewers, thumbnail_url, a
 -- Sync auto-increment sequence counters
 SELECT setval(pg_get_serial_sequence('categories', 'id'), COALESCE(MAX(id), 1)) FROM categories;
 SELECT setval(pg_get_serial_sequence('streams', 'id'), COALESCE(MAX(id), 1)) FROM streams;
-
--- Table structure for stream chat messages (realtime chat, Twitch-like)
-CREATE TABLE chat_messages (
-  id SERIAL PRIMARY KEY,
-  stream_id VARCHAR(120) NOT NULL,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  message VARCHAR(500) NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_chat_messages_stream_id ON chat_messages (stream_id, created_at);

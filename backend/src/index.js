@@ -12,7 +12,6 @@ import apiRoutes from './routes/index.js';
 import { createMediaRoutes, startMediaServer, clearHLSFiles } from './mediaServer.mjs';
 import swaggerDocument from './swagger.js';
 import { initChatSocket } from './chatSocket.js';
-import { ensureChatTable } from './routes/chat.js';
 
 const PORT = process.env.PORT || 4000;
 
@@ -39,18 +38,11 @@ app.use((err, req, res, next) => {
     res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
-async function start() { 
+async function start() {
     try {
         // verify PostgreSQL connection
         await db.query('SELECT 1');
         console.log('✅ Connected to BDD');
-        // Ensure chat persistence table exists (safe on existing DBs)
-        try {
-            await ensureChatTable();
-            console.log('✅ Chat table ready');
-        } catch (err) {
-            console.error('⚠️ Unable to ensure chat table', err?.message || err);
-        }
         // Clear HLS files on server start
         clearHLSFiles();
 
@@ -64,7 +56,6 @@ async function start() {
         const server = httpServer.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);
             console.log(`📺 HLS available at http://localhost:${PORT}/api/hls`);
-            console.log(`💬 Chat realtime ready (Socket.IO)`);
         });
 
         // Handle server errors

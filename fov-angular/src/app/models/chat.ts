@@ -7,11 +7,6 @@ export interface ChatMessage {
   createdAt: string;
 }
 
-export interface ChatHistoryResponse {
-  streamId: string;
-  messages: ChatMessage[];
-}
-
 export interface SendChatResponse {
   message: ChatMessage;
 }

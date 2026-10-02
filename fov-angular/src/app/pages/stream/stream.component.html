@@ -1,19 +1,4 @@
 <div class="stream-page">
-  <div class="stream-header">
-    <button class="btn-back" (click)="goBack()">
-      <span class="icon">←</span>
-      Retour
-    </button>
-    
-    <div class="stream-title" *ngIf="isLive && streamInfo">
-      <span class="live-badge">🔴 LIVE</span>
-      <h1>{{ streamInfo.title || streamId }}</h1>
-      <span class="stream-category-badge" *ngIf="streamInfo.category">{{ streamInfo.category }}</span>
-      <span class="track-info">{{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}</span>
-      <span class="viewer-info" *ngIf="streamInfo.viewers > 0">{{ streamInfo.viewers }} spectateur{{ streamInfo.viewers > 1 ? 's' : '' }}</span>
-    </div>
-  </div>
-
   <div class="loading-state" *ngIf="isLoading">
     <div class="loading-spinner"></div>
     <p>Vérification...</p>
@@ -49,14 +34,21 @@
   <div class="player-wrapper" *ngIf="!isLoading && isLive && !errorMessage && !streamEndedMessage">
     <div class="stream-content">
       <div class="player-pane">
-        <app-fov-player
-          [streamId]="streamId"
-          (streamEnded)="onStreamEnded()">
+        <app-fov-player [streamId]="streamId" (streamEnded)="onStreamEnded()">
         </app-fov-player>
       </div>
       <div class="chat-pane">
         <app-stream-chat [streamId]="streamId"></app-stream-chat>
       </div>
+    </div>
+  </div>
+  <div class="stream-header">
+    <div class="stream-title" *ngIf="isLive && streamInfo">
+      <h1>{{ streamInfo.title || streamId }}</h1>
+      <span class="stream-category-badge" *ngIf="streamInfo.category">{{ streamInfo.category }}</span>
+      <span class="track-info">{{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}</span>
+      <span class="viewer-info" *ngIf="streamInfo.viewers > 0">{{ streamInfo.viewers }} spectateur{{ streamInfo.viewers
+        > 1 ? 's' : '' }}</span>
     </div>
   </div>
 </div>

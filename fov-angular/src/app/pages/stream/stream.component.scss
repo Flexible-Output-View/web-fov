@@ -95,6 +95,18 @@
   flex-direction: column;
 }
 
+@media (max-width: 1100px) {
+  .chat-pane {
+    width: 280px;
+  }
+}
+
+@media (max-width: 860px) {
+  .chat-pane {
+    width: 240px;
+  }
+}
+
 .loading-state,
 .error-state,
 .offline-state,
@@ -184,38 +196,6 @@
   &:hover {
     border-color: var(--text-secondary, #888);
     color: var(--text-primary, #fff);
-  }
-}
-
-@media (max-width: 1024px) {
-  .stream-content {
-    flex-direction: column;
-    overflow-y: auto;
-  }
-
-  .player-pane {
-    flex: none;
-    height: 55dvh;
-    min-height: 300px;
-  }
-
-  .chat-pane {
-    width: 100%;
-    flex: none;
-    height: 45dvh;
-    min-height: 320px;
-    border-top: 1px solid var(--border-color, #2a2a2a);
-  }
-
-  .player-wrapper {
-    height: auto;
-    min-height: calc(100dvh - 56px);
-    overflow: visible;
-  }
-
-  .stream-content {
-    height: auto;
-    min-height: calc(100dvh - 56px);
   }
 }
 

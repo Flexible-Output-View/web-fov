@@ -156,28 +156,15 @@ const swaggerDocument = {
             }
         },
         '/api/chat/{streamId}': {
-            get: {
-                tags: ['Chat'],
-                summary: 'Get recent chat messages for a stream (public, no auth required)',
-                parameters: [
-                    { name: 'streamId', in: 'path', required: true, schema: { type: 'string' } },
-                    { name: 'limit', in: 'query', schema: { type: 'integer', default: 50, minimum: 1, maximum: 100 } }
-                ],
-                responses: {
-                    200: { description: 'Chat history' },
-                    400: { $ref: '#/components/responses/BadRequest' },
-                    500: { $ref: '#/components/responses/ServerError' }
-                }
-            },
             post: {
                 tags: ['Chat'],
-                summary: 'Send a chat message (authenticated users only, broadcast via Socket.IO)',
+                summary: 'Send a chat message (authenticated users only, broadcast via Socket.IO, never stored)',
                 parameters: [
                     { name: 'streamId', in: 'path', required: true, schema: { type: 'string' } }
                 ],
                 requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/SendChatRequest' } } } },
                 responses: {
-                    201: { description: 'Message sent' },
+                    201: { description: 'Message broadcast to connected clients' },
                     400: { $ref: '#/components/responses/BadRequest' },
                     401: { description: 'Authentication required' },
                     500: { $ref: '#/components/responses/ServerError' }
