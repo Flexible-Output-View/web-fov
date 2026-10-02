@@ -3,13 +3,14 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { FovPlayerComponent } from '../../components/fov-player/fov-player.component';
+import { StreamChatComponent } from '../../components/stream-chat/stream-chat.component';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { LiveStreamInfo } from '../../models/live-stream.model';
 
 @Component({
   selector: 'app-stream',
   standalone: true,
-  imports: [CommonModule, FovPlayerComponent],
+  imports: [CommonModule, FovPlayerComponent, StreamChatComponent],
   templateUrl: './stream.component.html',
   styleUrls: ['./stream.component.scss']
 })

@@ -1,0 +1,72 @@
+<aside class="stream-chat" aria-label="Chat en direct">
+  <header class="chat-header">
+    <span class="chat-title">CHAT EN DIRECT</span>
+    <span
+      class="connection-dot"
+      [class.online]="isConnected"
+      [title]="isConnected ? 'Connecté au chat' : 'Connexion au chat…'"
+    ></span>
+  </header>
+
+  <div
+    #messagesScroll
+    class="chat-messages"
+    (scroll)="onScroll()"
+    role="log"
+    aria-live="polite"
+  >
+    <div class="chat-empty" *ngIf="messages.length === 0">
+      <p class="empty-icon">💬</p>
+      <p>Bienvenue dans le chat !</p>
+      <p class="empty-hint">Soyez le premier à discuter.</p>
+    </div>
+
+    <div
+      class="chat-line"
+      *ngFor="let msg of messages; trackBy: trackByMessage"
+    >
+      <span class="chat-time">{{ formatTime(msg.createdAt) }}</span>
+      <span
+        class="chat-username"
+        [style.color]="usernameColor(msg.username)"
+        >{{ msg.username }}</span
+      ><span class="chat-colon">: </span>
+      <span class="chat-text">{{ msg.message }}</span>
+    </div>
+  </div>
+
+  <footer class="chat-footer">
+    <div class="send-error" *ngIf="sendError">{{ sendError }}</div>
+
+    <div class="chat-input-row" *ngIf="isLoggedIn; else loginPrompt">
+      <input
+        class="chat-input"
+        type="text"
+        [(ngModel)]="draft"
+        (keydown)="onKeydown($event)"
+        [maxlength]="maxLength"
+        [disabled]="isSending"
+        placeholder="Envoyer un message"
+        aria-label="Envoyer un message"
+      />
+      <button
+        class="chat-send"
+        (click)="send()"
+        [disabled]="!canSend"
+        aria-label="Envoyer"
+      >
+        {{ isSending ? '…' : 'Discuter' }}
+      </button>
+    </div>
+    <div class="chat-count" *ngIf="isLoggedIn">
+      {{ draft.length }}/{{ maxLength }}
+    </div>
+
+    <ng-template #loginPrompt>
+      <div class="login-prompt">
+        <p>Connectez-vous pour participer au chat.</p>
+        <a routerLink="/login" class="btn-login">Se connecter</a>
+      </div>
+    </ng-template>
+  </footer>
+</aside>
