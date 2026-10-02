@@ -1,4 +1,4 @@
-FROM node:22.12.0-bookworm-slim AS build
+FROM node:22.23.3-bookworm-slim AS build
 
 WORKDIR /app
 
@@ -6,7 +6,7 @@ ARG API_URL
 
 # Angular CLI aligné sur fov-angular/package-lock.json (node_modules/@angular/cli).
 # Ne pas utiliser @latest : casserait la reproductibilité.
-RUN npm install -g @angular/cli@20.3.24
+RUN npm install -g @angular/cli@22.2.1
 
 # Copy package files and install deps
 # NOTE: ne pas régénérer le lock ici — npm ci utilise fov-angular/package-lock.json versionné

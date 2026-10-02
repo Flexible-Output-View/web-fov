@@ -1,4 +1,4 @@
-FROM node:22.12.0-bookworm-slim
+FROM node:22.23.3-bookworm-slim
 
 # install ffmpeg for media processing (pinné via base bookworm ; JS deps figées via package-lock.json)
 RUN apt-get update \
