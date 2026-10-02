@@ -5,7 +5,6 @@ export default {
         'src/**/*.js',
         'src/**/*.mjs',
         '!src/index.js',
-        '!src/mediaServer.mjs',
         '!**/node_modules/**'
     ],
     testMatch: [
