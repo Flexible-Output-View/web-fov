@@ -12,6 +12,20 @@ on:
 jobs:
   test-and-lint:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: fovwebdb
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U root -d fovwebdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     permissions:
       contents: read
       id-token: write
@@ -31,10 +45,28 @@ jobs:
           cd backend
           npm ci
 
+      - name: Load integration database schema
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U root -d fovwebdb -f fovwebdb.sql
+
       - name: Run tests with coverage
         run: |
           cd backend
           npm run test:coverage
+
+      - name: Run PostgreSQL integration tests
+        env:
+          RUN_INTEGRATION: "1"
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: root
+          DB_PASSWORD: postgres
+          DB_NAME: fovwebdb
+          JWT_SECRET: integration-test-secret
+        run: |
+          cd backend
+          npm run test:integration
 
       - name: Upload coverage to Codecov
         if: github.event_name == 'pull_request' || (github.ref == 'refs/heads/dev' && !github.event.repository.fork)

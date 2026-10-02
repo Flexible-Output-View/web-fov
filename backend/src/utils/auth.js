@@ -76,6 +76,7 @@ export function sanitizeUser(row) {
         return null;
     }
 
-    const { password_hash, ...user } = row;
+    const user = { ...row };
+    delete user.password_hash;
     return user;
 }
