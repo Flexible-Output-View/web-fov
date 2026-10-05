@@ -15,7 +15,7 @@
     "@angular/core": "^20.3.16",
     "@angular/forms": "^20.3.16",
     "@angular/platform-browser": "^20.3.16",
-    "@angular/router": "^20.3.16",
+    "@angular/router": "^22.2.1",
     "hls.js": "^1.6.15",
     "rxjs": "~7.8.0",
     "socket.io-client": "^4.8.3",
