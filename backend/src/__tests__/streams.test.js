@@ -71,8 +71,8 @@ describe('Streams Routes', () => {
     let consoleLogSpy;
 
     beforeAll(() => {
-        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
     afterAll(() => {
@@ -97,10 +97,32 @@ describe('Streams Routes', () => {
         const response = await request(createApp()).get('/');
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual(rows[0]);
+        expect(response.body).toEqual(rows);
         expect(dbQuery).toHaveBeenCalledWith(
             'SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams ORDER BY viewers DESC'
         );
+    });
+
+    test('returns an empty list when no streams exist', async () => {
+        dbQuery.mockResolvedValue([]);
+
+        const response = await request(createApp()).get('/');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([]);
+    });
+
+    test('returns every stream when several streams exist', async () => {
+        const rows = [
+            { id: 1, title: 'Most viewed' },
+            { id: 2, title: 'Also live' }
+        ];
+        dbQuery.mockResolvedValue(rows);
+
+        const response = await request(createApp()).get('/');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(rows);
     });
 
     test('returns a stream by id and handles missing streams', async () => {
@@ -117,6 +139,10 @@ describe('Streams Routes', () => {
         const missing = await request(createApp()).get('/99');
         expect(missing.status).toBe(404);
         expect(missing.body).toEqual({ error: 'Stream not found' });
+
+        const invalid = await request(createApp()).get('/not-a-number');
+        expect(invalid.status).toBe(404);
+        expect(invalid.body).toEqual({ error: 'Stream not found' });
     });
 
     test('returns an HLS URL using the request host and protocol', async () => {
@@ -134,7 +160,7 @@ describe('Streams Routes', () => {
             { name: '2', isDirectory: () => true },
             { name: 'live', isDirectory: () => true }
         ]);
-        buildSeparatedAvailableTracks.mockImplementation((streamId, trackDirs, url) => {
+        buildSeparatedAvailableTracks.mockImplementation((streamId, _trackDirs, _url) => {
             if (streamId === '12') {
                 return [
                     buildSeparatedTrack('v:0', 'Main Cam', '12', '2', 'edge.example.test:8080', 'video'),

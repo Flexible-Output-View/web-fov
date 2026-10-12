@@ -2,6 +2,16 @@
 
 A flexible, customizable video streaming platform that allows streamers to broadcast multi-track video/audio streams and viewers to personalize their viewing experience.
 
+## CI Status
+| Component / Pipeline | Main (Production) | Dev (Development) |
+| ---: | :--- | :--- |
+| **Deployment** | [![Deploy Public](https://github.com/Flexible-Output-View/web-fov/actions/workflows/fov-deploy-public.yml/badge.svg)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/fov-deploy-public.yml) | [![Deploy Dev](https://github.com/Flexible-Output-View/web-fov/actions/workflows/fov-deploy.yml/badge.svg?branch=dev)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/fov-deploy.yml) |
+| **Backend Tests & Lint** | [![Backend Tests](https://github.com/Flexible-Output-View/web-fov/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/backend-tests.yml) | [![Backend Tests](https://github.com/Flexible-Output-View/web-fov/actions/workflows/backend-tests.yml/badge.svg?branch=dev)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/backend-tests.yml) |
+| **Angular Tests** | [![Angular Tests](https://github.com/Flexible-Output-View/web-fov/actions/workflows/angular-tests.yml/badge.svg)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/angular-tests.yml) | [![Angular Tests](https://github.com/Flexible-Output-View/web-fov/actions/workflows/angular-tests.yml/badge.svg?branch=dev)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/angular-tests.yml) |
+| **Backend Coverage** | [![Backend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/main?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/main) | [![Backend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/dev?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev) |
+| **Frontend Coverage** | [![Frontend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/main?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/main) | [![Frontend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/dev?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev) |
+
+
 ## 📋 Project Overview
 
 FOV is a complete video streaming solution composed of two main components:
