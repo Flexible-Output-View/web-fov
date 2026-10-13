@@ -3,8 +3,8 @@
 ## 1. System Overview
 
 The FOV Backend is a **modular Express.js REST API** with media streaming capabilities. It separates concerns into:
-- **API Layer**: RESTful routes for data management
-- **Database Layer**: MySQL connection pooling
+- **API Layer**: RESTful routes for data management (including auth)
+- **Database Layer**: Postgres connection pooling (`pg` Pool)
 - **Media Layer**: HLS video streaming (SRT ingest)
 - **Middleware Layer**: CORS, logging, error handling
 
@@ -18,7 +18,7 @@ The FOV Backend is a **modular Express.js REST API** with media streaming capabi
 │     Express.js REST API Server       │
 │  (Port 4000 - Main API)              │
 ├──────────────────────────────────────┤
-│  Routes: /api/users, /streams, etc   │
+│  Routes: /api/auth, /api/users, /streams, etc   │
 │  Middleware: CORS, Morgan, JSON      │
 │  Error Handling: Centralized         │
 └──────────────┬──────────────────────┘
@@ -57,17 +57,17 @@ The FOV Backend is a **modular Express.js REST API** with media streaming capabi
 - NestJS: Excellent but heavier; unnecessary for our current scope
 - Koa: Modern but less mature; Express more stable
 
-### Database: **MySQL 8.0+**
+### Database: **Postgres 18**
 
-**Why MySQL?**
-- Mature, stable, widely-hosted (AWS RDS, DigitalOcean, Linode)
+**Why Postgres?**
+- Mature, stable, widely-hosted (AWS RDS, DigitalOcean, managed Postgres)
 - ACID compliance ensures data integrity
 - Good performance for structured data (users, streams, categories)
-- Connection pooling support (mysql2/promise)
+- Connection pooling support (`pg` Pool)
 - Cost-effective at scale
 
 **Schema Highlights:**
-- Users: `id`, `username`, `display_name`, `created_at`
+- Users: `id`, `username`, `email`, `password_hash`, `display_name`, `created_at`
 - Streams: `id`, `streamer`, `title`, `category_id`, `viewers`, `thumbnail_url`, `avatar_url`, `is_live`
 - Categories: `id`, `name`, `viewers`, `image_url`
 
@@ -87,13 +87,13 @@ Encoder → SRT Server → FFmpeg → Segmentation → HLS Segments → CDN/Clie
 (OBS)     (Port 9999) (Transcode) (/media/hls/) (.m3u8, .ts files)
 ```
 
-### Connection Management: **mysql2/promise Pool**
+### Connection Management: **pg Pool**
 
 **Why Pooling?**
 - Reuses connections, reduces overhead
 - Prevents "too many connections" errors
 - Auto-reconnection on failure
-- Default: 5 connections (configurable)
+- Default: 5 connections (configurable via `max`)
 
 ---
 
@@ -122,9 +122,11 @@ Encoder → SRT Server → FFmpeg → Segmentation → HLS Segments → CDN/Clie
 
 **Design Pattern:** **Singleton Pool**
 ```javascript
-const pool = mysql.createPool({...})
-export default { pool, getConnection(), query() }
+const pool = new Pool({...})
+export default { pool, getClient(), query() }
 ```
+
+Route handlers write `?` placeholders; `db.js` rewrites them to Postgres `$1, $2, ...` before execution.
 
 **Why:**
 - Single pool instance across app lifetime
@@ -139,21 +141,28 @@ export default { pool, getConnection(), query() }
 
 **Separation of Concerns:**
 ```
+/api/auth → routes/auth.js
 /api/users → routes/users.js
 /api/streams → routes/streams.js
 /api/categories → routes/categories.js
 ```
 
+### `src/routes/auth.js` - Auth API
+
+**Operations:**
+- `POST /auth/register` - Register (`username`, `email`, `password`) → `201 {token, user}`
+- `POST /auth/login` - Login (`login`, `password`, username or email) → `200 {token, user}`
+
+**Implementation Notes:**
+- Validation in `src/utils/auth.js` (username regex, email format, password length)
+- Email normalized to lowercase; password hashed with bcrypt (10 rounds)
+- JWT signed with `JWT_SECRET`, expiry `JWT_EXPIRES_IN` (default `7d`)
+- Duplicate username/email (Postgres `23505`) → `409`; bad credentials → `401`
+
 ### `src/routes/users.js` - User API
 
 **Operations:**
 - `GET /:id` - Fetch user by ID
-- `POST /` - Create user (minimal validation)
-
-**Implementation Notes:**
-- Uses async/await for DB calls
-- Error passed to next() middleware
-- Input validation basic; strengthen in security review
 
 ### `src/routes/streams.js` - Stream Management
 
@@ -191,7 +200,7 @@ Express Middleware (CORS, JSON parse, logging)
     ↓
 Route Handler (async)
     ↓
-Database Query (mysql2/promise)
+Database Query (pg Pool, `?` rewritten to `$n`)
     ↓
 Response (JSON)
     ↓
@@ -251,13 +260,15 @@ Client HLS Player
 **Current State:**
 - ✅ CORS enabled (configurable)
 - ✅ Morgan request logging
-- ⚠️ No authentication (to be implemented)
-- ⚠️ Basic input validation
+- ✅ User registration and login with JWT issuance
+- ✅ Password hashing (bcrypt) and auth input validation
+- ⚠️ No global auth guard yet (tokens issued but routes not all protected)
+- ⚠️ Basic input validation outside auth
 - ⚠️ No rate limiting
 
 **Roadmap:**
-- JWT authentication for protected endpoints
-- Input sanitization (SQL injection prevention)
+- Global JWT auth guard for protected endpoints
+- Input sanitization (broader coverage)
 - Rate limiting (Express-limiter)
 - HTTPS enforcement in production
 - Database credentials rotation
@@ -319,8 +330,9 @@ index.js
   ├── cors
   ├── morgan
   ├── db.js
-  │   └── mysql2/promise
+  │   └── pg (Pool)
   ├── routes/
+  │   ├── auth.js → db.js, bcryptjs, jsonwebtoken
   │   ├── users.js → db.js
   │   ├── streams.js → db.js, fs, path
   │   └── categories.js → db.js
@@ -361,5 +373,5 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** April 2026
+**Document Version:** 1.1  
+**Last Updated:** September 2026

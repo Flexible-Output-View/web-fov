@@ -4,7 +4,10 @@ import path from 'path';
 import cors from 'cors';
 import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
-import { writeStreamMeta } from './streamTrackUtils.js';
+import {
+    writeStreamMeta,
+    parseNamedTrackArray
+} from './streamTrackUtils.js';
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
 const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
@@ -14,12 +17,15 @@ await fs.promises.mkdir(HLS_DIR, { recursive: true });
 const ffmpegProcesses = new Map();
 const registeredStreams = new Map();
 const baseSrtPort = parseInt(process.env.SRT_PORT || '9999', 10);
+const maxSrtPort = baseSrtPort + 11;
 const debugSrtPort = parseInt(process.env.DEBUG_SRT_PORT || String(baseSrtPort), 10);
 
 function parseRegisterRequest(body) {
     const { tracks: tracksV, audioTracks: tracksA, streamId: providedStreamId } = body ?? {};
     const trackVNum = Number.parseInt(tracksV, 10);
     const trackANum = Number.parseInt(tracksA, 10);
+    const videoTrackNames = parseNamedTrackArray(body?.videoTrackNames, 'videoTrackNames');
+    const audioTrackNames = parseNamedTrackArray(body?.audioTrackNames, 'audioTrackNames');
 
     if (!Number.isInteger(trackVNum) || trackVNum <= 0) {
         return { error: "Invalid 'video tracks' parameter." };
@@ -27,10 +33,18 @@ function parseRegisterRequest(body) {
     if (!Number.isInteger(trackANum) || trackANum <= 0) {
         return { error: "Invalid 'audio tracks' parameter." };
     }
+    if (videoTrackNames.error) {
+        return { error: videoTrackNames.error };
+    }
+    if (audioTrackNames.error) {
+        return { error: audioTrackNames.error };
+    }
 
     return {
         trackVNum,
         trackANum,
+        videoTrackNames,
+        audioTrackNames,
         streamId: providedStreamId || randomUUID()
     };
 }
@@ -80,19 +94,17 @@ function clearStreamHLSFiles(streamId) {
 // Safely kill a process with grace period - try SIGINT first, then SIGKILL
 function killFFmpegProcess(streamId, process, timeout = PROCESS_GRACE_PERIOD) {
     return new Promise((resolve) => {
-        if (!process || process.killed) {
+        if (!process) {
             resolve(true);
             return;
         }
 
         const killTimer = setTimeout(() => {
-            if (!process.killed) {
-                console.log(`⚠️ FFmpeg for stream ${streamId} did not exit gracefully, force killing (SIGKILL)...`);
-                try {
-                    process.kill('SIGKILL');
-                } catch (err) {
-                    console.error(`⚠️ Failed to SIGKILL ffmpeg for stream ${streamId}:`, err);
-                }
+            console.log(`⚠️ FFmpeg for stream ${streamId} did not exit gracefully, force killing (SIGKILL)...`);
+            try {
+                process.kill('SIGKILL');
+            } catch (err) {
+                console.error(`⚠️ Failed to SIGKILL ffmpeg for stream ${streamId}:`, err);
             }
             resolve(true);
         }, timeout);
@@ -131,7 +143,7 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
     }
 
     // 3. Pair each video track with its audio at the same index (v:0,a:0).
-    // Extra audio tracks beyond the video count get their own audio-only variant (a:N).
+    // Extra audio tracks beyond the video count get their own audio-only variant.
     const maxTracks = Math.max(videoTrackCount, audioTrackCount);
 
     for (let i = 0; i < maxTracks; i++) {
@@ -175,7 +187,11 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '15',
-        '-hls_flags', 'delete_segments+independent_segments+omit_endlist',
+        // ↓ Added: program_date_time — injects EXT-X-PROGRAM-DATE-TIME into every
+        //   playlist segment. HLS.js uses wall-clock timestamps to align tracks,
+        //   bypassing the sequence×duration arithmetic that breaks when video
+        //   segments are longer than audio segments due to keyframe-only cutting.
+        '-hls_flags', 'delete_segments+independent_segments+omit_endlist+program_date_time',
         '-hls_segment_type', 'mpegts',
         '-hls_segment_filename', path.join(streamHlsDir, '%v', 'seg%05d.ts'),
         '-var_stream_map', varStreamEntries.join(' '),
@@ -185,7 +201,7 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
     return ffmpegArgs;
 }
 
-function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null) {
+function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, nameOptions = {}) {
     if (!tracksV || tracksV === 0) {
         if (socket) {
             socket.destroy();
@@ -206,9 +222,12 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null) 
 
     ffmpegProc.on('exit', (code, signal) => {
         console.log(`ℹ️ FFmpeg for stream ${streamId} exited (code=${code} signal=${signal})`);
-        clearStreamHLSFiles(streamId);
-        ffmpegProcesses.delete(streamId);
-        registeredStreams.delete(streamId);
+        const currentProcess = ffmpegProcesses.get(streamId);
+        if (currentProcess?.process === ffmpegProc) {
+            clearStreamHLSFiles(streamId);
+            ffmpegProcesses.delete(streamId);
+            registeredStreams.delete(streamId);
+        }
         console.log(`📊 Active streams: ${ffmpegProcesses.size}`);
         if (socket) {
             try {
@@ -221,6 +240,12 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null) 
 
     ffmpegProc.on('error', (err) => {
         console.error(`⚠️ FFmpeg spawn failed for stream ${streamId}:`, err);
+        const currentProcess = ffmpegProcesses.get(streamId);
+        if (currentProcess?.process === ffmpegProc) {
+            clearStreamHLSFiles(streamId);
+            ffmpegProcesses.delete(streamId);
+            registeredStreams.delete(streamId);
+        }
         if (socket) {
             try {
                 socket.destroy();
@@ -255,6 +280,8 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null) 
         process: ffmpegProc,
         tracksV,
         tracksA,
+        videoTrackNames: nameOptions.videoTrackNames ?? [],
+        audioTrackNames: nameOptions.audioTrackNames ?? [],
         socket,
         stopped: false,
         createdAt: Date.now()
@@ -302,7 +329,8 @@ function createMediaRoutes() {
             return res.status(400).json({ error: parsed.error });
         }
 
-        const { trackVNum, trackANum, streamId } = parsed;
+        const { trackVNum, trackANum, videoTrackNames, audioTrackNames, streamId } = parsed;
+        const nameOptions = { videoTrackNames, audioTrackNames };
 
         if (registeredStreams.has(streamId)) {
             return res.status(409).json({ error: 'StreamId already registered', streamId });
@@ -311,19 +339,25 @@ function createMediaRoutes() {
         try {
             const host = process.env.SRT_URL || '127.0.0.1';
             let srtPort = baseSrtPort;
-            while (Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
+            while (srtPort <= maxSrtPort && Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
                 srtPort++;
+            }
+
+            if (srtPort > maxSrtPort) {
+                return res.status(503).json({ error: 'No SRT ports available' });
             }
 
             const srtUrl = `srt://0.0.0.0:${srtPort}`;
             const srtUrlExternal = buildSrtUrl(host, srtPort, 'caller');
 
-            writeStreamMeta(streamId, trackVNum, trackANum, HLS_DIR);
-            startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl);
+            writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
+            startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl, nameOptions);
 
             registeredStreams.set(streamId, {
                 tracksV: trackVNum,
                 tracksA: trackANum,
+                videoTrackNames,
+                audioTrackNames,
                 port: srtPort,
                 srtUrl
             });
@@ -351,7 +385,8 @@ function createMediaRoutes() {
             return res.status(400).json({ error: parsed.error });
         }
 
-        const { trackVNum, trackANum, streamId } = parsed;
+        const { trackVNum, trackANum, videoTrackNames, audioTrackNames, streamId } = parsed;
+        const nameOptions = { videoTrackNames, audioTrackNames };
 
         if (registeredStreams.has(streamId)) {
             return res.status(409).json({ error: 'StreamId already registered', streamId });
@@ -359,11 +394,13 @@ function createMediaRoutes() {
 
         try {
             const srtUrlListener = 'http://localhost:4443';
-            writeStreamMeta(streamId, trackVNum, trackANum, HLS_DIR);
+            writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
 
             registeredStreams.set(streamId, {
                 tracksV: trackVNum,
                 tracksA: trackANum,
+                videoTrackNames,
+                audioTrackNames,
                 port: debugSrtPort,
                 debug: true
             });
@@ -534,4 +571,4 @@ async function startMediaServer() {
     });
 }
 
-export { createMediaRoutes, startMediaServer, ffmpegProcesses, killFFmpegProcess, clearHLSFiles };
+export { createMediaRoutes, startMediaServer, ffmpegProcesses, registeredStreams, killFFmpegProcess, clearHLSFiles };

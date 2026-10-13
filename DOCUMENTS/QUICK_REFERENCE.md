@@ -67,10 +67,15 @@ git commit -m "feat: description"
 # Health check
 curl http://localhost:4000/
 
-# Create user
-curl -X POST http://localhost:4000/api/users \
+# Register
+curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"john","display_name":"John"}'
+  -d '{"username":"john","email":"john@example.com","password":"secret123"}'
+
+# Login
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"john","password":"secret123"}'
 
 # Get user
 curl http://localhost:4000/api/users/1
@@ -101,9 +106,10 @@ curl http://localhost:4000/api/categories
 backend/
 ├── src/
 │   ├── index.js              # Main app
-│   ├── db.js                 # Database
+│   ├── db.js                 # Database (Postgres pg Pool)
 │   ├── mediaServer.mjs       # Streaming
 │   ├── routes/               # API routes
+│   │   ├── auth.js
 │   │   ├── users.js
 │   │   ├── streams.js
 │   │   ├── categories.js
@@ -140,10 +146,13 @@ backend/
 NODE_ENV=development
 PORT=4000
 DB_HOST=localhost
+DB_PORT=5432
 DB_USER=admin
 DB_PASSWORD=your_password
 DB_NAME=fovwebdb
 MEDIA_ROOT=./media
+JWT_SECRET=change-me-in-production
+JWT_EXPIRES_IN=7d
 ```
 
 ---
@@ -167,10 +176,8 @@ Current threshold: 50%
 node test-db.js
 
 # Create database (first time)
-mysql -u admin -p
+psql -U admin -d postgres
 > CREATE DATABASE fovwebdb;
-> CREATE USER 'admin'@'localhost' IDENTIFIED BY 'password';
-> GRANT ALL ON fovwebdb.* TO 'admin'@'localhost';
 ```
 
 ---
@@ -231,9 +238,16 @@ docker-compose up -d
 
 **Create User:**
 ```bash
-curl -X POST http://localhost:4000/api/users \
+curl -X POST http://localhost:4000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"username":"testuser"}'
+  -d '{"username":"testuser","email":"test@example.com","password":"secret123"}'
+```
+
+**Login:**
+```bash
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"testuser","password":"secret123"}'
 ```
 
 **Get User:**
@@ -277,12 +291,12 @@ npm test -- --logHeapUsage
 docker stats fov-backend
 
 # Check database performance
-# Enable slow query log in MySQL
-SET GLOBAL slow_query_log='ON';
-SET GLOBAL long_query_time=1;
+# Log slow statements in Postgres
+ALTER SYSTEM SET log_min_duration_statement = 1000;
+SELECT pg_reload_conf();
 ```
 
 ---
 
 **Bookmark this page!**  
-Last updated: April 2026
+Last updated: September 2026

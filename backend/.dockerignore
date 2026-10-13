@@ -1,5 +1,8 @@
 node_modules
-npm - debug.log
-    .env
+npm-debug.log
+.env
 media
-    .DS_Store
+.DS_Store
+coverage
+.git
+.gitignore

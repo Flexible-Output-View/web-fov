@@ -30,30 +30,27 @@ services:
       - API_HOSTNAME=${API_URL}
       - TWITCH_ID=${TWITCH_ID}
       - TWITCH_SECRET=${TWITCH_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
 
   frontend:
     build:
       context: ./fov-angular
-      args:
-        - API_URL=${API_URL}
 
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_started
-    # volumes: #DEV ONLY
-    #  - ./fov-angular:/app
-    #  - /app/node_modules
     ports:
       - "4200:80"
     networks:
       - frontend
+    environment:
+      - API_URL=http://backend:4000
 
   fov-db:
-    image: postgres:18
+    image: postgres:18-bookworm
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     volumes:
       - fov-db:/var/lib/postgresql
       - ./fovwebdb.sql:/docker-entrypoint-initdb.d/init.sql
@@ -61,7 +58,7 @@ services:
       - backend
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root -d fovwebdb"]
+      test: [ "CMD-SHELL", "pg_isready -U root -d fovwebdb" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -73,9 +70,9 @@ services:
 
 networks:
   frontend:
-    driver: bridge
+    #driver: bridge
   backend:
-    driver: bridge
+    #driver: bridge
     internal: true
 
 volumes:

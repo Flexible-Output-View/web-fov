@@ -6,6 +6,7 @@ import { ProfileComponent } from './pages/profile/profile.component';
 import { LoginComponent } from './pages/login/login.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { StreamComponent } from './pages/stream/stream.component';
+import { HowDoesItWorkComponent } from './pages/how-does-it-work/how-does-it-work.component';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -16,5 +17,6 @@ export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
   { path: 'stream/:streamId', component: StreamComponent },
+  { path: 'how-does-it-work', component: HowDoesItWorkComponent, title: 'Comment ça marche ?' },
   { path: '**', redirectTo: '' }
 ];

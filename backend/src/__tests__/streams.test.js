@@ -10,7 +10,9 @@ const hlsRoot = path.join(mediaRoot, 'hls');
 
 const dbQuery = jest.fn();
 const readdirSync = jest.fn();
-const resolveTrackIsVideo = jest.fn();
+const buildSeparatedAvailableTracks = jest.fn();
+const probeTrackHasVideo = jest.fn();
+const probeTrackHasAudio = jest.fn();
 const sortTrackIds = jest.fn(trackIds => [...trackIds].sort((a, b) => Number(a) - Number(b)));
 
 process.env.MEDIA_ROOT = mediaRoot;
@@ -27,7 +29,9 @@ jest.unstable_mockModule('../mediaServer.mjs', () => ({
     ffmpegProcesses: new Map()
 }));
 jest.unstable_mockModule('../streamTrackUtils.js', () => ({
-    resolveTrackIsVideo,
+    buildSeparatedAvailableTracks,
+    probeTrackHasVideo,
+    probeTrackHasAudio,
     sortTrackIds
 }));
 
@@ -51,13 +55,24 @@ function setDirectoryEntries(entries) {
     });
 }
 
+function buildSeparatedTrack(trackId, name, streamId, variantId, host, type) {
+    const isVideo = type === 'video';
+    return {
+        trackId,
+        name,
+        videoUrl: `http://${host}/api/hls/${streamId}/${variantId}/playlist.m3u8`,
+        isVideo,
+        isAudio: !isVideo
+    };
+}
+
 describe('Streams Routes', () => {
     let consoleErrorSpy;
     let consoleLogSpy;
 
     beforeAll(() => {
-        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => { });
+        consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
     afterAll(() => {
@@ -67,7 +82,9 @@ describe('Streams Routes', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        resolveTrackIsVideo.mockResolvedValue(true);
+        buildSeparatedAvailableTracks.mockReturnValue(null);
+        probeTrackHasVideo.mockResolvedValue(true);
+        probeTrackHasAudio.mockResolvedValue(true);
         setDirectoryEntries([]);
         delete process.env.API_HOSTNAME;
         delete process.env.API_PROTOCOL;
@@ -80,10 +97,32 @@ describe('Streams Routes', () => {
         const response = await request(createApp()).get('/');
 
         expect(response.status).toBe(200);
-        expect(response.body).toEqual(rows[0]);
+        expect(response.body).toEqual(rows);
         expect(dbQuery).toHaveBeenCalledWith(
             'SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams ORDER BY viewers DESC'
         );
+    });
+
+    test('returns an empty list when no streams exist', async () => {
+        dbQuery.mockResolvedValue([]);
+
+        const response = await request(createApp()).get('/');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([]);
+    });
+
+    test('returns every stream when several streams exist', async () => {
+        const rows = [
+            { id: 1, title: 'Most viewed' },
+            { id: 2, title: 'Also live' }
+        ];
+        dbQuery.mockResolvedValue(rows);
+
+        const response = await request(createApp()).get('/');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(rows);
     });
 
     test('returns a stream by id and handles missing streams', async () => {
@@ -100,6 +139,10 @@ describe('Streams Routes', () => {
         const missing = await request(createApp()).get('/99');
         expect(missing.status).toBe(404);
         expect(missing.body).toEqual({ error: 'Stream not found' });
+
+        const invalid = await request(createApp()).get('/not-a-number');
+        expect(invalid.status).toBe(404);
+        expect(invalid.body).toEqual({ error: 'Stream not found' });
     });
 
     test('returns an HLS URL using the request host and protocol', async () => {
@@ -111,12 +154,36 @@ describe('Streams Routes', () => {
         });
     });
 
-    test('builds available streams with sorted tracks and database metadata', async () => {
+    test('builds available streams with separated tracks and database metadata', async () => {
         setDirectoryEntries([
             { name: '12', isDirectory: () => true },
             { name: '2', isDirectory: () => true },
             { name: 'live', isDirectory: () => true }
         ]);
+        buildSeparatedAvailableTracks.mockImplementation((streamId, _trackDirs, _url) => {
+            if (streamId === '12') {
+                return [
+                    buildSeparatedTrack('v:0', 'Main Cam', '12', '2', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:0', 'Mic', '12', '2', 'edge.example.test:8080', 'audio'),
+                    buildSeparatedTrack('v:1', 'Side Cam', '12', '10', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:1', 'Game Audio', '12', '10', 'edge.example.test:8080', 'audio')
+                ];
+            }
+            if (streamId === '2') {
+                return [
+                    buildSeparatedTrack('v:0', 'Cam', '2', '2', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:0', 'Audio', '2', '2', 'edge.example.test:8080', 'audio'),
+                    buildSeparatedTrack('v:1', 'Cam 2', '2', '10', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:1', 'Audio 2', '2', '10', 'edge.example.test:8080', 'audio')
+                ];
+            }
+            return [
+                buildSeparatedTrack('v:0', 'Live Cam', 'live', '2', 'edge.example.test:8080', 'video'),
+                buildSeparatedTrack('a:0', 'Live Audio', 'live', '2', 'edge.example.test:8080', 'audio'),
+                buildSeparatedTrack('v:1', 'Live Cam 2', 'live', '10', 'edge.example.test:8080', 'video'),
+                buildSeparatedTrack('a:1', 'Live Audio 2', 'live', '10', 'edge.example.test:8080', 'audio')
+            ];
+        });
         dbQuery.mockResolvedValueOnce([{
             title: 'Concert',
             category: 'Music',
@@ -133,18 +200,12 @@ describe('Streams Routes', () => {
         expect(response.body).toEqual([
             {
                 streamId: '12',
-                trackCount: 2,
+                trackCount: 4,
                 tracks: [
-                    {
-                        trackId: '2',
-                        videoUrl: 'http://edge.example.test:8080/api/hls/12/2/playlist.m3u8',
-                        isVideo: true
-                    },
-                    {
-                        trackId: '10',
-                        videoUrl: 'http://edge.example.test:8080/api/hls/12/10/playlist.m3u8',
-                        isVideo: true
-                    }
+                    buildSeparatedTrack('v:0', 'Main Cam', '12', '2', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:0', 'Mic', '12', '2', 'edge.example.test:8080', 'audio'),
+                    buildSeparatedTrack('v:1', 'Side Cam', '12', '10', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:1', 'Game Audio', '12', '10', 'edge.example.test:8080', 'audio')
                 ],
                 title: 'Concert',
                 category: 'Music',
@@ -154,18 +215,12 @@ describe('Streams Routes', () => {
             },
             {
                 streamId: '2',
-                trackCount: 2,
+                trackCount: 4,
                 tracks: [
-                    {
-                        trackId: '2',
-                        videoUrl: 'http://edge.example.test:8080/api/hls/2/2/playlist.m3u8',
-                        isVideo: true
-                    },
-                    {
-                        trackId: '10',
-                        videoUrl: 'http://edge.example.test:8080/api/hls/2/10/playlist.m3u8',
-                        isVideo: true
-                    }
+                    buildSeparatedTrack('v:0', 'Cam', '2', '2', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:0', 'Audio', '2', '2', 'edge.example.test:8080', 'audio'),
+                    buildSeparatedTrack('v:1', 'Cam 2', '2', '10', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:1', 'Audio 2', '2', '10', 'edge.example.test:8080', 'audio')
                 ],
                 title: '',
                 category: '',
@@ -175,18 +230,12 @@ describe('Streams Routes', () => {
             },
             {
                 streamId: 'live',
-                trackCount: 2,
+                trackCount: 4,
                 tracks: [
-                    {
-                        trackId: '2',
-                        videoUrl: 'http://edge.example.test:8080/api/hls/live/2/playlist.m3u8',
-                        isVideo: true
-                    },
-                    {
-                        trackId: '10',
-                        videoUrl: 'http://edge.example.test:8080/api/hls/live/10/playlist.m3u8',
-                        isVideo: true
-                    }
+                    buildSeparatedTrack('v:0', 'Live Cam', 'live', '2', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:0', 'Live Audio', 'live', '2', 'edge.example.test:8080', 'audio'),
+                    buildSeparatedTrack('v:1', 'Live Cam 2', 'live', '10', 'edge.example.test:8080', 'video'),
+                    buildSeparatedTrack('a:1', 'Live Audio 2', 'live', '10', 'edge.example.test:8080', 'audio')
                 ],
                 title: '',
                 category: '',
@@ -195,7 +244,50 @@ describe('Streams Routes', () => {
                 thumbnailUrl: ''
             }
         ]);
-        expect(resolveTrackIsVideo).toHaveBeenCalledTimes(6);
+        expect(buildSeparatedAvailableTracks).toHaveBeenCalledTimes(3);
+        expect(probeTrackHasVideo).not.toHaveBeenCalled();
+        expect(probeTrackHasAudio).not.toHaveBeenCalled();
+    });
+
+    test('falls back to probing variants when metadata is unavailable', async () => {
+        setDirectoryEntries([{ name: '7', isDirectory: () => true }]);
+        dbQuery.mockResolvedValueOnce([]);
+
+        const response = await request(createApp()).get('/available').set('Host', 'edge.example.test:8080');
+
+        expect(response.status).toBe(200);
+        expect(response.body[0].tracks).toEqual([
+            {
+                trackId: 'v:0',
+                name: 'Video 0',
+                videoUrl: 'http://edge.example.test:8080/api/hls/7/2/playlist.m3u8',
+                isVideo: true,
+                isAudio: false
+            },
+            {
+                trackId: 'a:0',
+                name: 'Audio 0',
+                videoUrl: 'http://edge.example.test:8080/api/hls/7/2/playlist.m3u8',
+                isVideo: false,
+                isAudio: true
+            },
+            {
+                trackId: 'v:1',
+                name: 'Video 1',
+                videoUrl: 'http://edge.example.test:8080/api/hls/7/10/playlist.m3u8',
+                isVideo: true,
+                isAudio: false
+            },
+            {
+                trackId: 'a:1',
+                name: 'Audio 1',
+                videoUrl: 'http://edge.example.test:8080/api/hls/7/10/playlist.m3u8',
+                isVideo: false,
+                isAudio: true
+            }
+        ]);
+        expect(probeTrackHasVideo).toHaveBeenCalledTimes(2);
+        expect(probeTrackHasAudio).toHaveBeenCalledTimes(2);
     });
 
     test('continues with tracks when stream metadata lookup fails', async () => {

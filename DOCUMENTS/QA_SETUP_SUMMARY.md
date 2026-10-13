@@ -32,7 +32,8 @@ The FOV Backend now includes a **comprehensive quality assurance infrastructure*
 | File | Coverage | Tests |
 |------|----------|-------|
 | [`src/__tests__/db.test.js`](src/__tests__/db.test.js) | Database module | Connection pool, query methods |
-| [`src/__tests__/users.test.js`](src/__tests__/users.test.js) | User routes | GET, POST, error handling |
+| [`src/__tests__/auth.test.js`](src/__tests__/auth.test.js) | Auth routes | Register, login, error handling |
+| [`src/__tests__/users.test.js`](src/__tests__/users.test.js) | User routes | GET, error handling |
 | [`src/__tests__/categories.test.js`](src/__tests__/categories.test.js) | Category routes | CRUD operations, validation |
 | [`src/__tests__/streams-utils.test.js`](src/__tests__/streams-utils.test.js) | Stream utilities | Playlist validation, segment counting |
 
@@ -349,7 +350,9 @@ docker push registry/fov-backend:0.2.0
 | express | ^4.22.1 | REST API framework |
 | cors | ^2.8.5 | Cross-origin resource sharing |
 | morgan | ^1.10.0 | HTTP request logging |
-| mysql2 | ^3.6.5 | MySQL database driver |
+| pg | ^8.23.0 | Postgres database driver |
+| bcryptjs | ^3.0.3 | Password hashing |
+| jsonwebtoken | ^9.0.3 | JWT issuance |
 | dotenv | ^16.0.0 | Environment variables |
 | node-media-server | 2.2.0 | SRT ingest and streaming capability |
 
@@ -388,9 +391,9 @@ Pass all of:
 
 - ✅ Environment variables for secrets
 - ✅ Parameterized SQL queries
-- ✅ Input validation
+- ✅ Auth input validation + bcrypt hashing + JWT issuance
 - ✅ Error messages don't expose internals
-- ⚠️ Authentication (todo for v0.2.0)
+- ⚠️ Global authentication guard (todo for v0.2.0)
 - ⚠️ Rate limiting (todo for v0.2.0)
 
 ---
@@ -404,11 +407,10 @@ Pass all of:
 - ✅ Error handling (no stacktraces)
 
 ### Missing (Priority)
-1. **JWT Authentication** - All endpoints currently public
-2. **Input Sanitization** - Prevent SQL injection
+1. **Global JWT Guard** - Tokens issued, but not enforced on all endpoints yet
+2. **Input Sanitization** - Broader coverage beyond auth
 3. **Rate Limiting** - Prevent DDoS
 4. **HTTPS** - Use in production behind reverse proxy
-5. **Password Hashing** - If storing passwords
 
 See [SECURITY.md](SECURITY.md) for detailed roadmap.
 
@@ -450,10 +452,11 @@ npm run test:watch                         # Watch mode
 ## 🎯 Next Steps (Roadmap)
 
 ### v0.2.0 (Next Release)
-- [ ] Implement JWT authentication
-- [ ] Add comprehensive input validation (joi/yup)
+- [x] Implement JWT registration/login (done)
+- [ ] Enforce JWT guard on protected routes
+- [ ] Add comprehensive input validation (joi/yup) beyond auth
 - [ ] Implement rate limiting
-- [ ] Add Swagger/OpenAPI documentation
+- [x] Add Swagger/OpenAPI documentation (done, see `/api-docs`)
 - [ ] Increase coverage to 75%+
 - [ ] Security headers middleware
 

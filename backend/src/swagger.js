@@ -18,6 +18,8 @@ const swaggerDocument = {
         { name: 'Categories' },
         { name: 'Streams' },
         { name: 'Users' },
+        { name: 'Auth' },
+        { name: 'Chat' },
         { name: 'Twitch' },
         { name: 'FFmpeg' }
     ],
@@ -110,17 +112,34 @@ const swaggerDocument = {
                 }
             }
         },
-        '/api/users': {
+        '/api/auth/register': {
             post: {
-                tags: ['Users'],
-                summary: 'Create a user',
+                tags: ['Auth'],
+                summary: 'Register a new user',
                 requestBody: {
                     required: true,
-                    content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateUserRequest' } } }
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterRequest' } } }
                 },
                 responses: {
-                    201: { description: 'Created user ID' },
-                    400: { $ref: '#/components/responses/BadRequest' },
+                    201: { description: 'User registered', content: { 'application/json': { schema: { $ref: '#/components/schemas/AuthResponse' } } } },
+                    400: { description: 'Validation error' },
+                    409: { description: 'Username or email already exists' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/auth/login': {
+            post: {
+                tags: ['Auth'],
+                summary: 'Login with username or email',
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/LoginRequest' } } }
+                },
+                responses: {
+                    200: { description: 'Login successful', content: { 'application/json': { schema: { $ref: '#/components/schemas/AuthResponse' } } } },
+                    400: { description: 'Validation error' },
+                    401: { description: 'Invalid credentials' },
                     500: { $ref: '#/components/responses/ServerError' }
                 }
             }
@@ -132,6 +151,22 @@ const swaggerDocument = {
                 parameters: [{ name: 'limit', in: 'query', schema: { type: 'integer', default: 30, minimum: 1 } }],
                 responses: {
                     200: { description: 'Twitch categories' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/chat/{streamId}': {
+            post: {
+                tags: ['Chat'],
+                summary: 'Send a chat message (authenticated users only, broadcast via Socket.IO, never stored)',
+                parameters: [
+                    { name: 'streamId', in: 'path', required: true, schema: { type: 'string' } }
+                ],
+                requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/SendChatRequest' } } } },
+                responses: {
+                    201: { description: 'Message broadcast to connected clients' },
+                    400: { $ref: '#/components/responses/BadRequest' },
+                    401: { description: 'Authentication required' },
                     500: { $ref: '#/components/responses/ServerError' }
                 }
             }
@@ -186,15 +221,81 @@ const swaggerDocument = {
         },
         schemas: {
             Error: errorResponse,
-            CreateUserRequest: {
+            RegisterRequest: {
                 type: 'object',
-                required: ['username'],
-                properties: { username: { type: 'string' }, display_name: { type: 'string' } }
+                required: ['username', 'email', 'password'],
+                properties: {
+                    username: { type: 'string', minLength: 3, maxLength: 30 },
+                    email: { type: 'string', format: 'email' },
+                    password: { type: 'string', minLength: 8 }
+                }
+            },
+            LoginRequest: {
+                type: 'object',
+                required: ['login', 'password'],
+                properties: {
+                    login: { type: 'string', description: 'Username or email' },
+                    password: { type: 'string' }
+                }
+            },
+            AuthUser: {
+                type: 'object',
+                properties: {
+                    id: { type: 'integer' },
+                    username: { type: 'string' },
+                    email: { type: 'string', format: 'email' },
+                    created_at: { type: 'string', format: 'date-time' }
+                }
+            },
+            AuthResponse: {
+                type: 'object',
+                properties: {
+                    token: { type: 'string' },
+                    user: { $ref: '#/components/schemas/AuthUser' }
+                }
+            },
+            SendChatRequest: {
+                type: 'object',
+                required: ['message'],
+                properties: {
+                    message: { type: 'string', minLength: 1, maxLength: 500, description: 'Chat message text' }
+                }
+            },
+            ChatMessage: {
+                type: 'object',
+                properties: {
+                    id: { type: ['integer', 'string'] },
+                    streamId: { type: 'string' },
+                    userId: { type: ['integer', 'string'] },
+                    username: { type: 'string' },
+                    message: { type: 'string' },
+                    createdAt: { type: 'string', format: 'date-time' }
+                }
             },
             RegisterStreamRequest: {
                 type: 'object',
                 required: ['tracks', 'audioTracks'],
-                properties: { tracks: { type: 'integer', minimum: 1 }, audioTracks: { type: 'integer', minimum: 1 }, streamId: { type: 'string' } }
+                properties: {
+                    tracks: { type: 'integer', minimum: 1 },
+                    audioTracks: { type: 'integer', minimum: 1 },
+                    streamId: { type: 'string' },
+                    videoTrackNames: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: { name: { type: 'string' } }
+                        },
+                        description: 'OBS video track names'
+                    },
+                    audioTrackNames: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: { name: { type: 'string' } }
+                        },
+                        description: 'OBS audio track names'
+                    }
+                }
             },
             StopStreamRequest: {
                 type: 'object',
