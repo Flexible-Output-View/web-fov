@@ -13,6 +13,8 @@ services:
       - frontend
       - backend
     depends_on:
+      moq-relay:
+        condition: service_started
       fov-db:
         condition: service_healthy
 
@@ -68,11 +70,22 @@ services:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
+  moq-relay:
+    image: moqdev/moq-relay
+    restart: unless-stopped
+    ports:
+      - 0.0.0.0:4443:4443
+      - 0.0.0.0:4443:4443/udp
+    environment:
+      - MOQ_LISTEN_BIND=0.0.0.0:4443
+      - MOQ_WEB_HTTP_LISTEN=0.0.0.0:4443
+      - MOQ_LISTEN_TLS_GENERATE=localhost # Only for development
+      - MOQ_AUTH_PUBLIC='*' # Only for development
+      - MOQ_STATS_ENABLED=true
+
 networks:
   frontend:
-    #driver: bridge
   backend:
-    #driver: bridge
     internal: true
 
 volumes:
