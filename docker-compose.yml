@@ -85,8 +85,6 @@ services:
       - MOQ_AUTH_PUBLIC=* # Only for development
       - MOQ_STATS_ENABLED=true
       - MOQ_STATS_NODE=local/host
-      - MOQ_LOG_LEVEL=debug
-    network_mode: host
 
 networks:
   frontend:

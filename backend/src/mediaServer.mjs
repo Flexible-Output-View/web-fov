@@ -355,11 +355,13 @@ function createMediaRoutes() {
             startFFmpegListener(streamId, trackVNum, trackANum, null, ingestUrl, nameOptions);
 
             registeredStreams.set(streamId, {
+                streamId,
                 tracksV: trackVNum,
                 tracksA: trackANum,
                 videoTrackNames,
                 audioTrackNames,
                 port: srtPort,
+                protocol: 'srt',
                 ingestUrl
             });
 
@@ -398,11 +400,14 @@ function createMediaRoutes() {
             writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
 
             registeredStreams.set(streamId, {
+                streamId,
                 tracksV: trackVNum,
                 tracksA: trackANum,
                 videoTrackNames,
                 audioTrackNames,
                 port: debugSrtPort,
+                protocol: 'srt',
+                ingestUrl: srtUrlListener,
                 debug: true
             });
 
@@ -439,12 +444,14 @@ function createMediaRoutes() {
             const moqUrlExternal = `http://${host}:${moqPort}`;
 
             registeredStreams.set(streamId, {
+                streamId,
                 tracksV: trackVNum,
                 tracksA: trackANum,
                 videoTrackNames,
                 audioTrackNames,
                 port: moqPort,
-                protocol: 'moq'
+                protocol: 'moq',
+                ingestUrl: moqUrlExternal
             });
 
             console.log(`📝 Stream registered [MoQ]: ${streamId} (tracksV=${trackVNum}, (tracksA=${trackANum}, port=${moqPort})`);
