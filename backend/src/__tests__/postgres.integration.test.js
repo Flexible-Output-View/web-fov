@@ -62,4 +62,73 @@ app.use((err, req, res, _next) => {
         const badInput = await request(app).post('/api/auth/login').send({ login: credentials.username });
         expect(badInput.status).toBe(400);
     });
+
+    test('supports profile update, password change, and follow/unfollow', async () => {
+        const register = async (name) => {
+            const res = await request(app).post('/api/auth/register').send({
+                username: name,
+                email: `${name}@example.com`,
+                password: 'integration-secret'
+            });
+            expect(res.status).toBe(201);
+            return res.body.token;
+        };
+
+        const suffix = Date.now();
+        const aliceName = `alice_${suffix}`;
+        const bobName = `bob_${suffix}`;
+        const aliceToken = await register(aliceName);
+        const bobToken = await register(bobName);
+        const auth = (token) => ({ Authorization: `Bearer ${token}` });
+
+        // public profile (no email exposed)
+        const publicProfile = await request(app).get(`/api/users/${bobName}`);
+        expect(publicProfile.status).toBe(200);
+        expect(publicProfile.body).not.toHaveProperty('email');
+        expect(publicProfile.body.followersCount).toBe(0);
+
+        // update own profile
+        const update = await request(app)
+            .put('/api/users/me')
+            .set(auth(bobToken))
+            .send({ bio: 'Hello world', avatarUrl: 'data:image/png;base64,AAAA', bannerUrl: '' });
+        expect(update.status).toBe(200);
+        expect(update.body.bio).toBe('Hello world');
+        expect(update.body.email).toBe(`${bobName}@example.com`);
+
+        // alice follows bob
+        const follow = await request(app).post(`/api/users/${bobName}/follow`).set(auth(aliceToken));
+        expect(follow.status).toBe(200);
+        expect(follow.body).toEqual({ following: true });
+
+        const bobAsSeenByAlice = await request(app).get(`/api/users/${bobName}`).set(auth(aliceToken));
+        expect(bobAsSeenByAlice.body.followersCount).toBe(1);
+        expect(bobAsSeenByAlice.body.isFollowing).toBe(true);
+
+        const unfollow = await request(app).delete(`/api/users/${bobName}/follow`).set(auth(aliceToken));
+        expect(unfollow.status).toBe(200);
+        expect(unfollow.body).toEqual({ following: false });
+
+        // cannot follow yourself
+        const selfFollow = await request(app).post(`/api/users/${bobName}/follow`).set(auth(bobToken));
+        expect(selfFollow.status).toBe(400);
+
+        // change password (wrong current one is rejected)
+        const wrongPassword = await request(app)
+            .put('/api/users/me/password')
+            .set(auth(bobToken))
+            .send({ currentPassword: 'nope', newPassword: 'brand-new-secret' });
+        expect(wrongPassword.status).toBe(401);
+
+        const changePassword = await request(app)
+            .put('/api/users/me/password')
+            .set(auth(bobToken))
+            .send({ currentPassword: 'integration-secret', newPassword: 'brand-new-secret' });
+        expect(changePassword.status).toBe(200);
+
+        const login = await request(app)
+            .post('/api/auth/login')
+            .send({ login: bobName, password: 'brand-new-secret' });
+        expect(login.status).toBe(200);
+    });
 });

@@ -30,7 +30,10 @@ export class NavbarComponent {
       .subscribe((user) => {
         this.isAuthenticated = !!user;
         if (user) {
-          this.userService.loadProfile(user.username, user.email);
+          this.userService
+            .loadProfile()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe({ error: () => {} });
         } else {
           this.profile = null;
         }

@@ -1,9 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { AuthService, AuthUser } from '../../../services/auth.service';
+import { AuthService } from '../../../services/auth.service';
 import { UserProfile, UserService } from '../../../services/user.service';
 import { readImageAsDataUrl } from '../../../utils/image-upload';
 
@@ -45,16 +46,6 @@ export class PersonalSettingsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.authService.currentUser$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((user: AuthUser | null) => {
-        if (!user) {
-          this.router.navigate(['/login']);
-          return;
-        }
-        this.userService.loadProfile(user.username, user.email);
-      });
-
     this.userService.currentProfile$
       .pipe(takeUntil(this.destroy$))
       .subscribe((profile) => {
@@ -63,6 +54,19 @@ export class PersonalSettingsComponent implements OnInit, OnDestroy {
         this.bioDraft = profile.bio;
         this.avatarUrlDraft = profile.avatarUrl;
         this.bannerUrlDraft = profile.bannerUrl;
+      });
+
+    this.userService
+      .loadProfile()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        error: (err: HttpErrorResponse) => {
+          if (err.status === 401) {
+            this.router.navigate(['/login']);
+            return;
+          }
+          this.errorMessage = this.extractErrorMessage(err);
+        },
       });
   }
 
@@ -80,14 +84,22 @@ export class PersonalSettingsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.userService.updateProfile({
-      bio: this.bioDraft,
-      avatarUrl: this.avatarUrlDraft,
-      bannerUrl: this.bannerUrlDraft,
-    });
-
-    this.successMessage = 'Profil mis à jour.';
-    setTimeout(() => (this.successMessage = ''), 2500);
+    this.userService
+      .updateProfile({
+        bio: this.bioDraft,
+        avatarUrl: this.avatarUrlDraft,
+        bannerUrl: this.bannerUrlDraft,
+      })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.successMessage = 'Profil mis à jour.';
+          setTimeout(() => (this.successMessage = ''), 2500);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.errorMessage = this.extractErrorMessage(err);
+        },
+      });
   }
 
   savePassword(): void {
@@ -104,7 +116,7 @@ export class PersonalSettingsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.newPassword.length < 6) {
+    if (this.newPassword.length < 8) {
       this.errorMessage = 'Le mot de passe doit contenir au moins 8 caractères.';
       return;
     }
@@ -114,13 +126,21 @@ export class PersonalSettingsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    console.log('[PersonalSettings] Change password (not implemented yet)');
-
-    this.successMessage = 'Mot de passe mis à jour (simulation).';
-    this.currentPassword = '';
-    this.newPassword = '';
-    this.confirmNewPassword = '';
-    setTimeout(() => (this.successMessage = ''), 2500);
+    this.userService
+      .changePassword(this.currentPassword, this.newPassword)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.successMessage = 'Mot de passe mis à jour.';
+          this.currentPassword = '';
+          this.newPassword = '';
+          this.confirmNewPassword = '';
+          setTimeout(() => (this.successMessage = ''), 2500);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.errorMessage = this.extractErrorMessage(err);
+        },
+      });
   }
 
   cancel(): void {
@@ -175,5 +195,16 @@ export class PersonalSettingsComponent implements OnInit, OnDestroy {
 
   removeBanner(): void {
     this.bannerUrlDraft = '';
+  }
+
+  private extractErrorMessage(err: HttpErrorResponse): string {
+    const body = err?.error;
+    if (body?.errors && typeof body.errors === 'object') {
+      const firstError = Object.values(body.errors)[0];
+      if (typeof firstError === 'string') {
+        return firstError;
+      }
+    }
+    return body?.error || 'Une erreur est survenue.';
   }
 }

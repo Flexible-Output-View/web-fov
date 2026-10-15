@@ -6,6 +6,7 @@ import {
     hashPassword,
     comparePassword,
     signToken,
+    verifyToken,
     sanitizeUser
 } from '../utils/auth.js';
 
@@ -52,6 +53,13 @@ describe('Auth utilities', () => {
 
         expect(payload.userId).toBe(42);
         expect(payload.exp).toBeGreaterThan(payload.iat);
+    });
+
+    test('verifies a signed token and rejects tampered ones', () => {
+        const token = signToken(7);
+
+        expect(verifyToken(token).userId).toBe(7);
+        expect(() => verifyToken('not-a-token')).toThrow();
     });
 
     test('sanitizes the password hash', () => {

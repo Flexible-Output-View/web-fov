@@ -71,6 +71,10 @@ export function signToken(userId) {
     );
 }
 
+export function verifyToken(token) {
+    return jwt.verify(token, getJwtSecret());
+}
+
 export function sanitizeUser(row) {
     if (!row) {
         return null;

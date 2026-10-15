@@ -208,7 +208,12 @@ Encoders should use these settings:
 |----------|--------|-------------|
 | `/auth/register` | POST | Register a new user (`username`, `email`, `password`) → `201 {token, user}` |
 | `/auth/login` | POST | Login with username or email (`login`, `password`) → `200 {token, user}` |
-| `/users/:id` | GET | Get user profile |
+| `/users/me` | GET | Get the authenticated user's profile (Bearer token) |
+| `/users/me` | PUT | Update own profile (`bio`, `avatarUrl`, `bannerUrl`) (Bearer token) |
+| `/users/me/password` | PUT | Change own password (`currentPassword`, `newPassword`) (Bearer token) |
+| `/users/{username}` | GET | Get a public profile by username |
+| `/users/{username}/follow` | POST | Follow a user (Bearer token) |
+| `/users/{username}/follow` | DELETE | Unfollow a user (Bearer token) |
 | `/streams` | GET | List all streams |
 | `/streams/available` | GET | Get active streams with HLS URLs |
 | `/streams/:id` | GET | Get stream details |
@@ -237,6 +242,8 @@ curl -X POST http://localhost:4000/api/auth/login \
 ```
 
 `login` accepts a username or an email (email match is case-insensitive). Wrong credentials return `401 {error: "Invalid credentials"}`. The JWT (`JWT_SECRET`, expiry `JWT_EXPIRES_IN`, default `7d`) is returned as `token` and persisted by the Angular client (`fov_auth_token` / `fov_auth_user`). Interactive docs: `http://localhost:4000/api-docs`.
+
+**Profile endpoints (protected):** send the token as `Authorization: Bearer <token>`. `PUT /api/users/me` accepts `{bio, avatarUrl, bannerUrl}` (bio ≤ 300 chars, images are URLs or data URLs ≤ 5 MB). `PUT /api/users/me/password` accepts `{currentPassword, newPassword}` (min 8 chars). `GET /api/users/{username}` returns the public profile (`followersCount`, `followingCount`, and `isFollowing` when authenticated) without the email.
 
 See [DOCUMENTS/API-TESTING.md](DOCUMENTS/API-TESTING.md) for detailed examples.
 
@@ -310,6 +317,8 @@ docker-compose -f docker-compose.prod.yml up -d
 - Environment variable separation
 - User registration and login (`POST /api/auth/register`, `POST /api/auth/login`)
 - JWT issuance (`JWT_SECRET` / `JWT_EXPIRES_IN`, default `7d`)
+- JWT bearer auth middleware (`requireAuth` / `optionalAuth`) protecting profile update, password change, and follow endpoints
+- Profile management (`GET/PUT /api/users/me`, avatar/banner/bio) and follow/unfollow
 - Password hashing with bcrypt
 - Input validation for auth (username, email, password rules)
 

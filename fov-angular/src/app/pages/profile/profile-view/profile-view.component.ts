@@ -1,5 +1,6 @@
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../../services/auth.service';
@@ -35,21 +36,28 @@ export class ProfileViewComponent implements OnInit, OnDestroy {
 
     this.isOwnProfile = !!me && me.username === this.username;
 
-    if (this.isOwnProfile && me) {
-      this.userService.loadProfile(me.username, me.email);
+    if (this.isOwnProfile) {
       this.userService.currentProfile$
         .pipe(takeUntil(this.destroy$))
         .subscribe((p) => (this.profile = p));
+      this.userService
+        .loadProfile()
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({ error: () => (this.notFound = true) });
     } else {
       this.userService
         .getProfileByUsername(this.username)
         .pipe(takeUntil(this.destroy$))
-        .subscribe((p) => {
-          if (p) {
+        .subscribe({
+          next: (p) => {
             this.profile = p;
-          } else {
-            this.notFound = true;
-          }
+            this.following = !!p.isFollowing;
+          },
+          error: (err: HttpErrorResponse) => {
+            if (err.status === 404) {
+              this.notFound = true;
+            }
+          },
         });
     }
   }
@@ -64,7 +72,16 @@ export class ProfileViewComponent implements OnInit, OnDestroy {
   }
 
   toggleFollow(): void {
-    // TODO: implémenter la logique de follow/unfollow via un service
-    this.following = !this.following;
+    const previous = this.following;
+    this.following = !previous;
+
+    const request$ = this.following
+      ? this.userService.follow(this.username)
+      : this.userService.unfollow(this.username);
+
+    request$.pipe(takeUntil(this.destroy$)).subscribe({
+      next: (res) => (this.following = res.following),
+      error: () => (this.following = previous),
+    });
   }
 }

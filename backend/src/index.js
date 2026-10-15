@@ -7,6 +7,7 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 
 import db from './db.js';
+import { ensureSchema } from './schema.js';
 import apiRoutes from './routes/index.js';
 import { createMediaRoutes, startMediaServer, clearHLSFiles } from './mediaServer.mjs';
 import swaggerDocument from './swagger.js';
@@ -16,7 +17,7 @@ const PORT = process.env.PORT || 4000;
 const app = express();
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({ limit: '6mb' }));
 app.enable('trust proxy');
 
 // Mount media routes (HLS and FFmpeg endpoints)
@@ -41,6 +42,8 @@ async function start() {
         // verify PostgreSQL connection
         await db.query('SELECT 1');
         console.log('✅ Connected to BDD');
+        // ensure profile-related schema exists on already-initialised databases
+        await ensureSchema();
         // Clear HLS files on server start
         clearHLSFiles();
 

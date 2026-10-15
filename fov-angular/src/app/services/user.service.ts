@@ -1,65 +1,83 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface UserProfile {
+  id?: number;
   username: string;
-  email: string;
+  email?: string;
   bio: string;
   avatarUrl: string;
   bannerUrl: string;
   followersCount: number;
   followingCount: number;
+  isFollowing?: boolean;
 }
 
-const STORAGE_PREFIX = 'fov_profile_';
+export interface ProfileUpdates {
+  bio: string;
+  avatarUrl: string;
+  bannerUrl: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class UserService {
+  private readonly API_URL = environment.apiUrl;
   private currentProfileSubject = new BehaviorSubject<UserProfile | null>(null);
   public currentProfile$ = this.currentProfileSubject.asObservable();
 
-  loadProfile(username: string, email: string): void {
-    const key = STORAGE_PREFIX + username;
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      try {
-        this.currentProfileSubject.next(JSON.parse(raw));
-        return;
-      } catch {}
-    }
-    const defaultProfile: UserProfile = {
-      username,
-      email,
-      bio: '',
-      avatarUrl: '',
-      bannerUrl: '',
-      followersCount: 0,
-      followingCount: 0,
-    };
-    this.currentProfileSubject.next(defaultProfile);
+  constructor(private http: HttpClient) {}
+
+  /** Fetch the authenticated user's own profile and cache it. */
+  loadProfile(): Observable<UserProfile> {
+    return this.http
+      .get<UserProfile>(`${this.API_URL}/users/me`)
+      .pipe(tap((profile) => this.currentProfileSubject.next(profile)));
   }
 
-  getProfileByUsername(username: string): Observable<UserProfile | null> {
-    const key = STORAGE_PREFIX + username;
-    const raw = localStorage.getItem(key);
-    if (raw) {
-      try {
-        return new BehaviorSubject(JSON.parse(raw)).asObservable();
-      } catch {}
-    }
-    return new BehaviorSubject<UserProfile | null>(null).asObservable();
+  /** Fetch a public profile by username. */
+  getProfileByUsername(username: string): Observable<UserProfile> {
+    return this.http.get<UserProfile>(
+      `${this.API_URL}/users/${encodeURIComponent(username)}`,
+    );
   }
 
-  updateProfile(updates: Partial<UserProfile>): void {
-    const current = this.currentProfileSubject.value;
-    if (!current) return;
+  /** Update the authenticated user's public profile fields. */
+  updateProfile(updates: ProfileUpdates): Observable<UserProfile> {
+    return this.http
+      .put<UserProfile>(`${this.API_URL}/users/me`, updates)
+      .pipe(tap((profile) => this.currentProfileSubject.next(profile)));
+  }
 
-    const updated = { ...current, ...updates };
-    localStorage.setItem(STORAGE_PREFIX + updated.username, JSON.stringify(updated));
-    this.currentProfileSubject.next(updated);
+  /** Change the authenticated user's password. */
+  changePassword(currentPassword: string, newPassword: string): Observable<void> {
+    return this.http.put<void>(`${this.API_URL}/users/me/password`, {
+      currentPassword,
+      newPassword,
+    });
+  }
+
+  /** Follow a user. */
+  follow(username: string): Observable<{ following: boolean }> {
+    return this.http.post<{ following: boolean }>(
+      `${this.API_URL}/users/${encodeURIComponent(username)}/follow`,
+      {},
+    );
+  }
+
+  /** Unfollow a user. */
+  unfollow(username: string): Observable<{ following: boolean }> {
+    return this.http.delete<{ following: boolean }>(
+      `${this.API_URL}/users/${encodeURIComponent(username)}/follow`,
+    );
   }
 
   getCurrentProfile(): UserProfile | null {
     return this.currentProfileSubject.value;
-    }
+  }
+
+  clearProfile(): void {
+    this.currentProfileSubject.next(null);
+  }
 }
