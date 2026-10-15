@@ -1,14 +1,16 @@
-import { Component, Input } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { LiveStreamInfo } from '../../models/live-stream.model';
+import "@moq/watch/element";
 
 @Component({
   selector: 'app-featured-carousel',
   standalone: true,
   imports: [CommonModule, RouterModule],
   templateUrl: './featured-carousel.component.html',
-  styleUrls: ['./featured-carousel.component.scss']
+  styleUrls: ['./featured-carousel.component.scss'],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA]
 })
 export class FeaturedCarouselComponent {
   @Input() streams: LiveStreamInfo[] = [];

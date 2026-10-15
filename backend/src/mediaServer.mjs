@@ -17,6 +17,7 @@ await fs.promises.mkdir(HLS_DIR, { recursive: true });
 const ffmpegProcesses = new Map();
 const registeredStreams = new Map();
 const baseSrtPort = parseInt(process.env.SRT_PORT || '9999', 10);
+const moqPort = parseInt(process.env.MOQ_PORT || '4443', 10);
 const maxSrtPort = baseSrtPort + 11;
 const debugSrtPort = parseInt(process.env.DEBUG_SRT_PORT || String(baseSrtPort), 10);
 
@@ -125,7 +126,7 @@ function killFFmpegProcess(streamId, process, timeout = PROCESS_GRACE_PERIOD) {
     });
 }
 
-function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
+function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, ingestUrl) {
     const streamHlsDir = path.join(HLS_DIR, streamId);
     const mapArgs = [];
     const audioCodecArgs = [];
@@ -171,8 +172,8 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
         'linger=0'
     ].join('&');
 
-    const inputSource = srtUrl
-        ? `${srtUrl}?${srtParams}`
+    const inputSource = ingestUrl
+        ? `${ingestUrl}?${srtParams}`
         : 'pipe:';
 
     const ffmpegArgs = [
@@ -201,7 +202,7 @@ function buildFfmpegArgs(videoTrackCount, audioTrackCount, streamId, srtUrl) {
     return ffmpegArgs;
 }
 
-function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, nameOptions = {}) {
+function startFFmpegListener(streamId, tracksV, tracksA, socket, ingestUrl = null, nameOptions = {}) {
     if (!tracksV || tracksV === 0) {
         if (socket) {
             socket.destroy();
@@ -209,11 +210,11 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, 
         return;
     }
 
-    const ffmpegArgs = buildFfmpegArgs(tracksV, tracksA, streamId, srtUrl);
+    const ffmpegArgs = buildFfmpegArgs(tracksV, tracksA, streamId, ingestUrl);
 
     console.log(`📀 Spawning FFmpeg for stream ${streamId}:`, 'ffmpeg', ffmpegArgs.join(' '));
 
-    const stdio = srtUrl ? ['inherit', 'inherit', 'inherit'] : ['pipe', 'inherit', 'inherit'];
+    const stdio = ingestUrl ? ['inherit', 'inherit', 'inherit'] : ['pipe', 'inherit', 'inherit'];
     const ffmpegProc = spawn('ffmpeg', ffmpegArgs, { stdio });
 
     if (socket) {
@@ -347,11 +348,11 @@ function createMediaRoutes() {
                 return res.status(503).json({ error: 'No SRT ports available' });
             }
 
-            const srtUrl = `srt://0.0.0.0:${srtPort}`;
+            const ingestUrl = `srt://0.0.0.0:${srtPort}`;
             const srtUrlExternal = buildSrtUrl(host, srtPort, 'caller');
 
             writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
-            startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl, nameOptions);
+            startFFmpegListener(streamId, trackVNum, trackANum, null, ingestUrl, nameOptions);
 
             registeredStreams.set(streamId, {
                 tracksV: trackVNum,
@@ -359,7 +360,7 @@ function createMediaRoutes() {
                 videoTrackNames,
                 audioTrackNames,
                 port: srtPort,
-                srtUrl
+                ingestUrl
             });
 
             console.log(`📝 Stream registered: ${streamId} (tracksV=${trackVNum}, (tracksA=${trackANum}, port=${srtPort})`);
@@ -369,7 +370,7 @@ function createMediaRoutes() {
                 streamId,
                 tracksV: trackVNum,
                 tracksA: trackANum,
-                srtUrl: srtUrlExternal,
+                ingestUrl: srtUrlExternal,
                 hlsUrl: `/api/hls/${streamId}/0/playlist.m3u8`
             });
         } catch (err) {
@@ -393,7 +394,7 @@ function createMediaRoutes() {
         }
 
         try {
-            const srtUrlListener = 'http://localhost:4443';
+            const srtUrlListener = 'srt://0.0.0.0:5555?mode=listener';
             writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
 
             registeredStreams.set(streamId, {
@@ -412,12 +413,78 @@ function createMediaRoutes() {
                 streamId,
                 tracksV: trackVNum,
                 tracksA: trackANum,
-                srtUrl: srtUrlListener,
+                ingestUrl: srtUrlListener,
                 hlsUrl: `/api/hls/${streamId}/0/playlist.m3u8`
             });
         } catch (err) {
             console.error(`⚠️ Failed to register debug stream ${streamId}:`, err);
             return res.status(500).json({ error: 'Failed to register stream' });
+        }
+    });
+
+    // POST /moq/register — same as /ffmpeg/register but for moq streams
+    router.post('/moq/register', (req, res) => {
+        const parsed = parseRegisterRequest(req.body);
+        if (parsed.error) {
+            return res.status(400).json({ error: parsed.error });
+        }
+
+        const { trackVNum, trackANum, videoTrackNames, audioTrackNames, streamId } = parsed;
+        if (registeredStreams.has(streamId)) {
+            return res.status(409).json({ error: 'StreamId already registered', streamId });
+        }
+
+        try {
+            const host = process.env.MOQ_URL || '127.0.0.1';
+            const moqUrlExternal = `http://${host}:${moqPort}`;
+
+            registeredStreams.set(streamId, {
+                tracksV: trackVNum,
+                tracksA: trackANum,
+                videoTrackNames,
+                audioTrackNames,
+                port: moqPort,
+                protocol: 'moq'
+            });
+
+            console.log(`📝 Stream registered [MoQ]: ${streamId} (tracksV=${trackVNum}, (tracksA=${trackANum}, port=${moqPort})`);
+
+            return res.status(200).json({
+                status: 'registered',
+                streamId,
+                tracksV: trackVNum,
+                tracksA: trackANum,
+                ingestUrl: moqUrlExternal
+            });
+        } catch (err) {
+            console.error(`⚠️ Failed to register stream ${streamId}:`, err);
+            return res.status(500).json({ error: 'Failed to register stream' });
+        }
+    });
+
+    // POST /moq/stop — moq stop stream
+    router.post('/moq/stop', async (req, res) => {
+        const { streamId } = req.body ?? {};
+
+        if (!streamId) {
+            return res.status(400).json({ error: "Missing 'streamId' parameter" });
+        }
+
+        const registered = registeredStreams.get(streamId);
+
+        if (!registered) {
+            return res.status(200).json({ status: 'not_found', streamId });
+        }
+
+        try {
+            if (registered) {
+                registeredStreams.delete(streamId);
+                console.log(`🗑️ Cancelled registration for stream ${streamId}`);
+            }
+            return res.status(200).json({ status: 'stopped', streamId });
+        } catch (err) {
+            console.error(`⚠️ Failed to stop stream ${streamId}:`, err);
+            return res.status(500).json({ error: 'Failed to stop stream' });
         }
     });
 
@@ -478,7 +545,7 @@ function createMediaRoutes() {
                     pid: streamData.process?.pid,
                     tracks: streamData.tracks,
                     hlsUrl: `/api/hls/${streamId}/0/playlist.m3u8`,
-                    srtUrl: registered
+                    ingestUrl: registered
                         ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
                         : null
                 });
@@ -497,7 +564,7 @@ function createMediaRoutes() {
                 pid: data.process.pid,
                 tracks: data.tracks,
                 hlsUrl: `/api/hls/${id}/0/playlist.m3u8`,
-                srtUrl: registered
+                ingestUrl: registered
                     ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
                     : null,
                 srtPort: registered ? registered.port : null
