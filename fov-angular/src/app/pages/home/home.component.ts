@@ -4,7 +4,7 @@ import { FeaturedCarouselComponent } from '../../components/featured-carousel/fe
 import { CategoryCardComponent, Category } from '../../components/category-card/category-card.component';
 import { TwitchService } from '../../services/twitch.service';
 import { LiveStreamsService } from '../../services/live-streams.service';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import * as API from '../../models/APIModels'
 import { Subject, takeUntil, interval, startWith, switchMap } from 'rxjs';
 
 @Component({
@@ -20,7 +20,7 @@ import { Subject, takeUntil, interval, startWith, switchMap } from 'rxjs';
 })
 export class HomeComponent implements OnInit, OnDestroy {
   popularCategories: Category[] = [];
-  liveStreams: LiveStreamInfo[] = [];
+  liveStreams: API.LiveStreamInfo[] = [];
   
   isLoadingCategories = true;
   isLoadingLiveStreams = true;

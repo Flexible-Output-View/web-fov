@@ -2,8 +2,8 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { AuthService, AuthUser } from '../../services/auth.service';
-
+import { AuthService } from '../../services/auth.service';
+import * as API from '../../models/APIModels'
 @Component({
   selector: 'app-profile',
   standalone: true,
@@ -29,7 +29,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
     this.authService.currentUser$
       .pipe(takeUntil(this.destroy$))
-      .subscribe((user: AuthUser | null) => {
+      .subscribe((user: API.AuthUser | null) => {
         if (!user) {
           this.router.navigate(['/login']);
           return;

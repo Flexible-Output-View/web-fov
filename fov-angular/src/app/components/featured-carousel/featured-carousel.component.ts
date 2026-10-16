@@ -1,7 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import * as API from '../../models/APIModels'
 
 @Component({
   selector: 'app-featured-carousel',
@@ -11,7 +11,7 @@ import { LiveStreamInfo } from '../../models/live-stream.model';
   styleUrls: ['./featured-carousel.component.scss']
 })
 export class FeaturedCarouselComponent {
-  @Input() streams: LiveStreamInfo[] = [];
+  @Input() streams: API.LiveStreamInfo[] = [];
   @Input() isLoading = false;
   currentSlide = 0;
 

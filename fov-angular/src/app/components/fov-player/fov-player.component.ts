@@ -8,22 +8,13 @@ import {
   ElementRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import Hls from 'hls.js';
-import { environment } from '../../../environments/environment';
-
-export interface Track {
-  index: number;
-  name: string;
-  trackId: string;
-  videoUrl: string;
-  isVideo: boolean;
-  isAudio: boolean;
-}
+import * as API from '../../models/APIModels';
+import { LiveStreamsService } from '../../services/live-streams.service';
 
 export interface VideoWrapper {
   playerId: string;
-  track: Track;
+  track: API.LiveStreamTrack;
   x: number;
   y: number;
   width: number;
@@ -48,7 +39,7 @@ export interface VideoWrapper {
 
 export interface AudioWrapper {
   playerId: string;
-  track: Track;
+  track: API.LiveStreamTrack;
   hls: Hls | null;
   audioElement: HTMLAudioElement | null;
   volume: number;
@@ -81,34 +72,6 @@ interface SavedLayout {
   audioWrappers?: SavedAudioLayout[];
 }
 
-interface ApiTracksResponse {
-  tracks: Track[];
-  videoCount: number;
-  ready: boolean;
-  pending?: number;
-  totalDirs?: number;
-  message?: string;
-}
-
-interface ApiStreamTrack {
-  trackId: string;
-  name?: string;
-  videoUrl: string;
-  isVideo?: boolean;
-  isAudio?: boolean;
-}
-
-interface ApiLiveStream {
-  streamId: string;
-  trackCount: number;
-  tracks: ApiStreamTrack[];
-}
-
-interface ApiAvailableStreamsResponse {
-  streams: ApiLiveStream[];
-  streamCount: number;
-}
-
 interface TrackBufferInfo {
   playerId: string;
   name: string;
@@ -133,7 +96,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   videoWrappers: VideoWrapper[] = [];
   audioWrappers: AudioWrapper[] = [];
-  availableTracks: Track[] = [];
+  availableTracks: API.LiveStreamTrack[] = [];
   editMode = false;
   isLoading = true;
   errorMessage = '';
@@ -157,28 +120,20 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   private masterPlayerId: string | null = null;
   private syncInterval: any = null;
-  private pollingInterval: any = null;
-  private bufferCheckInterval: any = null;
+  private pollingTimeout: any = null;
   private trackIdCounter = 0;
   private originalTrackOrder: string[] = [];
 
   private readonly SYNC_THRESHOLD = 0.1;
   private readonly HARD_SYNC_THRESHOLD = 0.3;
   private readonly MIN_BUFFER_FOR_START = 6;
-  private readonly MIN_COMMON_RANGE = 4;
-  private readonly MIN_FORWARD_BUFFER = 3;
-  private readonly SAFE_POSITION_MARGIN = 0.5;
-
   private readonly MAX_WIDTH_RATIO = 0.8;
-  private readonly API_URL = environment.apiUrl;
   private readonly MAX_POLL_ATTEMPTS = 60;
   private pollAttempts = 0;
   private initGeneration = 0;
   private isInitialized = false;
 
-  // Public : utilisé dans le template *ngIf
   audioUnlocked = false;
-
   private readonly MOBILE_BREAKPOINT = 768;
   private bufferCheckCount = 0;
 
@@ -192,7 +147,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   isFullscreen = false;
   fullscreenAudioPanelOpen = false;
 
-  constructor(private http: HttpClient) {}
+  constructor(private liveStreamsService: LiveStreamsService) {}
 
   private get layoutStorageKey(): string {
     return `fov_layout_${this.streamId}`;
@@ -212,26 +167,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     } catch {}
   }
 
-  private async canAutoplayWithSound(): Promise<boolean> {
-    try {
-      const v = document.createElement('video');
-      // Micro MP4 base64 valide (1 frame transparente) — suffisant pour le probe
-      v.src =
-        'data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJtcDQxaXNvbQAAAAhmcmVlAAAADm1kYXQ=';
-      v.muted = false;
-      v.volume = 0.001;
-      await v.play();
-      v.pause();
-      v.src = '';
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   getLoadingMessage(): string {
     if (this.errorMessage) return '';
-    if (this.isLoading && !this.isBufferingPhase) return 'Connexion au serveur...';
+    if (this.isLoading && !this.isBufferingPhase)
+      return 'Connexion au serveur...';
     return 'Chargement du live...';
   }
 
@@ -251,9 +190,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy() {
     this.stopSyncMonitoring();
     this.stopPolling();
-    this.stopBufferCheck();
-    this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
-    this.audioWrappers.forEach((w) => { w.hls?.destroy(); });
+    this.videoWrappers.forEach((w) => {
+      w.hls?.destroy();
+    });
+    this.audioWrappers.forEach((w) => {
+      w.hls?.destroy();
+    });
     if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
     if (this.isFullscreen) document.exitFullscreen?.().catch(() => {});
 
@@ -354,7 +296,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       const main = this.videoWrappers.find((w) => w.isVideo);
       if (!main) return;
       const mainAspect = main.aspectRatio || 16 / 9;
-      const mainFitted = this.getFittedSize(stageW, stageH * 0.68, mainAspect, 0.96);
+      const mainFitted = this.getFittedSize(
+        stageW,
+        stageH * 0.68,
+        mainAspect,
+        0.96,
+      );
       main.width = mainFitted.width;
       main.height = mainFitted.height;
       main.x = (stageW - main.width) / 2;
@@ -404,131 +351,22 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   private fetchAvailableTracks() {
-    this.http.get<any>(`${this.API_URL}/streams/available`).subscribe({
-      next: (response) => {
-        if (Array.isArray(response)) {
-          this.handleArrayApiFormat(response);
-        } else if (response.streams) {
-          this.handleNewApiFormat(response as ApiAvailableStreamsResponse);
-        } else if (response.tracks) {
-          this.handleLegacyApiFormat(response as ApiTracksResponse);
+    this.liveStreamsService.getStreamTracks(this.streamId).subscribe({
+      next: (tracks) => {
+        if (tracks && tracks.length > 0) {
+          this.stopPolling();
+          this.availableTracks = tracks;
+          this.initializeAllTracks();
+          this.isLoading = false;
         } else {
           this.handleNoData();
         }
       },
       error: (err) => {
-        console.error(`[FOV] fetchAvailableTracks error:`, err.status, err.message);
-        this.pollAttempts++;
-        if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
-          this.startPolling(2000);
-        } else {
-          this.isLoading = false;
-          this.isBufferingPhase = false;
-          this.errorMessage = 'Impossible de charger les flux.';
-        }
+        console.error(`[FOV] fetchAvailableTracks error:`, err);
+        this.handleNoData();
       },
     });
-  }
-
-  private waitForPlaylistsReady(tracks: Track[]): Promise<void> {
-    const tracksToCheck = tracks.filter((t) => t.videoUrl);
-    return new Promise((resolve) => {
-      let attempts = 0;
-      const maxAttempts = 30;
-      const check = async () => {
-        attempts++;
-        try {
-          const results = await Promise.all(
-            tracksToCheck.map((t) =>
-              fetch(t.videoUrl, { method: 'HEAD', cache: 'no-store' })
-                .then((r) => r.ok)
-                .catch(() => false),
-            ),
-          );
-          if (results.every((r) => r === true)) {
-            resolve();
-          } else if (attempts < maxAttempts) {
-            setTimeout(check, 1000);
-          } else {
-            resolve();
-          }
-        } catch {
-          if (attempts < maxAttempts) setTimeout(check, 1000);
-          else resolve();
-        }
-      };
-      check();
-    });
-  }
-
-  private handleArrayApiFormat(streams: any[]) {
-    const stream = streams.find(
-      (s) => s.streamId === this.streamId && (s.trackCount ?? 0) > 0,
-    );
-    if (stream && stream.tracks && stream.tracks.length > 0) {
-      this.stopPolling();
-      this.availableTracks = stream.tracks.map((t: any, i: number) => ({
-        index: i,
-        name: t.name || t.trackId,
-        trackId: t.trackId,
-        videoUrl: t.videoUrl,
-        isVideo: t.isVideo ?? true,
-        isAudio: t.isAudio ?? false,
-      }));
-      this.waitForPlaylistsReady(this.availableTracks).then(() => {
-        this.initializeAllTracks();
-        this.isLoading = false;
-      });
-    } else {
-      this.handleNoData();
-    }
-  }
-
-  private handleNewApiFormat(response: ApiAvailableStreamsResponse) {
-    const stream = response.streams.find(
-      (s) => s.streamId === this.streamId && (s.trackCount ?? 0) > 0,
-    );
-    if (stream && stream.tracks.length > 0) {
-      this.stopPolling();
-      this.availableTracks = stream.tracks.map((t: any, i: number) => ({
-        index: i,
-        name: t.name || t.trackId,
-        trackId: t.trackId,
-        videoUrl: t.videoUrl,
-        isVideo: t.isVideo ?? true,
-        isAudio: t.isAudio ?? false,
-      }));
-      this.waitForPlaylistsReady(this.availableTracks).then(() => {
-        this.initializeAllTracks();
-        this.isLoading = false;
-      });
-    } else {
-      this.handleNoData();
-    }
-  }
-
-  private handleLegacyApiFormat(response: ApiTracksResponse) {
-    const totalDirs = response.totalDirs || 0;
-    const readyCount = response.videoCount || 0;
-    const pending = response.pending || 0;
-    const allReady = totalDirs > 0 && pending === 0 && readyCount === totalDirs;
-    if (allReady && response.tracks && response.tracks.length > 0) {
-      this.stopPolling();
-      this.availableTracks = response.tracks;
-      this.initializeAllTracks();
-      this.isLoading = false;
-    } else {
-      this.pollAttempts++;
-      if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
-        const pollDelay =
-          pending > 0 && readyCount > 0 ? 500 : totalDirs > 0 ? 1000 : 2000;
-        this.startPolling(pollDelay);
-      } else {
-        this.isLoading = false;
-        this.isBufferingPhase = false;
-        this.errorMessage = 'Timeout.';
-      }
-    }
   }
 
   private handleNoData() {
@@ -544,21 +382,21 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   private startPolling(delay: number = 2000) {
     this.stopPolling();
-    this.pollingInterval = setTimeout(() => {
+    this.pollingTimeout = setTimeout(() => {
       this.fetchAvailableTracks();
     }, delay);
   }
 
   private stopPolling() {
-    if (this.pollingInterval) {
-      clearTimeout(this.pollingInterval);
-      this.pollingInterval = null;
+    if (this.pollingTimeout) {
+      clearTimeout(this.pollingTimeout);
+      this.pollingTimeout = null;
     }
   }
 
-  private addAudioTrack(track: Track) {
+  private addAudioTrack(track: API.LiveStreamTrack) {
     const uniqueId = this.trackIdCounter++;
-    const trackCopy: Track = { ...track, index: uniqueId };
+    const trackCopy: API.LiveStreamTrack = { ...track, index: uniqueId };
 
     const newWrapper: AudioWrapper = {
       playerId: `audio_${this.playerId}_${trackCopy.index}`,
@@ -578,14 +416,21 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     }, 100);
   }
 
-  private initHlsForAudioWrapper(wrapper: AudioWrapper, videoUrl: string, attempt = 0) {
+  private initHlsForAudioWrapper(
+    wrapper: AudioWrapper,
+    videoUrl: string,
+    attempt = 0,
+  ) {
     const audioEl = document.getElementById(
       `audioElement_${wrapper.playerId}`,
     ) as HTMLAudioElement;
 
     if (!audioEl) {
       if (attempt < 20) {
-        setTimeout(() => this.initHlsForAudioWrapper(wrapper, videoUrl, attempt + 1), 50);
+        setTimeout(
+          () => this.initHlsForAudioWrapper(wrapper, videoUrl, attempt + 1),
+          50,
+        );
       } else {
         console.error(`[FOV] [${wrapper.track.name}] Audio element NOT FOUND`);
       }
@@ -632,7 +477,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
-          console.error(`[FOV] [${wrapper.track.name}] Audio HLS FATAL: ${data.details}`);
+          console.error(
+            `[FOV] [${wrapper.track.name}] Audio HLS FATAL: ${data.details}`,
+          );
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             setTimeout(() => wrapper.hls?.startLoad(), 2000);
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -643,7 +490,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
       hls.loadSource(videoUrl);
       hls.attachMedia(audioEl as any);
-      console.log(`[FOV] [${wrapper.track.name}] Audio wrapper initialized — volume: ${wrapper.volume}`);
+      console.log(
+        `[FOV] [${wrapper.track.name}] Audio wrapper initialized — volume: ${wrapper.volume}`,
+      );
     } else {
       audioEl.src = videoUrl;
       wrapper.isReady = true;
@@ -656,11 +505,15 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const generation = ++this.initGeneration;
 
     if (this.videoWrappers.length > 0) {
-      this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
+      this.videoWrappers.forEach((w) => {
+        w.hls?.destroy();
+      });
       this.videoWrappers = [];
     }
     if (this.audioWrappers.length > 0) {
-      this.audioWrappers.forEach((w) => { w.hls?.destroy(); });
+      this.audioWrappers.forEach((w) => {
+        w.hls?.destroy();
+      });
       this.audioWrappers = [];
     }
 
@@ -682,10 +535,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     });
 
     audioTracks.forEach((track, index) => {
-      setTimeout(() => {
-        if (generation !== this.initGeneration) return;
-        this.addAudioTrack(track);
-      }, (videoTracks.length + index) * stagger);
+      setTimeout(
+        () => {
+          if (generation !== this.initGeneration) return;
+          this.addAudioTrack(track);
+        },
+        (videoTracks.length + index) * stagger,
+      );
     });
 
     const totalStagger = this.availableTracks.length * stagger;
@@ -699,9 +555,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     return document.getElementById(`stageArea_${this.playerId}`);
   }
 
-  private addTrack(track: Track) {
+  private addTrack(track: API.LiveStreamTrack) {
     const uniqueId = this.trackIdCounter++;
-    const trackCopy: Track = { ...track, index: uniqueId, name: `${track.name}` };
+    const trackCopy: API.LiveStreamTrack = {
+      ...track,
+      index: uniqueId,
+      name: `${track.name}`,
+    };
 
     const stage = this.getStageElement();
     const stageW = stage ? stage.offsetWidth : 800;
@@ -717,7 +577,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
     if (isFirst) {
       if (this.isMobileLayout()) {
-        const fitted = this.getFittedSize(stageW, stageH * 0.68, initialAspectRatio, 0.96);
+        const fitted = this.getFittedSize(
+          stageW,
+          stageH * 0.68,
+          initialAspectRatio,
+          0.96,
+        );
         initialWidth = fitted.width;
         initialHeight = fitted.height;
         initialX = (stageW - initialWidth) / 2;
@@ -812,14 +677,21 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     }, 50);
   }
 
-  private initHlsForWrapper(wrapper: VideoWrapper, videoUrl: string, attempt = 0) {
+  private initHlsForWrapper(
+    wrapper: VideoWrapper,
+    videoUrl: string,
+    attempt = 0,
+  ) {
     const videoEl = document.getElementById(
       `videoElement_${this.playerId}_${wrapper.track.index}`,
     ) as HTMLVideoElement;
 
     if (!videoEl) {
       if (attempt < 20) {
-        setTimeout(() => this.initHlsForWrapper(wrapper, videoUrl, attempt + 1), 50);
+        setTimeout(
+          () => this.initHlsForWrapper(wrapper, videoUrl, attempt + 1),
+          50,
+        );
       } else {
         console.error(
           `[FOV] [${wrapper.track.name}] Video element NOT FOUND after 20 attempts`,
@@ -884,7 +756,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         const frags = data.details.fragments.slice(0, 3);
         console.log(
           `[FOV] [${wrapper.track.name}] LEVEL_LOADED hasPDT:${data.details.hasProgramDateTime}`,
-          frags.map((f) => ({ pdt: f.programDateTime, start: f.start.toFixed(2) })),
+          frags.map((f) => ({
+            pdt: f.programDateTime,
+            start: f.start.toFixed(2),
+          })),
         );
       });
 
@@ -929,7 +804,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
       hls.loadSource(videoUrl);
       hls.attachMedia(videoEl);
-      console.log(`[FOV] [${wrapper.track.name}] Video wrapper — audio MUTED (sound from AudioWrappers only)`);
+      console.log(
+        `[FOV] [${wrapper.track.name}] Video wrapper — audio MUTED (sound from AudioWrappers only)`,
+      );
     } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
       videoEl.src = videoUrl;
       wrapper.isReady = true;
@@ -975,34 +852,41 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private collectBufferInfos(): TrackBufferInfo[] {
     const videoInfos: TrackBufferInfo[] = this.videoWrappers.map((w) => {
       const el = w.videoElement;
-      let start = 0, end = 0, length = 0;
+      let start = 0,
+        end = 0,
+        length = 0;
       if (el && el.buffered.length > 0) {
         start = el.buffered.start(0);
-        end   = el.buffered.end(el.buffered.length - 1);
+        end = el.buffered.end(el.buffered.length - 1);
         length = end - start;
       }
-      
+
       return {
         playerId: w.playerId,
-        name:     w.track.name,
-        start, end, length,
+        name: w.track.name,
+        start,
+        end,
+        length,
         startPdt: this.getTrackStartPdt(w),
       };
-      
     });
 
     const audioInfos: TrackBufferInfo[] = this.audioWrappers.map((w) => {
       const el = w.audioElement;
-      let start = 0, end = 0, length = 0;
+      let start = 0,
+        end = 0,
+        length = 0;
       if (el && el.buffered.length > 0) {
         start = el.buffered.start(0);
-        end   = el.buffered.end(el.buffered.length - 1);
+        end = el.buffered.end(el.buffered.length - 1);
         length = end - start;
       }
       return {
         playerId: w.playerId,
-        name:     w.track.name,
-        start, end, length,
+        name: w.track.name,
+        start,
+        end,
+        length,
         startPdt: this.getTrackStartPdt(w),
       };
     });
@@ -1013,14 +897,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private computeSyncTargets(
     infos: TrackBufferInfo[],
   ): { playerId: string; name: string; target: number }[] | null {
-
     const allHavePdt = infos.every((i) => i.startPdt !== null);
 
     if (allHavePdt) {
       const wallClockStarts = infos.map((i) => i.startPdt! + i.start * 1000);
-      const wallClockEnds   = infos.map((i) => i.startPdt! + i.end   * 1000);
+      const wallClockEnds = infos.map((i) => i.startPdt! + i.end * 1000);
       const commonWallStart = Math.max(...wallClockStarts);
-      const commonWallEnd   = Math.min(...wallClockEnds);
+      const commonWallEnd = Math.min(...wallClockEnds);
 
       if (commonWallEnd - commonWallStart < 3000) {
         console.log('[FOV] PDT overlap < 3s — waiting');
@@ -1031,13 +914,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         const t = (commonWallStart - inf.startPdt!) / 1000 + 0.1;
         return {
           playerId: inf.playerId,
-          name:     inf.name,
-          target:   Math.max(inf.start + 0.1, Math.min(t, inf.end - 1)),
+          name: inf.name,
+          target: Math.max(inf.start + 0.1, Math.min(t, inf.end - 1)),
         };
       });
 
       for (let i = 0; i < infos.length; i++) {
-        const inf    = infos[i];
+        const inf = infos[i];
         const target = targets[i].target;
         if (target < inf.start || target > inf.end - 0.5) {
           console.log(
@@ -1050,24 +933,26 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       const overlapSec = (commonWallEnd - commonWallStart) / 1000;
       console.log(
         `[FOV] PDT overlap: ${overlapSec.toFixed(1)}s — targets: ` +
-        targets.map((t) => `${t.name}→${t.target.toFixed(2)}s`).join(', '),
+          targets.map((t) => `${t.name}→${t.target.toFixed(2)}s`).join(', '),
       );
       return targets;
     }
 
     console.log('[FOV] No PDT — fallback sync');
     const syncPoint = Math.min(...infos.map((i) => i.end)) - 3;
-    const maxStart  = Math.max(...infos.map((i) => i.start));
+    const maxStart = Math.max(...infos.map((i) => i.start));
 
     if (syncPoint <= maxStart) {
-      console.log(`[FOV] Fallback syncPoint ${syncPoint.toFixed(1)}s <= maxStart — waiting`);
+      console.log(
+        `[FOV] Fallback syncPoint ${syncPoint.toFixed(1)}s <= maxStart — waiting`,
+      );
       return null;
     }
 
     const targets = infos.map((inf) => ({
       playerId: inf.playerId,
-      name:     inf.name,
-      target:   Math.max(inf.start + 0.1, Math.min(syncPoint, inf.end - 1)),
+      name: inf.name,
+      target: Math.max(inf.start + 0.1, Math.min(syncPoint, inf.end - 1)),
     }));
     console.log(`[FOV] Fallback syncPoint: ${syncPoint.toFixed(2)}s`);
     return targets;
@@ -1106,7 +991,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
           .join(' | ');
         console.log(
           `[FOV] Buffer check #${this.bufferCheckCount}: ${summary} | min: ` +
-          `${Math.min(...infos.map((i) => i.length)).toFixed(1)}s`,
+            `${Math.min(...infos.map((i) => i.length)).toFixed(1)}s`,
         );
       }
 
@@ -1133,13 +1018,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     setTimeout(check, 800);
   }
 
-  private stopBufferCheck() {
-    if (this.bufferCheckInterval) {
-      clearInterval(this.bufferCheckInterval);
-      this.bufferCheckInterval = null;
-    }
-  }
-
   private async startSynchronizedPlayback(
     targets: { playerId: string; name: string; target: number }[],
   ): Promise<void> {
@@ -1147,7 +1025,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
     console.log(
       `[FOV] startSynchronizedPlayback — ` +
-      targets.map((t) => `${t.name}→${t.target.toFixed(2)}s`).join(', '),
+        targets.map((t) => `${t.name}→${t.target.toFixed(2)}s`).join(', '),
     );
 
     // Pause tout
@@ -1155,39 +1033,47 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     for (const w of this.audioWrappers) w.audioElement?.pause();
 
     // Seek vidéos
-    const videoSeeks = this.videoWrappers.map((w) =>
-      new Promise<void>((resolve) => {
-        if (!w.videoElement) { resolve(); return; }
-        const t = targets.find((t) => t.playerId === w.playerId);
-        const seekTarget = t?.target ?? w.bufferStart;
-        const onSeeked = () => {
-          w.videoElement!.removeEventListener('seeked', onSeeked);
-          resolve();
-        };
-        w.videoElement.addEventListener('seeked', onSeeked);
-        w.videoElement.currentTime = seekTarget;
-      }),
+    const videoSeeks = this.videoWrappers.map(
+      (w) =>
+        new Promise<void>((resolve) => {
+          if (!w.videoElement) {
+            resolve();
+            return;
+          }
+          const t = targets.find((t) => t.playerId === w.playerId);
+          const seekTarget = t?.target ?? w.bufferStart;
+          const onSeeked = () => {
+            w.videoElement!.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
+          w.videoElement.addEventListener('seeked', onSeeked);
+          w.videoElement.currentTime = seekTarget;
+        }),
     );
 
     // Seek audios
-    const audioSeeks = this.audioWrappers.map((w) =>
-      new Promise<void>((resolve) => {
-        if (!w.audioElement) { resolve(); return; }
-        const t = targets.find((t) => t.playerId === w.playerId);
-        const seekTarget = t?.target ?? w.bufferStart;
+    const audioSeeks = this.audioWrappers.map(
+      (w) =>
+        new Promise<void>((resolve) => {
+          if (!w.audioElement) {
+            resolve();
+            return;
+          }
+          const t = targets.find((t) => t.playerId === w.playerId);
+          const seekTarget = t?.target ?? w.bufferStart;
 
-        // Si déjà à la bonne position → pas besoin d'attendre 'seeked'
-        if (Math.abs(w.audioElement.currentTime - seekTarget) < 0.05) {
-          resolve();
-          return;
-        }
-        const onSeeked = () => {
-          w.audioElement!.removeEventListener('seeked', onSeeked);
-          resolve();
-        };
-        w.audioElement.addEventListener('seeked', onSeeked);
-        w.audioElement.currentTime = seekTarget;
-      }),
+          // Si déjà à la bonne position → pas besoin d'attendre 'seeked'
+          if (Math.abs(w.audioElement.currentTime - seekTarget) < 0.05) {
+            resolve();
+            return;
+          }
+          const onSeeked = () => {
+            w.audioElement!.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
+          w.audioElement.addEventListener('seeked', onSeeked);
+          w.audioElement.currentTime = seekTarget;
+        }),
     );
 
     await Promise.all([...videoSeeks, ...audioSeeks]);
@@ -1203,7 +1089,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         this.updateBufferInfo(w);
         console.log(
           `[FOV] [${w.track.name}] Post-play ct:${w.videoElement?.currentTime.toFixed(2)} ` +
-          `buf:${w.bufferStart.toFixed(1)}-${w.bufferEnd.toFixed(1)}`,
+            `buf:${w.bufferStart.toFixed(1)}-${w.bufferEnd.toFixed(1)}`,
         );
       }
 
@@ -1253,8 +1139,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         return;
       }
 
-      console.warn('[FOV] sessionStorage consent present but browser still blocks — showing overlay');
-      try { sessionStorage.removeItem(AUDIO_UNLOCKED_SESSION_KEY); } catch {}
+      console.warn(
+        '[FOV] sessionStorage consent present but browser still blocks — showing overlay',
+      );
+      try {
+        sessionStorage.removeItem(AUDIO_UNLOCKED_SESSION_KEY);
+      } catch {}
       // Pas besoin de resumeAllMuted — les audios jouent déjà muted
       this.registerClickToUnlock();
       this.registerDocumentUnlock();
@@ -1285,7 +1175,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    console.warn('[FOV] Auto audio unlock blocked — waiting for user interaction');
+    console.warn(
+      '[FOV] Auto audio unlock blocked — waiting for user interaction',
+    );
     this.registerClickToUnlock();
     this.registerDocumentUnlock();
   }
@@ -1310,7 +1202,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
     const stage = document.getElementById(`stageArea_${this.playerId}`);
     if (stage) {
-      stage.addEventListener('click', this.clickToUnlockHandler, { once: true });
+      stage.addEventListener('click', this.clickToUnlockHandler, {
+        once: true,
+      });
       console.log('[FOV] Click-to-unlock registered on stage');
     } else {
       console.warn('[FOV] Stage not found for click-to-unlock');
@@ -1352,7 +1246,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     }
 
     // Trouver le master pour la resynchronisation
-    const master = this.videoWrappers.find((w) => w.playerId === this.masterPlayerId);
+    const master = this.videoWrappers.find(
+      (w) => w.playerId === this.masterPlayerId,
+    );
     const masterTime = master?.videoElement?.currentTime ?? null;
     const masterPdt = master ? this.getTrackStartPdt(master) : null;
 
@@ -1372,9 +1268,15 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         }
 
         // Vérifier que la position est dans le buffer
-        const inBuffer = targetTime >= w.bufferStart && targetTime <= w.bufferEnd - 0.3;
-        if (inBuffer && Math.abs(w.audioElement.currentTime - targetTime) > 0.2) {
-          console.log(`[FOV] [${w.track.name}] Resync on unlock → ${targetTime.toFixed(2)}s`);
+        const inBuffer =
+          targetTime >= w.bufferStart && targetTime <= w.bufferEnd - 0.3;
+        if (
+          inBuffer &&
+          Math.abs(w.audioElement.currentTime - targetTime) > 0.2
+        ) {
+          console.log(
+            `[FOV] [${w.track.name}] Resync on unlock → ${targetTime.toFixed(2)}s`,
+          );
           w.audioElement.currentTime = targetTime;
         }
       }
@@ -1391,9 +1293,15 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       this.clickToUnlockHandler = null;
     }
     if (this.documentUnlockHandler) {
-      document.removeEventListener('click', this.documentUnlockHandler, { capture: true });
-      document.removeEventListener('keydown', this.documentUnlockHandler, { capture: true });
-      document.removeEventListener('touchstart', this.documentUnlockHandler, { capture: true });
+      document.removeEventListener('click', this.documentUnlockHandler, {
+        capture: true,
+      });
+      document.removeEventListener('keydown', this.documentUnlockHandler, {
+        capture: true,
+      });
+      document.removeEventListener('touchstart', this.documentUnlockHandler, {
+        capture: true,
+      });
       this.documentUnlockHandler = null;
     }
 
@@ -1417,9 +1325,17 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         if (waitCount % 20 === 1) {
           console.log(
             `[FOV] waitForAllReady #${waitCount}: ` +
-            this.videoWrappers.map((w) => `${w.track.name}:${w.videoElement?.readyState ?? '?'}`).join(', ') +
-            ' | audio: ' +
-            this.audioWrappers.map((w) => `${w.track.name}:${w.audioElement?.readyState ?? '?'}`).join(', '),
+              this.videoWrappers
+                .map(
+                  (w) => `${w.track.name}:${w.videoElement?.readyState ?? '?'}`,
+                )
+                .join(', ') +
+              ' | audio: ' +
+              this.audioWrappers
+                .map(
+                  (w) => `${w.track.name}:${w.audioElement?.readyState ?? '?'}`,
+                )
+                .join(', '),
           );
         }
 
@@ -1451,9 +1367,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   private syncAllToMaster() {
     if (!this.playbackStarted) return;
 
-    const master = this.videoWrappers.find((w) => w.playerId === this.masterPlayerId);
+    const master = this.videoWrappers.find(
+      (w) => w.playerId === this.masterPlayerId,
+    );
     if (!master || !master.isVideo || !master.videoElement) return;
-    if (master.videoElement.paused || master.videoElement.readyState < 3) return;
+    if (master.videoElement.paused || master.videoElement.readyState < 3)
+      return;
 
     const masterTime = master.videoElement.currentTime;
     const masterPdt = this.getTrackStartPdt(master);
@@ -1468,7 +1387,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         w.videoElement.paused ||
         w.videoElement.seeking ||
         w.videoElement.readyState < 3
-      ) return;
+      )
+        return;
 
       const slaveTime = w.videoElement.currentTime;
       const slavePdt = this.getTrackStartPdt(w);
@@ -1484,9 +1404,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
       if (absDrift > this.HARD_SYNC_THRESHOLD) {
         const forwardBuffer = w.bufferEnd - expectedSlaveTime;
-        const inBuffer = expectedSlaveTime >= w.bufferStart && forwardBuffer > 1.0;
+        const inBuffer =
+          expectedSlaveTime >= w.bufferStart && forwardBuffer > 1.0;
         if (inBuffer) {
-          console.warn(`[FOV] [${w.track.name}] Hard resync: ${(drift*1000).toFixed(0)}ms → ${expectedSlaveTime.toFixed(2)}s`);
+          console.warn(
+            `[FOV] [${w.track.name}] Hard resync: ${(drift * 1000).toFixed(0)}ms → ${expectedSlaveTime.toFixed(2)}s`,
+          );
           w.videoElement.currentTime = expectedSlaveTime;
           w.videoElement.playbackRate = 1;
         } else {
@@ -1502,12 +1425,15 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     if (!this.audioUnlocked) return;
 
     for (const w of this.audioWrappers) {
-      if (!w.audioElement || w.audioElement.paused || w.audioElement.seeking) continue;
+      if (!w.audioElement || w.audioElement.paused || w.audioElement.seeking)
+        continue;
 
       // Mettre à jour bufferStart/bufferEnd de l'audio
       if (w.audioElement.buffered.length > 0) {
         w.bufferStart = w.audioElement.buffered.start(0);
-        w.bufferEnd = w.audioElement.buffered.end(w.audioElement.buffered.length - 1);
+        w.bufferEnd = w.audioElement.buffered.end(
+          w.audioElement.buffered.length - 1,
+        );
       }
 
       const audioTime = w.audioElement.currentTime;
@@ -1525,7 +1451,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
           expectedAudioTime >= w.bufferStart &&
           expectedAudioTime <= w.bufferEnd - 0.5;
         if (inBuffer) {
-          console.warn(`[FOV] [${w.track.name}] Audio hard resync: ${(drift*1000).toFixed(0)}ms → ${expectedAudioTime.toFixed(2)}s`);
+          console.warn(
+            `[FOV] [${w.track.name}] Audio hard resync: ${(drift * 1000).toFixed(0)}ms → ${expectedAudioTime.toFixed(2)}s`,
+          );
           w.audioElement.currentTime = expectedAudioTime;
         }
       }
@@ -1546,7 +1474,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   startDrag(event: PointerEvent, wrapper: VideoWrapper) {
     if (!this.editMode || !wrapper.isVideo) return;
-    if ((event.target as HTMLElement).classList.contains('resize-handle')) return;
+    if ((event.target as HTMLElement).classList.contains('resize-handle'))
+      return;
     this.activeDragWrapper = wrapper;
     this.dragStartX = event.clientX;
     this.dragStartY = event.clientY;
@@ -1579,11 +1508,17 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       const dy = event.clientY - this.dragStartY;
       const newX = Math.max(
         0,
-        Math.min(this.initialX + dx, stageRect.width - this.activeDragWrapper.width),
+        Math.min(
+          this.initialX + dx,
+          stageRect.width - this.activeDragWrapper.width,
+        ),
       );
       const newY = Math.max(
         0,
-        Math.min(this.initialY + dy, stageRect.height - this.activeDragWrapper.height),
+        Math.min(
+          this.initialY + dy,
+          stageRect.height - this.activeDragWrapper.height,
+        ),
       );
       this.activeDragWrapper.x = newX;
       this.activeDragWrapper.y = newY;
@@ -1640,8 +1575,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
     const videoWrappers = this.videoWrappers.filter((w) => w.isVideo);
     videoWrappers.sort((a, b) => {
-      const indexA = this.originalTrackOrder.indexOf(a.track.name.split('_')[0]);
-      const indexB = this.originalTrackOrder.indexOf(b.track.name.split('_')[0]);
+      const indexA = this.originalTrackOrder.indexOf(
+        a.track.name.split('_')[0],
+      );
+      const indexB = this.originalTrackOrder.indexOf(
+        b.track.name.split('_')[0],
+      );
       return indexA - indexB;
     });
 
@@ -1666,7 +1605,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
         w.width = 300;
         w.height = w.width / w.aspectRatio;
         let yOffset = 20;
-        for (let j = 1; j < i; j++) yOffset += this.videoWrappers[j].height + 10;
+        for (let j = 1; j < i; j++)
+          yOffset += this.videoWrappers[j].height + 10;
         w.y = yOffset;
       }
       w.visible = true;
@@ -1712,7 +1652,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   private setupMasterListeners() {
     if (this.videoWrappers.length === 0) return;
-    const masterWrapper = this.videoWrappers.find((w) => w.playerId === this.masterPlayerId);
+    const masterWrapper = this.videoWrappers.find(
+      (w) => w.playerId === this.masterPlayerId,
+    );
     if (!masterWrapper) return;
     const videoEl = masterWrapper.videoElement;
     if (!videoEl) return;
@@ -1726,7 +1668,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
           const maxHeight = stage.offsetHeight;
           if (masterWrapper.height > maxHeight) {
             masterWrapper.height = maxHeight;
-            masterWrapper.width = masterWrapper.height * masterWrapper.aspectRatio;
+            masterWrapper.width =
+              masterWrapper.height * masterWrapper.aspectRatio;
           }
         }
       }
@@ -1800,7 +1743,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   }
 
   isWrapperMaximized(wrapper: VideoWrapper): boolean {
-    return wrapper.nw > 0.9 && wrapper.nh > 0.9 && wrapper.x < 10 && wrapper.y < 10;
+    return (
+      wrapper.nw > 0.9 && wrapper.nh > 0.9 && wrapper.x < 10 && wrapper.y < 10
+    );
   }
 
   private async playAllWrappers() {
@@ -1828,8 +1773,12 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
           return 'ok';
         } catch {
           w.videoElement.muted = true;
-          try { await w.videoElement.play(); return 'ok-muted'; }
-          catch { return 'failed'; }
+          try {
+            await w.videoElement.play();
+            return 'ok-muted';
+          } catch {
+            return 'failed';
+          }
         }
       }),
     );
@@ -1850,11 +1799,15 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
     console.log(
       '[FOV] Play results video:',
-      this.videoWrappers.map((w, i) => `${w.track.name}:${videoResults[i]}`).join(', '),
+      this.videoWrappers
+        .map((w, i) => `${w.track.name}:${videoResults[i]}`)
+        .join(', '),
     );
     console.log(
       '[FOV] Play results audio:',
-      this.audioWrappers.map((w, i) => `${w.track.name}:${audioResults[i]}`).join(', '),
+      this.audioWrappers
+        .map((w, i) => `${w.track.name}:${audioResults[i]}`)
+        .join(', '),
     );
 
     // Garantir video toujours muted après play
@@ -1868,7 +1821,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   setVolume(wrapper: VideoWrapper, event: Event) {
     const val = parseFloat((event.target as HTMLInputElement).value);
-    console.warn(`[FOV] setVolume called on video wrapper ${wrapper.track.name} — ignored, video is always muted`);
+    console.warn(
+      `[FOV] setVolume called on video wrapper ${wrapper.track.name} — ignored, video is always muted`,
+    );
     wrapper.volume = val;
     // L'utilisateur interagit manuellement → audio déverrouillé
     if (!this.audioUnlocked) {
@@ -1878,7 +1833,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     }
     // Nettoyer les listeners de déverrouillage si encore actifs
     if (this.documentUnlockHandler) {
-      document.removeEventListener('click', this.documentUnlockHandler, { capture: true });
+      document.removeEventListener('click', this.documentUnlockHandler, {
+        capture: true,
+      });
       document.removeEventListener('keydown', this.documentUnlockHandler, {
         capture: true,
       });
@@ -1921,7 +1878,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       console.log('[FOV] ✓ Layout saved');
       this.layoutSaved = true;
       if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
-      this.savedLayoutTimeout = setTimeout(() => { this.layoutSaved = false; }, 2500);
+      this.savedLayoutTimeout = setTimeout(() => {
+        this.layoutSaved = false;
+      }, 2500);
     } catch (e) {
       console.error('[FOV] Failed to save layout:', e);
     }
@@ -1951,7 +1910,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
     const ordered: VideoWrapper[] = [];
     const unmatched: VideoWrapper[] = [...this.videoWrappers];
-    const sortedSaved = [...layout.wrappers].sort((a, b) => a.orderIndex - b.orderIndex);
+    const sortedSaved = [...layout.wrappers].sort(
+      (a, b) => a.orderIndex - b.orderIndex,
+    );
 
     for (const saved of sortedSaved) {
       const idx = unmatched.findIndex((w) => w.track.name === saved.trackName);
@@ -1985,7 +1946,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.updateMasterReference();
 
     if (this.playbackStarted) {
-      const master = this.videoWrappers.find((w) => w.playerId === this.masterPlayerId);
+      const master = this.videoWrappers.find(
+        (w) => w.playerId === this.masterPlayerId,
+      );
       if (master?.videoElement) {
         const masterTime = master.videoElement.currentTime;
         const masterPdt = this.getTrackStartPdt(master);
@@ -1998,8 +1961,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
               ? (masterPdt + masterTime * 1000 - slavePdt) / 1000
               : masterTime;
 
-          const alreadyThere = Math.abs(w.videoElement.currentTime - targetTime) < 0.3;
-          const inBuffer = targetTime >= w.bufferStart && targetTime <= w.bufferEnd - 0.3;
+          const alreadyThere =
+            Math.abs(w.videoElement.currentTime - targetTime) < 0.3;
+          const inBuffer =
+            targetTime >= w.bufferStart && targetTime <= w.bufferEnd - 0.3;
 
           if (alreadyThere) {
             console.log(
@@ -2022,13 +1987,17 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
     if (layout.audioWrappers && layout.audioWrappers.length > 0) {
       for (const w of this.audioWrappers) {
-        const saved = layout.audioWrappers.find((s) => s.trackName === w.track.name);
+        const saved = layout.audioWrappers.find(
+          (s) => s.trackName === w.track.name,
+        );
         if (!saved) continue;
         w.volume = saved.volume;
         if (this.audioUnlocked && w.audioElement) {
           w.audioElement.volume = saved.volume;
           w.audioElement.muted = saved.volume === 0;
-          console.log(`[FOV] [${w.track.name}] Audio volume restored: ${(saved.volume * 100).toFixed(0)}%`);
+          console.log(
+            `[FOV] [${w.track.name}] Audio volume restored: ${(saved.volume * 100).toFixed(0)}%`,
+          );
         }
       }
     }
@@ -2039,7 +2008,10 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    console.log('%c[FOV] ✓ Layout restored', 'color: #16a34a; font-weight: bold');
+    console.log(
+      '%c[FOV] ✓ Layout restored',
+      'color: #16a34a; font-weight: bold',
+    );
   }
 
   clearSavedLayout(): void {
@@ -2049,22 +2021,29 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   setAudioVolume(wrapper: AudioWrapper, event: Event) {
     const val = parseFloat((event.target as HTMLInputElement).value);
     wrapper.volume = val;
-    console.log(`[FOV] [${wrapper.track.name}] Audio volume → ${(val * 100).toFixed(0)}%`);
+    console.log(
+      `[FOV] [${wrapper.track.name}] Audio volume → ${(val * 100).toFixed(0)}%`,
+    );
     if (!this.audioUnlocked) {
       this.unlockAudio();
     } else if (wrapper.audioElement) {
       wrapper.audioElement.volume = val;
       wrapper.audioElement.muted = val === 0;
-      console.log(`[FOV] [${wrapper.track.name}] Audio element volume applied: ${val}`);
+      console.log(
+        `[FOV] [${wrapper.track.name}] Audio element volume applied: ${val}`,
+      );
     }
   }
 
   refreshStream() {
     this.stopSyncMonitoring();
     this.stopPolling();
-    this.stopBufferCheck();
-    this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
-    this.audioWrappers.forEach((w) => { w.hls?.destroy(); });
+    this.videoWrappers.forEach((w) => {
+      w.hls?.destroy();
+    });
+    this.audioWrappers.forEach((w) => {
+      w.hls?.destroy();
+    });
     this.videoWrappers = [];
     this.audioWrappers = [];
     this.syncStats.clear();
@@ -2076,10 +2055,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.bufferCheckCount = 0;
 
     this.audioUnlocked = this.getSessionAudioUnlocked();
-    if (this.audioUnlocked) {
-      console.log('[FOV] refreshStream: audio consent restored from sessionStorage');
-    }
-
     this.loadTracks();
   }
 }
