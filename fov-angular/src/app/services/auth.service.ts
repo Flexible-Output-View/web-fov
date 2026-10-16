@@ -3,23 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-
-export interface AuthUser {
-  id?: number | string;
-  username: string;
-  email: string;
-  avatarUrl?: string;
-}
-
-interface RawAuthResponse {
-  token?: string;
-  accessToken?: string;
-  user?: AuthUser;
-  id?: number | string;
-  username?: string;
-  email?: string;
-  avatarUrl?: string;
-}
+import * as API from '../models/APIModels'
 
 const TOKEN_KEY = 'fov_auth_token';
 const USER_KEY = 'fov_auth_user';
@@ -27,7 +11,7 @@ const USER_KEY = 'fov_auth_user';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly API_URL = environment.apiUrl;
-  private currentUserSubject = new BehaviorSubject<AuthUser | null>(
+  private currentUserSubject = new BehaviorSubject<API.AuthUser | null>(
     this.readStoredUser(),
   );
   public currentUser$ = this.currentUserSubject.asObservable();
@@ -40,9 +24,9 @@ export class AuthService {
     username: string,
     email: string,
     password: string,
-  ): Observable<RawAuthResponse> {
+  ): Observable<API.RawAuthResponse> {
     return this.http
-      .post<RawAuthResponse>(`${this.API_URL}/auth/register`, {
+      .post<API.RawAuthResponse>(`${this.API_URL}/auth/register`, {
         username,
         email,
         password,
@@ -53,9 +37,9 @@ export class AuthService {
       );
   }
 
-  login(login: string, password: string): Observable<RawAuthResponse> {
+  login(login: string, password: string): Observable<API.RawAuthResponse> {
     return this.http
-      .post<RawAuthResponse>(`${this.API_URL}/auth/login`, {
+      .post<API.RawAuthResponse>(`${this.API_URL}/auth/login`, {
         login,
         password,
       })
@@ -89,13 +73,13 @@ export class AuthService {
     return this.currentUserSubject.value?.email ?? '';
   }
 
-  getCurrentUser(): AuthUser | null {
+  getCurrentUser(): API.AuthUser | null {
     return this.currentUserSubject.value;
   }
 
   // ---------- Helpers ----------
 
-  private persistSession(res: RawAuthResponse): void {
+  private persistSession(res: API.RawAuthResponse): void {
     if (!res) {
       console.warn('[Auth] Empty response');
       return;
@@ -107,7 +91,7 @@ export class AuthService {
       return;
     }
 
-    const user: AuthUser | null = res.user
+    const user: API.AuthUser | null = res.user
       ? res.user
       : res.username && res.email
         ? {
@@ -125,11 +109,11 @@ export class AuthService {
     }
   }
 
-  private readStoredUser(): AuthUser | null {
+  private readStoredUser(): API.AuthUser | null {
     const raw = localStorage.getItem(USER_KEY);
     if (!raw) return null;
     try {
-      return JSON.parse(raw) as AuthUser;
+      return JSON.parse(raw) as API.AuthUser;
     } catch {
       return null;
     }

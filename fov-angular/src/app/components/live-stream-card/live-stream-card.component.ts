@@ -1,7 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import * as API from '../../models/APIModels'
 
 @Component({
   selector: 'app-live-stream-card',
@@ -11,5 +11,5 @@ import { LiveStreamInfo } from '../../models/live-stream.model';
   styleUrls: ['./live-stream-card.component.scss']
 })
 export class LiveStreamCardComponent {
-  @Input() stream!: LiveStreamInfo;
+  @Input() stream!: API.LiveStreamInfo;
 }

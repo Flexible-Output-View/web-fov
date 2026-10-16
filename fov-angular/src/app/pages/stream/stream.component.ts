@@ -5,7 +5,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { FovPlayerComponent } from '../../components/fov-player/fov-player.component';
 import { StreamChatComponent } from '../../components/stream-chat/stream-chat.component';
 import { LiveStreamsService } from '../../services/live-streams.service';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import * as API from '../../models/APIModels'
 
 @Component({
   selector: 'app-stream',
@@ -16,7 +16,7 @@ import { LiveStreamInfo } from '../../models/live-stream.model';
 })
 export class StreamComponent implements OnInit, OnDestroy {
   streamId: string = '';
-  streamInfo: LiveStreamInfo | null = null;
+  streamInfo: API.LiveStreamInfo | null = null;
   isLoading = true;
   isLive = false;
   errorMessage = '';
