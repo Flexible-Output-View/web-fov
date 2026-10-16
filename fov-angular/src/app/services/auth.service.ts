@@ -121,8 +121,11 @@ export class AuthService {
     localStorage.setItem(AUTH_TOKEN_KEY, token);
     if (user) {
       localStorage.setItem(USER_KEY, JSON.stringify(user));
-      this.currentUserSubject.next(user);
+    } else {
+      // Response carried a token but no user payload: drop any stale user.
+      localStorage.removeItem(USER_KEY);
     }
+    this.currentUserSubject.next(user);
   }
 
   private readStoredUser(): AuthUser | null {

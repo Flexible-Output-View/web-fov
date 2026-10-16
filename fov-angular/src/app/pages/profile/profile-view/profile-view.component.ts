@@ -21,6 +21,7 @@ export class ProfileViewComponent implements OnInit, OnDestroy {
   isAuthenticated = false;
   notFound = false;
   following = false;
+  errorMessage = '';
 
   private destroy$ = new Subject<void>();
 
@@ -43,7 +44,15 @@ export class ProfileViewComponent implements OnInit, OnDestroy {
       this.userService
         .loadProfile()
         .pipe(takeUntil(this.destroy$))
-        .subscribe({ error: () => (this.notFound = true) });
+        .subscribe({
+          error: (err: HttpErrorResponse) => {
+            if (err.status === 404) {
+              this.notFound = true;
+            } else {
+              this.errorMessage = 'Impossible de charger le profil.';
+            }
+          },
+        });
     } else {
       this.userService
         .getProfileByUsername(this.username)
@@ -69,6 +78,12 @@ export class ProfileViewComponent implements OnInit, OnDestroy {
 
   goToSettings(): void {
     this.router.navigate(['/profile/personal_settings']);
+  }
+
+  logout(): void {
+    this.authService.logout();
+    this.userService.clearProfile();
+    this.router.navigate(['/login']);
   }
 
   toggleFollow(): void {

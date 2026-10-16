@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { UserProfile, UserService } from '../../services/user.service';
@@ -12,7 +12,7 @@ import { UserProfile, UserService } from '../../services/user.service';
 	templateUrl: './navbar.component.html',
 	styleUrl: './navbar.component.scss'
 })
-export class NavbarComponent {
+export class NavbarComponent implements OnInit, OnDestroy {
   isDarkTheme = true;
   profile: UserProfile | null = null;
   isAuthenticated = false;
@@ -22,13 +22,16 @@ export class NavbarComponent {
   constructor(
     private authService: AuthService,
     private userService: UserService,
+    private router: Router,
   ) {}
 
   ngOnInit(): void {
     this.authService.currentUser$
       .pipe(takeUntil(this.destroy$))
       .subscribe((user) => {
-        this.isAuthenticated = !!user;
+        // Derive the flag from the stored token, not just the cached user
+        // object, so the UI stays consistent with AuthService.isAuthenticated().
+        this.isAuthenticated = this.authService.isAuthenticated();
         if (user) {
           this.userService
             .loadProfile()
@@ -49,6 +52,12 @@ export class NavbarComponent {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  logout(): void {
+    this.authService.logout();
+    this.userService.clearProfile();
+    this.router.navigate(['/login']);
   }
 
   get avatarUrl(): string | null {

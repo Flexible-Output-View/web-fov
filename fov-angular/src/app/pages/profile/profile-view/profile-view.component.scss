@@ -113,6 +113,13 @@
   margin-top: var(--spacing-md, 16px);
 }
 
+.load-error {
+  max-width: 600px;
+  margin: 40px auto;
+  text-align: center;
+  color: #ef4444;
+}
+
 .btn-primary {
   padding: 10px 20px;
   background-color: var(--accent-primary, #9147ff);

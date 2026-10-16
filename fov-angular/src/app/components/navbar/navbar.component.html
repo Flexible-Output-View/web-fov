@@ -39,6 +39,10 @@
       </div>
     </a>
 
+    <button *ngIf="isAuthenticated" class="logout-button" (click)="logout()">
+      Se déconnecter
+    </button>
+
     <a *ngIf="!isAuthenticated" routerLink="/login" class="login-link">
       Se connecter
     </a>

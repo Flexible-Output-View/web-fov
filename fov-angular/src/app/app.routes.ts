@@ -17,10 +17,13 @@ export const routes: Routes = [
   { path: 'followed', component: FollowedComponent },
   { path: 'profile', component: ProfileComponent },
   { path: 'profile/personal_settings', component: PersonalSettingsComponent },
-  { path: ':username', component: PublicProfileComponent },
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
   { path: 'stream/:streamId', component: StreamComponent },
   { path: 'how-does-it-work', component: HowDoesItWorkComponent, title: 'Comment ça marche ?' },
+  // NOTE: keep the dynamic :username route LAST (just before the wildcard).
+  // Angular matches routes in declaration order, so any single-segment static
+  // route placed after it (e.g. 'login') would be shadowed by a profile lookup.
+  { path: ':username', component: PublicProfileComponent },
   { path: '**', redirectTo: '' }
 ];

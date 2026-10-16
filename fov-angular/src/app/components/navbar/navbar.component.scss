@@ -222,3 +222,19 @@
     background-color: rgba(145, 71, 255, 0.1);
   }
 }
+
+.logout-button {
+  background: none;
+  border: 1px solid var(--border-color, #2a2a2a);
+  color: var(--text-secondary, #aaa);
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+}

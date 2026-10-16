@@ -41,6 +41,16 @@
       <span class="stat-label">Abonnements</span>
     </div>
   </div>
+
+  <div class="profile-content" *ngIf="isOwnProfile">
+    <button class="btn-logout" (click)="logout()">
+      Se déconnecter
+    </button>
+  </div>
+</div>
+
+<div class="load-error" *ngIf="errorMessage">
+  <p>{{ errorMessage }}</p>
 </div>
 
 <div class="not-found" *ngIf="notFound">
