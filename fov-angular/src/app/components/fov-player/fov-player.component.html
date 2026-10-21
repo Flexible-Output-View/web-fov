@@ -4,12 +4,7 @@
       <span class="live-indicator" *ngIf="playbackStarted">🔴 LIVE</span>
     </div>
     <div class="toolbar-right">
-
-      <button
-        *ngIf="!editMode"
-        class="btn-edit"
-        (click)="toggleEditMode()"
-        [disabled]="isBufferingPhase"
+      <button *ngIf="!editMode" class="btn-edit" (click)="toggleEditMode()" [disabled]="isBufferingPhase"
         title="Modifier la disposition">
         ✏️ Modifier
       </button>
@@ -29,14 +24,15 @@
       <span class="save-feedback" *ngIf="layoutSaved">
         ✓ Disposition sauvegardée
       </span>
-
     </div>
   </div>
 
-  <div class="loading-state" *ngIf="isLoading">
-    <div class="loading-spinner"></div>
-    <span>{{ getLoadingMessage() }}</span>
-  </div>
+  @if (isLoading) {
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <span>{{ getLoadingMessage() }}</span>
+    </div>
+  }
 
   <div class="error-state" *ngIf="!isLoading && errorMessage">
     <span>{{ errorMessage }}</span>
@@ -44,7 +40,6 @@
   </div>
 
   <div class="fov-workspace" *ngIf="!isLoading && !errorMessage">
-
     <div class="buffering-overlay" *ngIf="isBufferingPhase">
       <div class="buffering-content">
         <div class="loading-spinner large"></div>
@@ -52,62 +47,43 @@
       </div>
     </div>
 
-    <div class="fov-stage"
-         [id]="'stageArea_' + playerId"
-         [class.edit-mode]="editMode"
-         (click)="unlockAudio()">
+    <div class="fov-stage" [id]="'stageArea_' + playerId" [class.edit-mode]="editMode" (click)="unlockAudio()">
 
-      <ng-container *ngFor="let wrapper of videoWrappers; trackBy: trackByWrapper">
-        <div
-          *ngIf="wrapper.isVideo"
-          [id]="'videoWrapper_' + playerId + '_' + wrapper.track.index"
-          class="video-container"
-          [class.editable]="editMode"
-          [class.is-master]="wrapper === videoWrappers[0]"
-          [class.is-ready]="wrapper.isReady"
-          [style.z-index]="wrapper.zIndex"
-          [style.display]="wrapper.visible ? 'flex' : 'none'"
-          [style.left.px]="wrapper.x"
-          [style.top.px]="wrapper.y"
-          [style.width.px]="wrapper.width"
-          [style.height.px]="wrapper.height"
-          (pointerdown)="startDrag($event, wrapper)">
+      <ng-container *ngFor="let track of videoTracks; trackBy: trackByTrack">
+        <div [id]="'videoWrapper_' + track.id" class="video-container" [class.editable]="editMode"
+          [class.is-master]="track === videoTracks[0]" [style.z-index]="track.zIndex"
+          [style.display]="track.visible ? 'flex' : 'none'" [style.left.px]="track.x" [style.top.px]="track.y"
+          [style.width.px]="track.width" [style.height.px]="track.height" (pointerdown)="startDrag($event, track)">
 
+        @if (editMode) {
           <div class="drag-bar" *ngIf="editMode">
-            <span class="drag-label">{{ wrapper.track.name }}</span>
+            <span class="drag-label">{{ track.name }}</span>
             <div class="drag-bar-actions">
-              <button
-                class="drag-action-btn"
-                *ngIf="!isWrapperMaximized(wrapper)"
-                (click)="$event.stopPropagation(); maximizeWrapper(wrapper)"
-                title="Plein écran dans le stage">
-                ⛶
-              </button>
-              <button
-                class="drag-action-btn"
-                *ngIf="isWrapperMaximized(wrapper)"
-                (click)="$event.stopPropagation(); minimizeWrapper(wrapper)"
-                title="Réduire">
-                ⊡
-              </button>
+              @if (!isTrackMaximized(track)) {
+                <button class="drag-action-btn"
+                  (click)="$event.stopPropagation(); maximizeTrack(track)" title="Plein écran dans le stage">
+                  ⛶
+                </button>
+              }
+              @if (isTrackMaximized(track)) {
+                <button class="drag-action-btn"
+                  (click)="$event.stopPropagation(); minimizeTrack(track)" title="Réduire">
+                  ⊡
+                </button>
+              }
             </div>
           </div>
+        }
 
-          <video
-            [id]="'videoElement_' + playerId + '_' + wrapper.track.index"
-            playsinline>
-          </video>
+          <div class="media-outlet" [appMount]="track.element"></div>
 
-          <div class="resize-handle"
-               *ngIf="editMode"
-               (pointerdown)="startResize($event, wrapper)">
+          <div class="resize-handle" *ngIf="editMode" (pointerdown)="startResize($event, track)">
           </div>
         </div>
       </ng-container>
 
-      <div class="audio-unlock-overlay"
-          *ngIf="!audioUnlocked && playbackStarted && !isBufferingPhase"
-          (click)="unlockAudio()">
+      <div class="audio-unlock-overlay" *ngIf="!audioUnlocked && playbackStarted && !isBufferingPhase"
+        (click)="unlockAudio()">
         <div class="audio-unlock-content">
           <span class="audio-unlock-icon">🔇</span>
           <p class="audio-unlock-title">Son désactivé</p>
@@ -115,92 +91,69 @@
             Le navigateur bloque la lecture automatique avec son.<br>
             Cliquez n'importe où pour continuer.
           </p>
-          <button class="audio-unlock-btn" type="button"
-                  (click)="$event.stopPropagation(); unlockAudio()">
+          <button class="audio-unlock-btn" type="button" (click)="$event.stopPropagation(); unlockAudio()">
             🔊 Activer le son
           </button>
         </div>
       </div>
 
-      <button
-        class="btn-fullscreen"
-        type="button"
-        (click)="toggleFullscreen()"
+      <button class="btn-fullscreen" type="button" (click)="toggleFullscreen()"
         [title]="isFullscreen ? 'Quitter le plein écran' : 'Plein écran'">
         {{ isFullscreen ? '✕' : '⛶' }}
       </button>
 
-      <button
-        *ngIf="isFullscreen"
-        class="btn-fs-audio-toggle"
-        type="button"
-        (click)="toggleFullscreenAudioPanel()"
+      <button *ngIf="isFullscreen" class="btn-fs-audio-toggle" type="button" (click)="toggleFullscreenAudioPanel()"
         [title]="fullscreenAudioPanelOpen ? 'Masquer l\'audio' : 'Afficher l\'audio'">
-        {{ fullscreenAudioPanelOpen ? '>' : '<' }}
-      </button>
+        {{ fullscreenAudioPanelOpen ? '>' : '<' }} </button>
 
-      <div *ngIf="isFullscreen && fullscreenAudioPanelOpen" class="fs-audio-panel">
-        <h4>Audio</h4>
-
-        <div *ngFor="let aw of audioWrappers" class="audio-control">
-          <label>🎵 {{ aw.track.name }}</label>
-          <input type="range" min="0" max="1" step="0.01"
-            [value]="aw.volume"
-            (input)="setAudioVolume(aw, $event)">
-        </div>
-      </div>
+          <div *ngIf="isFullscreen && fullscreenAudioPanelOpen" class="fs-audio-panel">
+            <h4>Audio</h4>
+            <div *ngFor="let track of audioTracks" class="audio-control">
+              <label>🎵 {{ track.name }}</label>
+              <input type="range" min="0" max="1" step="0.01" [value]="track.volume"
+                (input)="setAudioVolume(track, $event)">
+            </div>
+          </div>
     </div>
 
     <div class="audio-sink" aria-hidden="true">
-      <audio
-        *ngFor="let aw of audioWrappers"
-        [id]="'audioElement_' + aw.playerId"
-        preload="auto"
-        playsinline>
-      </audio>
+      <ng-container *ngFor="let track of audioTracks">
+        <div [appMount]="track.element"></div>
+      </ng-container>
     </div>
 
-    <div class="fov-sidebar" *ngIf="videoWrappers.length > 0 || audioWrappers.length > 0">
-
+    <div class="fov-sidebar" *ngIf="videoTracks.length > 0 || audioTracks.length > 0">
       <div class="panel-section" *ngIf="editMode">
         <h4>Sources vidéo</h4>
         <ul class="source-list">
-          <ng-container *ngFor="let wrapper of videoWrappers; let i = index; trackBy: trackByWrapper">
-            <li *ngIf="wrapper.isVideo" class="source-item">
+          <ng-container *ngFor="let track of videoTracks; let i = index; trackBy: trackByTrack">
+            <li class="source-item">
               <div class="source-info">
                 <span class="source-name" [class.is-ref]="i === 0">
-                  {{ i === 0 ? '[REF] ' : '' }}{{ wrapper.track.name }}
+                  {{ i === 0 ? '[REF] ' : '' }}{{ track.name }}
                 </span>
               </div>
               <div class="source-controls">
-                <button class="icon-btn"
-                  [class.hidden]="!wrapper.visible"
-                  (click)="toggleVisibility(wrapper)">
-                  {{ wrapper.visible ? '👁' : '👁‍🗨' }}
+                <button class="icon-btn" [class.hidden]="!track.visible" (click)="toggleVisibility(track)">
+                  {{ track.visible ? '👁' : '👁‍🗨' }}
                 </button>
-                <button class="icon-btn"
-                  (click)="moveUp(i)"
-                  [disabled]="i === 0">▲</button>
-                <button class="icon-btn"
-                  (click)="moveDown(i)"
-                  [disabled]="i === videoWrappers.length - 1">▼</button>
+                <button class="icon-btn" (click)="moveUp(i)" [disabled]="i === 0">▲</button>
+                <button class="icon-btn" (click)="moveDown(i)" [disabled]="i === videoTracks.length - 1">▼</button>
               </div>
             </li>
           </ng-container>
         </ul>
       </div>
 
-      <div class="panel-section" *ngIf="audioWrappers.length > 0">
+      <div class="panel-section" *ngIf="audioTracks.length > 0">
         <h4>Audio — Pistes</h4>
-        <div *ngFor="let aw of audioWrappers" class="audio-control">
-          <label>🎵 {{ aw.track.name }}</label>
-          <input type="range" min="0" max="1" step="0.01"
-            [value]="aw.volume"
-            (input)="setAudioVolume(aw, $event)">
-          <span class="volume-value">{{ (aw.volume * 100).toFixed(0) }}%</span>
+        <div *ngFor="let track of audioTracks" class="audio-control">
+          <label>🎵 {{ track.name }}</label>
+          <input type="range" min="0" max="1" step="0.01" [value]="track.volume"
+            (input)="setAudioVolume(track, $event)">
+          <span class="volume-value">{{ (track.volume * 100).toFixed(0) }}%</span>
         </div>
       </div>
-
     </div>
   </div>
 </div>
