@@ -6,6 +6,7 @@ on:
       - "fov-angular/**"
       - ".github/workflows/angular-tests.yml"
       - "codecov.yml"
+      - bump-dependencies
   pull_request:
     branches: [main, dev]
 
