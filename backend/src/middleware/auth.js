@@ -1,7 +1,10 @@
 import { verifyToken } from '../utils/auth.js';
 
-function extractBearerToken(req) {
-    const header = req.headers.authorization || req.headers.Authorization;
+// Re-exported so socket authentication (`chatSocket.js`) keeps a single entry point.
+export { verifyToken };
+
+export function extractBearerToken(req) {
+    const header = req.headers?.authorization || req.headers?.Authorization;
     if (!header || typeof header !== 'string') {
         return null;
     }
@@ -29,7 +32,8 @@ function resolveUserId(req) {
 
 /**
  * Reject the request with 401 unless a valid JWT is provided.
- * On success attaches `req.userId`.
+ * On success attaches `req.userId` (current convention) and `req.user.id`
+ * (legacy shape still used by the chat routes).
  */
 export function requireAuth(req, res, next) {
     const userId = resolveUserId(req);
@@ -37,6 +41,7 @@ export function requireAuth(req, res, next) {
         return res.status(401).json({ error: 'Authentication required' });
     }
     req.userId = userId;
+    req.user = { id: userId };
     next();
 }
 
@@ -49,6 +54,7 @@ export function optionalAuth(req, res, next) {
     const userId = resolveUserId(req);
     if (userId) {
         req.userId = userId;
+        req.user = { id: userId };
     }
     next();
 }

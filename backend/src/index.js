@@ -5,12 +5,14 @@ import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
+import { createServer } from 'http';
 
 import db from './db.js';
 import { ensureSchema } from './schema.js';
 import apiRoutes from './routes/index.js';
 import { createMediaRoutes, startMediaServer, clearHLSFiles } from './mediaServer.mjs';
 import swaggerDocument from './swagger.js';
+import { initChatSocket } from './chatSocket.js';
 
 const PORT = process.env.PORT || 4000;
 
@@ -37,7 +39,7 @@ app.use((err, req, res, next) => {
     res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
-async function start() { 
+async function start() {
     try {
         // verify PostgreSQL connection
         await db.query('SELECT 1');
@@ -50,7 +52,11 @@ async function start() {
         // initialize media server
         await startMediaServer(app);
 
-        const server = app.listen(PORT, () => {
+        const httpServer = createServer(app);
+        const io = initChatSocket(httpServer);
+        app.set('io', io);
+
+        const server = httpServer.listen(PORT, () => {
             console.log(`🚀 Server listening on http://localhost:${PORT}`);
             console.log(`📺 HLS available at http://localhost:${PORT}/api/hls`);
         });

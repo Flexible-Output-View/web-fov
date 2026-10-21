@@ -6,6 +6,7 @@ on:
       - "backend/**"
       - ".github/workflows/backend-tests.yml"
       - "codecov.yml"
+      - bump-dependencies
   pull_request:
     branches: [main, dev]
 

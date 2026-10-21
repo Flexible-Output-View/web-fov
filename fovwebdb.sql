@@ -1,4 +1,5 @@
 -- Drop existing tables
+DROP TABLE IF EXISTS chat_messages;
 DROP TABLE IF EXISTS follows;
 DROP TABLE IF EXISTS streams;
 DROP TABLE IF EXISTS users;
