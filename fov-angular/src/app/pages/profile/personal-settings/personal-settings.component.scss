@@ -166,8 +166,18 @@
   border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 600;
-  cursor: not-allowed;
-  opacity: 0.6;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background-color: #ef4444;
+    color: white;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
 }
 
 .toast {
@@ -189,6 +199,95 @@
   &.success {
     background-color: #22c55e;
     color: white;
+  }
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.modal-dialog {
+  width: 100%;
+  max-width: 440px;
+  background-color: var(--bg-secondary, #1a1a1a);
+  border: 1px solid #ef4444;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+
+  h2 {
+    margin: 0 0 8px;
+    font-size: 1.2rem;
+    color: #ef4444;
+  }
+
+  .modal-warning {
+    margin: 0 0 16px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-secondary, #aaa);
+  }
+
+  .modal-error {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    color: #ef4444;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background-color: transparent;
+  color: var(--text-secondary, #aaa);
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--text-primary, #fff);
+    border-color: var(--text-primary, #fff);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.btn-danger-solid {
+  padding: 10px 20px;
+  background-color: #ef4444;
+  color: white;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: #dc2626;
+    border-color: #dc2626;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
   }
 }
 

@@ -164,11 +164,67 @@
   <div class="settings-section danger-zone">
     <h2>Zone de danger</h2>
     <p class="hint">Cette action est irréversible.</p>
-    <button class="btn-danger" disabled title="Bientôt disponible">
+    <button class="btn-danger" type="button" (click)="openDeleteModal()">
       Supprimer mon compte
     </button>
   </div>
 
   <div class="toast error" *ngIf="errorMessage">{{ errorMessage }}</div>
   <div class="toast success" *ngIf="successMessage">{{ successMessage }}</div>
+
+  <div class="modal-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
+    <div
+      class="modal-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="deleteAccountTitle"
+      (click)="$event.stopPropagation()">
+      <h2 id="deleteAccountTitle">Supprimer mon compte</h2>
+      <p class="modal-warning">
+        Cette action est définitive. Votre profil, vos abonnements et vos abonnés
+        seront supprimés et ne pourront pas être récupérés.
+      </p>
+
+      <div class="form-group">
+        <label for="deletePassword">Mot de passe actuel</label>
+        <div class="password-input">
+          <input
+            id="deletePassword"
+            [type]="showDeletePassword ? 'text' : 'password'"
+            [(ngModel)]="deletePassword"
+            placeholder="••••••••"
+            autocomplete="current-password"
+            [disabled]="isDeletingAccount"
+            (keyup.enter)="deleteAccount()"
+          />
+          <button
+            type="button"
+            class="btn-toggle-password"
+            (click)="showDeletePassword = !showDeletePassword"
+            [title]="showDeletePassword ? 'Masquer' : 'Afficher'">
+            {{ showDeletePassword ? '🙈' : '👁' }}
+          </button>
+        </div>
+      </div>
+
+      <p class="modal-error" *ngIf="deleteErrorMessage">{{ deleteErrorMessage }}</p>
+
+      <div class="modal-actions">
+        <button
+          type="button"
+          class="btn-secondary"
+          (click)="closeDeleteModal()"
+          [disabled]="isDeletingAccount">
+          Annuler
+        </button>
+        <button
+          type="button"
+          class="btn-danger-solid"
+          (click)="deleteAccount()"
+          [disabled]="isDeletingAccount || !deletePassword">
+          {{ isDeletingAccount ? 'Suppression…' : 'Supprimer définitivement' }}
+        </button>
+      </div>
+    </div>
+  </div>
 </div>

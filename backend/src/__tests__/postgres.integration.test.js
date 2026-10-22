@@ -131,4 +131,52 @@ app.use((err, req, res, _next) => {
             .send({ login: bobName, password: 'brand-new-secret' });
         expect(login.status).toBe(200);
     });
+
+    test('deletes an account, cascades follows, and invalidates access', async () => {
+        const register = async (name) => {
+            const res = await request(app).post('/api/auth/register').send({
+                username: name,
+                email: `${name}@example.com`,
+                password: 'integration-secret'
+            });
+            expect(res.status).toBe(201);
+            return res.body.token;
+        };
+
+        const suffix = Date.now();
+        const aliceName = `del_alice_${suffix}`;
+        const bobName = `del_bob_${suffix}`;
+        const aliceToken = await register(aliceName);
+        const bobToken = await register(bobName);
+        const auth = (token) => ({ Authorization: `Bearer ${token}` });
+
+        // Alice follows Bob so we can verify the cascade later.
+        await request(app).post(`/api/users/${bobName}/follow`).set(auth(aliceToken));
+
+        // A wrong password keeps the account intact.
+        const wrongPassword = await request(app)
+            .delete('/api/users/me')
+            .set(auth(bobToken))
+            .send({ password: 'not-the-password' });
+        expect(wrongPassword.status).toBe(400);
+        expect((await request(app).get(`/api/users/${bobName}`)).status).toBe(200);
+
+        // The correct password deletes the account.
+        const deletion = await request(app)
+            .delete('/api/users/me')
+            .set(auth(bobToken))
+            .send({ password: 'integration-secret' });
+        expect(deletion.status).toBe(200);
+        expect(deletion.body).toEqual({ ok: true });
+
+        // Profile is gone, follows were cascaded, and the old token is rejected.
+        expect((await request(app).get(`/api/users/${bobName}`)).status).toBe(404);
+        expect((await request(app).get(`/api/users/${aliceName}`)).body.followingCount).toBe(0);
+        expect((await request(app).get('/api/users/me').set(auth(bobToken))).status).toBe(401);
+
+        const login = await request(app)
+            .post('/api/auth/login')
+            .send({ login: bobName, password: 'integration-secret' });
+        expect(login.status).toBe(401);
+    });
 });

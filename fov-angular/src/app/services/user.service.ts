@@ -58,6 +58,13 @@ export class UserService {
     });
   }
 
+  /** Permanently delete the authenticated user's account. */
+  deleteAccount(password: string): Observable<void> {
+    return this.http.delete<void>(`${this.API_URL}/users/me`, {
+      body: { password },
+    });
+  }
+
   /** Follow a user. */
   follow(username: string): Observable<{ following: boolean }> {
     return this.http.post<{ following: boolean }>(

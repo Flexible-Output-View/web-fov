@@ -132,6 +132,39 @@ router.put('/me/password', requireAuth, async (req, res, next) => {
     }
 });
 
+// DELETE /api/users/me -> permanently delete own account
+router.delete('/me', requireAuth, async (req, res, next) => {
+    const { password } = req.body ?? {};
+
+    if (typeof password !== 'string' || password.length === 0) {
+        return res.status(400).json({ errors: { password: 'Password is required' } });
+    }
+
+    try {
+        const rows = await db.query('SELECT id, password_hash FROM users WHERE id = ?', [req.userId]);
+        if (!rows || rows.length === 0) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        const matches = await comparePassword(password, rows[0].password_hash);
+        if (!matches) {
+            // 400 rather than 401: the session is valid, only the confirmation failed.
+            // A 401 here would make the frontend interceptor log the user out.
+            return res.status(400).json({ errors: { password: 'Password is incorrect' } });
+        }
+
+        // `follows` rows are removed automatically via ON DELETE CASCADE.
+        const deleted = await db.query('DELETE FROM users WHERE id = ? RETURNING id', [req.userId]);
+        if (!deleted || deleted.length === 0) {
+            return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        res.json({ ok: true });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST /api/users/:username/follow -> follow a user
 router.post('/:username/follow', requireAuth, async (req, res, next) => {
     try {

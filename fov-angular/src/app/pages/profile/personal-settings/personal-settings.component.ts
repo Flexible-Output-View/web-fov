@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -28,6 +28,12 @@ export class PersonalSettingsComponent implements OnInit, OnDestroy {
   showCurrentPassword = false;
   showNewPassword = false;
   showConfirmPassword = false;
+
+  deletePassword = '';
+  showDeletePassword = false;
+  isDeleteModalOpen = false;
+  isDeletingAccount = false;
+  deleteErrorMessage = '';
 
   errorMessage = '';
   successMessage = '';
@@ -145,6 +151,58 @@ export class PersonalSettingsComponent implements OnInit, OnDestroy {
 
   cancel(): void {
     this.router.navigate(['/profile']);
+  }
+
+  openDeleteModal(): void {
+    this.deletePassword = '';
+    this.showDeletePassword = false;
+    this.deleteErrorMessage = '';
+    this.isDeleteModalOpen = true;
+  }
+
+  closeDeleteModal(): void {
+    if (this.isDeletingAccount) return;
+    this.isDeleteModalOpen = false;
+    this.deletePassword = '';
+    this.showDeletePassword = false;
+    this.deleteErrorMessage = '';
+  }
+
+  deleteAccount(): void {
+    if (this.isDeletingAccount) return;
+
+    this.deleteErrorMessage = '';
+
+    if (!this.deletePassword) {
+      this.deleteErrorMessage = 'Veuillez saisir votre mot de passe.';
+      return;
+    }
+
+    this.isDeletingAccount = true;
+
+    this.userService
+      .deleteAccount(this.deletePassword)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.isDeletingAccount = false;
+          this.isDeleteModalOpen = false;
+          this.authService.logout();
+          this.userService.clearProfile();
+          this.router.navigate(['/login']);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.isDeletingAccount = false;
+          this.deleteErrorMessage = this.extractErrorMessage(err);
+        },
+      });
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.isDeleteModalOpen) {
+      this.closeDeleteModal();
+    }
   }
 
   async onAvatarSelected(event: Event): Promise<void> {

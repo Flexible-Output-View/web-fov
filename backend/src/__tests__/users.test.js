@@ -204,6 +204,90 @@ describe('Users Routes', () => {
         });
     });
 
+    describe('DELETE /me', () => {
+        test('deletes the authenticated account when the password is correct', async () => {
+            db.query
+                .mockResolvedValueOnce([{ id: 1, password_hash: 'stored-hash' }])
+                .mockResolvedValueOnce([{ id: 1 }]);
+            authUtils.comparePassword.mockResolvedValue(true);
+
+            const response = await request(app)
+                .delete('/me')
+                .set(AUTH_HEADER)
+                .send({ password: 'correct-secret' });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({ ok: true });
+            expect(authUtils.comparePassword).toHaveBeenCalledWith('correct-secret', 'stored-hash');
+            expect(db.query).toHaveBeenNthCalledWith(
+                1,
+                'SELECT id, password_hash FROM users WHERE id = ?',
+                [1]
+            );
+            expect(db.query).toHaveBeenNthCalledWith(
+                2,
+                'DELETE FROM users WHERE id = ? RETURNING id',
+                [1]
+            );
+        });
+
+        test('returns 400 when the password is missing', async () => {
+            const response = await request(app).delete('/me').set(AUTH_HEADER).send({});
+
+            expect(response.status).toBe(400);
+            expect(response.body.errors).toHaveProperty('password');
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        test('returns 400 and keeps the account when the password is incorrect', async () => {
+            db.query.mockResolvedValueOnce([{ id: 1, password_hash: 'stored-hash' }]);
+            authUtils.comparePassword.mockResolvedValue(false);
+
+            const response = await request(app)
+                .delete('/me')
+                .set(AUTH_HEADER)
+                .send({ password: 'wrong-secret' });
+
+            expect(response.status).toBe(400);
+            expect(response.body.errors).toHaveProperty('password', 'Password is incorrect');
+            expect(db.query).toHaveBeenCalledTimes(1);
+            expect(db.query).not.toHaveBeenCalledWith(
+                'DELETE FROM users WHERE id = ? RETURNING id',
+                [1]
+            );
+        });
+
+        test('returns 401 when the user no longer exists', async () => {
+            db.query.mockResolvedValueOnce([]);
+
+            const response = await request(app)
+                .delete('/me')
+                .set(AUTH_HEADER)
+                .send({ password: 'correct-secret' });
+
+            expect(response.status).toBe(401);
+            expect(db.query).toHaveBeenCalledTimes(1);
+        });
+
+        test('returns 401 without a token', async () => {
+            const response = await request(app).delete('/me').send({ password: 'correct-secret' });
+
+            expect(response.status).toBe(401);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        test('handles database errors', async () => {
+            db.query.mockRejectedValue(new Error('Database connection failed'));
+
+            const response = await request(app)
+                .delete('/me')
+                .set(AUTH_HEADER)
+                .send({ password: 'correct-secret' });
+
+            expect(response.status).toBe(500);
+        });
+    });
+
     describe('POST /:username/follow', () => {
         test('follows another user', async () => {
             db.query

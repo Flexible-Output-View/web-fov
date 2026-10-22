@@ -125,6 +125,21 @@ const swaggerDocument = {
                     401: { $ref: '#/components/responses/Unauthorized' },
                     500: { $ref: '#/components/responses/ServerError' }
                 }
+            },
+            delete: {
+                tags: ['Users'],
+                summary: 'Permanently delete the authenticated user account',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/DeleteAccountRequest' } } }
+                },
+                responses: {
+                    200: { description: 'Account deleted' },
+                    400: { description: 'Validation error or incorrect password' },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
             }
         },
         '/api/users/me/password': {
@@ -372,6 +387,13 @@ const swaggerDocument = {
                 properties: {
                     currentPassword: { type: 'string' },
                     newPassword: { type: 'string', minLength: 8 }
+                }
+            },
+            DeleteAccountRequest: {
+                type: 'object',
+                required: ['password'],
+                properties: {
+                    password: { type: 'string', description: 'Current password, used to confirm the deletion' }
                 }
             },
             FollowResponse: {
