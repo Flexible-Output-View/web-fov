@@ -99,15 +99,25 @@ app.use((err, req, res, _next) => {
         // alice follows bob
         const follow = await request(app).post(`/api/users/${bobName}/follow`).set(auth(aliceToken));
         expect(follow.status).toBe(200);
-        expect(follow.body).toEqual({ following: true });
+        expect(follow.body).toEqual({ following: true, followersCount: 1 });
 
         const bobAsSeenByAlice = await request(app).get(`/api/users/${bobName}`).set(auth(aliceToken));
         expect(bobAsSeenByAlice.body.followersCount).toBe(1);
         expect(bobAsSeenByAlice.body.isFollowing).toBe(true);
 
+        const following = await request(app).get('/api/users/me/following').set(auth(aliceToken));
+        expect(following.status).toBe(200);
+        expect(following.body).toHaveLength(1);
+        expect(following.body[0]).toMatchObject({
+            username: bobName,
+            isFollowing: true,
+            followersCount: 1
+        });
+        expect(following.body[0]).not.toHaveProperty('email');
+
         const unfollow = await request(app).delete(`/api/users/${bobName}/follow`).set(auth(aliceToken));
         expect(unfollow.status).toBe(200);
-        expect(unfollow.body).toEqual({ following: false });
+        expect(unfollow.body).toEqual({ following: false, followersCount: 0 });
 
         // cannot follow yourself
         const selfFollow = await request(app).post(`/api/users/${bobName}/follow`).set(auth(bobToken));

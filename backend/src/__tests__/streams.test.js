@@ -138,7 +138,7 @@ describe('Streams Routes', () => {
         expect(found.status).toBe(200);
         expect(found.body).toEqual({ id: 4, title: 'Found' });
         expect(dbQuery).toHaveBeenCalledWith(
-            'SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams WHERE id = ?',
+            expect.stringContaining('WHERE LOWER(u.username) = LOWER(s.streamer)'),
             ['4']
         );
 
@@ -192,6 +192,8 @@ describe('Streams Routes', () => {
             ];
         });
         dbQuery.mockResolvedValueOnce([{
+            streamer: 'DJ Test',
+            streamer_username: 'dj_test',
             title: 'Concert',
             category: 'Music',
             viewers: 123,
@@ -217,6 +219,8 @@ describe('Streams Routes', () => {
                 title: 'Concert',
                 category: 'Music',
                 viewers: 123,
+                streamer: 'DJ Test',
+                streamerUsername: 'dj_test',
                 avatarUrl: 'avatar.png',
                 thumbnailUrl: 'thumb.png'
             },
@@ -232,6 +236,8 @@ describe('Streams Routes', () => {
                 title: '',
                 category: '',
                 viewers: 0,
+                streamer: '',
+                streamerUsername: null,
                 avatarUrl: '',
                 thumbnailUrl: ''
             },
@@ -247,6 +253,8 @@ describe('Streams Routes', () => {
                 title: '',
                 category: '',
                 viewers: 0,
+                streamer: '',
+                streamerUsername: null,
                 avatarUrl: '',
                 thumbnailUrl: ''
             }

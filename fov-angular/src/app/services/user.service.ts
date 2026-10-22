@@ -21,6 +21,11 @@ export interface ProfileUpdates {
   bannerUrl: string;
 }
 
+export interface FollowResponse {
+  following: boolean;
+  followersCount: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class UserService {
   private readonly API_URL = environment.apiUrl;
@@ -65,17 +70,22 @@ export class UserService {
     });
   }
 
+  /** Fetch the users followed by the authenticated user. */
+  getFollowing(): Observable<UserProfile[]> {
+    return this.http.get<UserProfile[]>(`${this.API_URL}/users/me/following`);
+  }
+
   /** Follow a user. */
-  follow(username: string): Observable<{ following: boolean }> {
-    return this.http.post<{ following: boolean }>(
+  follow(username: string): Observable<FollowResponse> {
+    return this.http.post<FollowResponse>(
       `${this.API_URL}/users/${encodeURIComponent(username)}/follow`,
       {},
     );
   }
 
   /** Unfollow a user. */
-  unfollow(username: string): Observable<{ following: boolean }> {
-    return this.http.delete<{ following: boolean }>(
+  unfollow(username: string): Observable<FollowResponse> {
+    return this.http.delete<FollowResponse>(
       `${this.API_URL}/users/${encodeURIComponent(username)}/follow`,
     );
   }

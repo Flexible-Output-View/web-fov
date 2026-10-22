@@ -137,6 +137,25 @@ const swaggerDocument = {
                 }
             }
         },
+        '/api/users/me/following': {
+            get: {
+                tags: ['Users'],
+                summary: 'List the users followed by the authenticated user',
+                security: [{ bearerAuth: [] }],
+                responses: {
+                    200: {
+                        description: 'Followed users',
+                        content: {
+                            'application/json': {
+                                schema: { type: 'array', items: { $ref: '#/components/schemas/UserProfile' } }
+                            }
+                        }
+                    },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
         '/api/users/me': {
             get: {
                 tags: ['Users'],
@@ -452,7 +471,10 @@ const swaggerDocument = {
             },
             FollowResponse: {
                 type: 'object',
-                properties: { following: { type: 'boolean' } }
+                properties: {
+                    following: { type: 'boolean' },
+                    followersCount: { type: 'integer', description: 'Updated follower count of the target user' }
+                }
             },
             RegisterStreamRequest: {
                 type: 'object',

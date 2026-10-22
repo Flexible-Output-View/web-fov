@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { Observable, Subject, takeUntil } from 'rxjs';
 import { FovPlayerComponent } from '../../components/fov-player/fov-player.component';
 import { StreamChatComponent } from '../../components/stream-chat/stream-chat.component';
@@ -11,7 +11,7 @@ import { LiveStreamInfo, ViewerCount } from '../../models/live-stream.model';
 @Component({
   selector: 'app-stream',
   standalone: true,
-  imports: [CommonModule, FovPlayerComponent, StreamChatComponent],
+  imports: [CommonModule, RouterModule, FovPlayerComponent, StreamChatComponent],
   templateUrl: './stream.component.html',
   styleUrls: ['./stream.component.scss']
 })
@@ -29,6 +29,11 @@ export class StreamComponent implements OnInit, OnDestroy {
   readonly viewerCount$: Observable<ViewerCount | null>;
 
   private destroy$ = new Subject<void>();
+
+  /** Prefer the matching account username, then the raw channel name. */
+  get streamerName(): string {
+    return this.streamInfo?.streamerUsername || this.streamInfo?.streamer || '';
+  }
 
   constructor(
     private route: ActivatedRoute,

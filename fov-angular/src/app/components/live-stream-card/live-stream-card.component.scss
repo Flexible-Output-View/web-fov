@@ -18,10 +18,12 @@
 }
 
 .card-thumbnail {
+  display: block;
   position: relative;
   aspect-ratio: 16 / 9;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   overflow: hidden;
+  text-decoration: none;
 
   &::after {
     content: '';
@@ -112,6 +114,7 @@
 }
 
 .avatar-wrapper {
+  display: block;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -137,6 +140,7 @@
   font-weight: bold;
   font-size: 14px;
   flex-shrink: 0;
+  text-decoration: none;
 }
 
 .card-text {
@@ -145,22 +149,36 @@
 }
 
 .streamer-name {
+  display: block;
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
+  text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  &:hover {
+    color: var(--accent-primary, #9147ff);
+    text-decoration: underline;
+  }
 }
 
 .stream-title {
+  display: block;
   margin: 2px 0 0 0;
   font-size: 0.85rem;
   color: var(--text-secondary);
+  text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  &:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
+  }
 }
 
 .stream-category {

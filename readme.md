@@ -212,8 +212,9 @@ Encoders should use these settings:
 | `/users/me` | PUT | Update own profile (`bio`, `avatarUrl`, `bannerUrl`) (Bearer token) |
 | `/users/me/password` | PUT | Change own password (`currentPassword`, `newPassword`) (Bearer token) |
 | `/users/{username}` | GET | Get a public profile by username |
-| `/users/{username}/follow` | POST | Follow a user (Bearer token) |
-| `/users/{username}/follow` | DELETE | Unfollow a user (Bearer token) |
+| `/users/me/following` | GET | List the users followed by the authenticated user (Bearer token) |
+| `/users/{username}/follow` | POST | Follow a user → `200 {following: true, followersCount}` (Bearer token) |
+| `/users/{username}/follow` | DELETE | Unfollow a user → `200 {following: false, followersCount}` (Bearer token) |
 | `/streams` | GET | List all streams |
 | `/streams/available` | GET | Get active streams with HLS URLs |
 | `/streams/:id` | GET | Get stream details |

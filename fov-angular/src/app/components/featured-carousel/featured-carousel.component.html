@@ -25,12 +25,12 @@
           </div>
           <div class="stream-info">
             <div class="streamer-avatar">
-              <img *ngIf="stream.avatarUrl" [src]="stream.avatarUrl" [alt]="stream.streamId">
-              <div class="avatar-placeholder" *ngIf="!stream.avatarUrl">{{ stream.streamId.charAt(0).toUpperCase() }}</div>
+              <img *ngIf="stream.avatarUrl" [src]="stream.avatarUrl" [alt]="stream.streamer || stream.streamId">
+              <div class="avatar-placeholder" *ngIf="!stream.avatarUrl">{{ (stream.streamer || stream.streamId).charAt(0).toUpperCase() }}</div>
             </div>
             <div class="stream-details">
               <h3 class="stream-title">{{ stream.title || stream.streamId }}</h3>
-              <p class="streamer-name">{{ stream.streamId }}</p>
+              <p class="streamer-name">{{ stream.streamer || stream.streamId }}</p>
               <p class="stream-category" *ngIf="stream.category">{{ stream.category }}</p>
             </div>
           </div>

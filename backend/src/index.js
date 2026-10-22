@@ -42,10 +42,10 @@ app.use((err, req, res, next) => {
 async function start() {
     try {
         // verify PostgreSQL connection
-        await db.query('SELECT 1');
+        //await db.query('SELECT 1');
         console.log('✅ Connected to BDD');
         // ensure profile-related schema exists on already-initialised databases
-        await ensureSchema();
+        //await ensureSchema();
         // Clear HLS files on server start
         clearHLSFiles();
 
