@@ -14,8 +14,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
 import { ChatService } from '../../services/chat.service';
-import { AuthService, AuthUser } from '../../services/auth.service';
-import { ChatMessage } from '../../models/chat';
+import * as API from '../../models/APIModels'
+import { AuthService } from '../../services/auth.service';
 
 const USERNAME_COLORS = [
   '#ff4545',
@@ -44,8 +44,8 @@ export class StreamChatComponent implements OnInit, OnChanges, OnDestroy, AfterV
 
   @ViewChild('messagesScroll') private messagesScroll?: ElementRef<HTMLElement>;
 
-  messages: ChatMessage[] = [];
-  currentUser: AuthUser | null = null;
+  messages: API.ChatMessage[] = [];
+  currentUser: API.AuthUser | null = null;
   draft = '';
   isSending = false;
   sendError = '';
@@ -129,7 +129,7 @@ export class StreamChatComponent implements OnInit, OnChanges, OnDestroy, AfterV
     }
   }
 
-  trackByMessage(_index: number, message: ChatMessage): string {
+  trackByMessage(_index: number, message: API.ChatMessage): string {
     return String(message.id);
   }
 
