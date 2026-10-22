@@ -26,7 +26,7 @@ export class StreamComponent implements OnInit, OnDestroy {
   redirectCountdown = 5;
   private redirectInterval: any = null;
 
-  readonly viewerCount$: Observable<ViewerCount | null>;
+  readonly viewerCount$: Observable<API.ViewerCount | null>;
 
   private destroy$ = new Subject<void>();
 
