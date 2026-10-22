@@ -3,7 +3,9 @@ import { ComponentFixture } from '@angular/core/testing';
 import { StreamComponent } from './stream.component';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LiveStreamsService } from '../../services/live-streams.service';
-import { of, throwError } from 'rxjs';
+import { ViewerPresenceService } from '../../services/viewer-presence.service';
+import { ViewerCount } from '../../models/live-stream.model';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 
@@ -31,11 +33,18 @@ describe('StreamComponent', () => {
   let fixture: ComponentFixture<StreamComponent>;
   let routerSpy: jasmine.SpyObj<Router>;
   let liveStreamsSpy: jasmine.SpyObj<LiveStreamsService>;
+  let presenceSpy: jasmine.SpyObj<ViewerPresenceService>;
+  let countsSubject: BehaviorSubject<ViewerCount | null>;
 
   beforeEach(async () => {
     routerSpy = jasmine.createSpyObj('Router', ['navigate']);
     liveStreamsSpy = jasmine.createSpyObj('LiveStreamsService', ['getStreamById']);
     liveStreamsSpy.getStreamById.and.returnValue(of(mockStream as any));
+
+    countsSubject = new BehaviorSubject<ViewerCount | null>(null);
+    presenceSpy = jasmine.createSpyObj('ViewerPresenceService', ['start', 'stop'], {
+      counts$: countsSubject.asObservable()
+    });
 
     await TestBed.configureTestingModule({
       imports: [CommonModule, MockFovPlayerComponent, MockStreamChatComponent],
@@ -45,7 +54,8 @@ describe('StreamComponent', () => {
           useValue: { params: of({ streamId: 'test-stream' }) }
         },
         { provide: Router, useValue: routerSpy },
-        { provide: LiveStreamsService, useValue: liveStreamsSpy }
+        { provide: LiveStreamsService, useValue: liveStreamsSpy },
+        { provide: ViewerPresenceService, useValue: presenceSpy }
       ]
     })
     .overrideComponent(StreamComponent, {
@@ -119,4 +129,58 @@ describe('StreamComponent', () => {
     expect(component.isLive).toBeFalse();
     expect(component.isLoading).toBeFalse();
   }));
+
+  it('starts viewer presence when the stream is live', () => {
+    expect(presenceSpy.start).toHaveBeenCalledWith('test-stream');
+  });
+
+  it('renders the live viewer total in the header', () => {
+    countsSubject.next({
+      streamId: 'test-stream',
+      total: 3,
+      authenticated: 1,
+      anonymous: 2,
+      updatedAt: new Date().toISOString()
+    });
+    fixture.detectChanges();
+
+    const badge = fixture.nativeElement.querySelector('.viewer-info') as HTMLElement;
+    expect(badge).toBeTruthy();
+    expect(badge.textContent).toContain('3 spectateurs');
+  });
+
+  it('renders a singular label for a single viewer', () => {
+    countsSubject.next({
+      streamId: 'test-stream',
+      total: 1,
+      authenticated: 0,
+      anonymous: 1,
+      updatedAt: new Date().toISOString()
+    });
+    fixture.detectChanges();
+
+    const badge = fixture.nativeElement.querySelector('.viewer-info') as HTMLElement;
+    expect(badge.textContent).toContain('1 spectateur');
+    expect(badge.textContent).not.toContain('spectateurs');
+  });
+
+  it('hides the viewer badge until a count is available', () => {
+    countsSubject.next(null);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.viewer-info')).toBeNull();
+  });
+
+  it('stops viewer presence when the stream ends', () => {
+    component.streamInfo = mockStream as any;
+    component.onStreamEnded();
+
+    expect(presenceSpy.stop).toHaveBeenCalled();
+  });
+
+  it('stops viewer presence on destroy', () => {
+    fixture.destroy();
+
+    expect(presenceSpy.stop).toHaveBeenCalled();
+  });
 });

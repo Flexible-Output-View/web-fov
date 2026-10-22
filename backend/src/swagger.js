@@ -100,6 +100,43 @@ const swaggerDocument = {
                 responses: { 200: { description: 'HLS URL' } }
             }
         },
+        '/api/streams/{id}/viewers/heartbeat': {
+            post: {
+                tags: ['Streams'],
+                summary: 'Report viewer presence and get the live viewer count',
+                description: 'Keeps the in-memory presence registry up to date. A valid bearer token marks the viewer as authenticated; anonymous viewers are counted too. The updated count is broadcast to the stream room as a viewer-count Socket.IO event.',
+                parameters: [{ $ref: '#/components/parameters/Id' }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/ViewerHeartbeatRequest' } } }
+                },
+                responses: {
+                    200: {
+                        description: 'Live viewer count',
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/ViewerCount' } } }
+                    },
+                    400: { $ref: '#/components/responses/BadRequest' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/streams/{id}/viewers/leave': {
+            post: {
+                tags: ['Streams'],
+                summary: 'Remove a viewer from the live count',
+                description: 'Called when a viewer leaves the stream page (or via sendBeacon on tab close).',
+                parameters: [{ $ref: '#/components/parameters/Id' }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/ViewerHeartbeatRequest' } } }
+                },
+                responses: {
+                    204: { description: 'Viewer removed' },
+                    400: { $ref: '#/components/responses/BadRequest' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
         '/api/users/me': {
             get: {
                 tags: ['Users'],
@@ -331,6 +368,23 @@ const swaggerDocument = {
                 required: ['message'],
                 properties: {
                     message: { type: 'string', minLength: 1, maxLength: 500, description: 'Chat message text' }
+                }
+            },
+            ViewerHeartbeatRequest: {
+                type: 'object',
+                required: ['visitorId'],
+                properties: {
+                    visitorId: { type: 'string', minLength: 1, maxLength: 120, description: 'Stable per-tab viewer identifier' }
+                }
+            },
+            ViewerCount: {
+                type: 'object',
+                properties: {
+                    streamId: { type: 'string' },
+                    total: { type: 'integer', description: 'Authenticated plus anonymous viewers' },
+                    authenticated: { type: 'integer', description: 'Viewers with a valid session token' },
+                    anonymous: { type: 'integer', description: 'Viewers without a session token' },
+                    updatedAt: { type: 'string', format: 'date-time' }
                 }
             },
             ChatMessage: {

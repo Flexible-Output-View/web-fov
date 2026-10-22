@@ -10,6 +10,8 @@ import {
     probeTrackHasAudio,
     sortTrackIds
 } from '../streamTrackUtils.js';
+import { optionalAuth } from '../middleware/auth.js';
+import { sanitizeVisitorId, viewerPresence } from '../viewerPresence.js';
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
 const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
@@ -208,6 +210,50 @@ function buildStreamEntry(streamId, tracks, streamInfo) {
         thumbnailUrl: streamInfo?.thumbnail_url || ''
     };
 }
+
+export function broadcastViewerCount(app, streamId, counts) {
+    if (!counts) {
+        return;
+    }
+    const io = app?.get?.('io');
+    if (io && typeof io.to === 'function') {
+        io.to(`stream:${streamId}`).emit('viewer-count', counts);
+    }
+}
+
+// Public: every viewer on a stream page reports presence here, authenticated
+// or not. Counts are kept in memory and pushed live to the stream room.
+router.post('/:id/viewers/heartbeat', optionalAuth, (req, res) => {
+    const visitorId = sanitizeVisitorId(req.body?.visitorId);
+    if (!visitorId) {
+        return res.status(400).json({ error: 'Invalid visitor id' });
+    }
+
+    const counts = viewerPresence.touch(req.params.id, visitorId, {
+        authenticated: Boolean(req.userId)
+    });
+    if (!counts) {
+        return res.status(400).json({ error: 'Invalid stream id' });
+    }
+
+    broadcastViewerCount(req.app, counts.streamId, counts);
+    res.json(counts);
+});
+
+router.post('/:id/viewers/leave', (req, res) => {
+    const visitorId = sanitizeVisitorId(req.body?.visitorId);
+    if (!visitorId) {
+        return res.status(400).json({ error: 'Invalid visitor id' });
+    }
+
+    const counts = viewerPresence.remove(req.params.id, visitorId);
+    if (!counts) {
+        return res.status(400).json({ error: 'Invalid stream id' });
+    }
+
+    broadcastViewerCount(req.app, counts.streamId, counts);
+    res.status(204).end();
+});
 
 router.get('/', async (req, res, next) => {
     try {
