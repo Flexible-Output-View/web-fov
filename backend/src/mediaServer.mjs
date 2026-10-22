@@ -17,6 +17,7 @@ await fs.promises.mkdir(HLS_DIR, { recursive: true });
 const ffmpegProcesses = new Map();
 const registeredStreams = new Map();
 const baseSrtPort = parseInt(process.env.SRT_PORT || '9999', 10);
+const maxSrtPort = baseSrtPort + 11;
 const debugSrtPort = parseInt(process.env.DEBUG_SRT_PORT || String(baseSrtPort), 10);
 
 function parseRegisterRequest(body) {
@@ -93,19 +94,17 @@ function clearStreamHLSFiles(streamId) {
 // Safely kill a process with grace period - try SIGINT first, then SIGKILL
 function killFFmpegProcess(streamId, process, timeout = PROCESS_GRACE_PERIOD) {
     return new Promise((resolve) => {
-        if (!process || process.killed) {
+        if (!process) {
             resolve(true);
             return;
         }
 
         const killTimer = setTimeout(() => {
-            if (!process.killed) {
-                console.log(`⚠️ FFmpeg for stream ${streamId} did not exit gracefully, force killing (SIGKILL)...`);
-                try {
-                    process.kill('SIGKILL');
-                } catch (err) {
-                    console.error(`⚠️ Failed to SIGKILL ffmpeg for stream ${streamId}:`, err);
-                }
+            console.log(`⚠️ FFmpeg for stream ${streamId} did not exit gracefully, force killing (SIGKILL)...`);
+            try {
+                process.kill('SIGKILL');
+            } catch (err) {
+                console.error(`⚠️ Failed to SIGKILL ffmpeg for stream ${streamId}:`, err);
             }
             resolve(true);
         }, timeout);
@@ -223,9 +222,12 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, 
 
     ffmpegProc.on('exit', (code, signal) => {
         console.log(`ℹ️ FFmpeg for stream ${streamId} exited (code=${code} signal=${signal})`);
-        clearStreamHLSFiles(streamId);
-        ffmpegProcesses.delete(streamId);
-        registeredStreams.delete(streamId);
+        const currentProcess = ffmpegProcesses.get(streamId);
+        if (currentProcess?.process === ffmpegProc) {
+            clearStreamHLSFiles(streamId);
+            ffmpegProcesses.delete(streamId);
+            registeredStreams.delete(streamId);
+        }
         console.log(`📊 Active streams: ${ffmpegProcesses.size}`);
         if (socket) {
             try {
@@ -238,6 +240,12 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, 
 
     ffmpegProc.on('error', (err) => {
         console.error(`⚠️ FFmpeg spawn failed for stream ${streamId}:`, err);
+        const currentProcess = ffmpegProcesses.get(streamId);
+        if (currentProcess?.process === ffmpegProc) {
+            clearStreamHLSFiles(streamId);
+            ffmpegProcesses.delete(streamId);
+            registeredStreams.delete(streamId);
+        }
         if (socket) {
             try {
                 socket.destroy();
@@ -331,8 +339,12 @@ function createMediaRoutes() {
         try {
             const host = process.env.SRT_URL || '127.0.0.1';
             let srtPort = baseSrtPort;
-            while (Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
+            while (srtPort <= maxSrtPort && Array.from(registeredStreams.values()).some(s => s.port === srtPort)) {
                 srtPort++;
+            }
+
+            if (srtPort > maxSrtPort) {
+                return res.status(503).json({ error: 'No SRT ports available' });
             }
 
             const srtUrl = `srt://0.0.0.0:${srtPort}`;
@@ -559,4 +571,4 @@ async function startMediaServer() {
     });
 }
 
-export { createMediaRoutes, startMediaServer, ffmpegProcesses, killFFmpegProcess, clearHLSFiles };
+export { createMediaRoutes, startMediaServer, ffmpegProcesses, registeredStreams, killFFmpegProcess, clearHLSFiles };

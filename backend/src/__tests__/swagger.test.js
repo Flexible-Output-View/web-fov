@@ -6,6 +6,10 @@ describe('Swagger document', () => {
         expect(swaggerDocument.info.title).toBe('FOV Backend API');
         expect(swaggerDocument.paths['/api']).toBeDefined();
         expect(swaggerDocument.paths['/api/streams/available'].get).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/{id}/viewers/heartbeat'].post).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/{id}/viewers/leave'].post).toBeDefined();
+        expect(swaggerDocument.components.schemas.ViewerCount).toBeDefined();
+        expect(swaggerDocument.components.schemas.ViewerHeartbeatRequest.required).toEqual(['visitorId']);
         expect(swaggerDocument.paths['/api/twitch/top-categories'].get).toBeDefined();
         expect(swaggerDocument.components.parameters.Id).toEqual({
             name: 'id',
@@ -15,6 +19,17 @@ describe('Swagger document', () => {
         });
         expect(swaggerDocument.paths['/api/auth/register'].post).toBeDefined();
         expect(swaggerDocument.paths['/api/auth/login'].post).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/me'].put).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/me'].delete).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/me/password'].put).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/{username}/follow'].post).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/{username}'].get).toBeDefined();
+        expect(swaggerDocument.components.schemas.UserProfile).toBeDefined();
+        expect(swaggerDocument.components.securitySchemes.bearerAuth).toEqual({
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT'
+        });
         expect(swaggerDocument.components.schemas.RegisterRequest.required).toEqual(['username', 'email', 'password']);
         expect(swaggerDocument.components.responses.ServerError).toBeDefined();
     });

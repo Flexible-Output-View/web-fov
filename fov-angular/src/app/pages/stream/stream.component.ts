@@ -1,15 +1,17 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
+import { Observable, Subject, takeUntil } from 'rxjs';
 import { FovPlayerComponent } from '../../components/fov-player/fov-player.component';
+import { StreamChatComponent } from '../../components/stream-chat/stream-chat.component';
 import { LiveStreamsService } from '../../services/live-streams.service';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import { ViewerPresenceService } from '../../services/viewer-presence.service';
+import { LiveStreamInfo, ViewerCount } from '../../models/live-stream.model';
 
 @Component({
   selector: 'app-stream',
   standalone: true,
-  imports: [CommonModule, FovPlayerComponent],
+  imports: [CommonModule, FovPlayerComponent, StreamChatComponent],
   templateUrl: './stream.component.html',
   styleUrls: ['./stream.component.scss']
 })
@@ -24,13 +26,18 @@ export class StreamComponent implements OnInit, OnDestroy {
   redirectCountdown = 5;
   private redirectInterval: any = null;
 
+  readonly viewerCount$: Observable<ViewerCount | null>;
+
   private destroy$ = new Subject<void>();
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private liveStreamsService: LiveStreamsService
-  ) {}
+    private liveStreamsService: LiveStreamsService,
+    private viewerPresence: ViewerPresenceService
+  ) {
+    this.viewerCount$ = this.viewerPresence.counts$;
+  }
 
   ngOnInit() {
     this.route.params.pipe(
@@ -44,6 +51,7 @@ export class StreamComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    this.viewerPresence.stop();
     if (this.redirectInterval) {
       clearInterval(this.redirectInterval);
     }
@@ -54,6 +62,7 @@ export class StreamComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.streamEndedMessage = '';
     this.isLive = false;
+    this.viewerPresence.stop();
 
     let attempts = 0;
     const maxAttempts = 5;
@@ -68,6 +77,7 @@ export class StreamComponent implements OnInit, OnDestroy {
             this.streamInfo = stream;
             this.isLive = true;
             this.isLoading = false;
+            this.viewerPresence.start(this.streamId);
           } else {
             attempts++;
             if (attempts < maxAttempts) {
@@ -75,6 +85,7 @@ export class StreamComponent implements OnInit, OnDestroy {
             } else {
               this.isLoading = false;
               this.isLive = false;
+              this.viewerPresence.stop();
             }
           }
         },
@@ -86,6 +97,7 @@ export class StreamComponent implements OnInit, OnDestroy {
           } else {
             this.isLoading = false;
             this.errorMessage = 'Impossible de se connecter au serveur';
+            this.viewerPresence.stop();
           }
         }
       });
@@ -96,6 +108,7 @@ export class StreamComponent implements OnInit, OnDestroy {
 
   onStreamEnded() {
     this.isLive = false;
+    this.viewerPresence.stop();
     this.streamEndedMessage = `${this.streamInfo?.title || this.streamId} a terminé sa diffusion`;
     this.redirectCountdown = 5;
 

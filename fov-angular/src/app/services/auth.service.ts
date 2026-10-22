@@ -21,7 +21,7 @@ interface RawAuthResponse {
   avatarUrl?: string;
 }
 
-const TOKEN_KEY = 'fov_auth_token';
+export const AUTH_TOKEN_KEY = 'fov_auth_token';
 const USER_KEY = 'fov_auth_user';
 
 @Injectable({ providedIn: 'root' })
@@ -66,7 +66,7 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     this.currentUserSubject.next(null);
   }
@@ -78,7 +78,7 @@ export class AuthService {
   }
 
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return localStorage.getItem(AUTH_TOKEN_KEY);
   }
 
   getUsername(): string {
@@ -118,11 +118,14 @@ export class AuthService {
         }
         : null;
 
-    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
     if (user) {
       localStorage.setItem(USER_KEY, JSON.stringify(user));
-      this.currentUserSubject.next(user);
+    } else {
+      // Response carried a token but no user payload: drop any stale user.
+      localStorage.removeItem(USER_KEY);
     }
+    this.currentUserSubject.next(user);
   }
 
   private readStoredUser(): AuthUser | null {

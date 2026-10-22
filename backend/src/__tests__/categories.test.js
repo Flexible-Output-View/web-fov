@@ -25,7 +25,7 @@ describe('Categories Routes', () => {
     });
 
     describe('GET /', () => {
-        test('returns the first category query result', async () => {
+        test('returns every category query result', async () => {
             const mockCategories = [{ id: 1, name: 'Gaming', viewers: 100 }];
 
             db.query.mockResolvedValue(mockCategories);
@@ -33,10 +33,32 @@ describe('Categories Routes', () => {
             const response = await request(app).get('/');
 
             expect(response.status).toBe(200);
-            expect(response.body).toEqual(mockCategories[0]);
+            expect(response.body).toEqual(mockCategories);
             expect(db.query).toHaveBeenCalledWith(
                 'SELECT id, name, viewers, image_url FROM categories ORDER BY viewers DESC'
             );
+        });
+
+        test('returns an empty list when no categories exist', async () => {
+            db.query.mockResolvedValue([]);
+
+            const response = await request(app).get('/');
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual([]);
+        });
+
+        test('returns several categories as a list', async () => {
+            const categories = [
+                { id: 1, name: 'Gaming', viewers: 100 },
+                { id: 2, name: 'Sports', viewers: 50 }
+            ];
+            db.query.mockResolvedValue(categories);
+
+            const response = await request(app).get('/');
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual(categories);
         });
 
         test('should handle database errors', async () => {
@@ -71,6 +93,14 @@ describe('Categories Routes', () => {
 
             expect(response.status).toBe(404);
             expect(response.body).toEqual({ error: 'Categorie not found' });
+        });
+
+        test('returns 404 for a non-numeric category id', async () => {
+            const response = await request(app).get('/not-a-number');
+
+            expect(response.status).toBe(404);
+            expect(response.body).toEqual({ error: 'Categorie not found' });
+            expect(db.query).not.toHaveBeenCalled();
         });
 
         test('forwards database errors', async () => {

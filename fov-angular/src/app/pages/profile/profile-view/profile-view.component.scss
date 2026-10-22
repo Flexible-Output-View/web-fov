@@ -1,0 +1,212 @@
+.profile-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--spacing-lg, 16px);
+}
+
+.profile-banner {
+  width: 100%;
+  height: 200px;
+  background-color: var(--bg-secondary, #1a1a1a);
+  background-size: cover;
+  background-position: center;
+  border-radius: 12px 12px 0 0;
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-bottom: none;
+
+  &.empty {
+    background-image: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+  }
+}
+
+.profile-header {
+  display: flex;
+  gap: var(--spacing-lg, 16px);
+  padding: var(--spacing-lg, 16px);
+  background-color: var(--bg-secondary, #1a1a1a);
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+
+  .avatar {
+    flex-shrink: 0;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background-color: var(--accent-primary, #9147ff);
+    color: white;
+    font-size: 3rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 4px solid var(--bg-primary, #0f0f0f);
+    margin-top: -60px;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .profile-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs, 4px);
+
+    h1 {
+      font-size: 1.75rem;
+      color: var(--text-primary, #fff);
+      margin: 0;
+    }
+
+    .bio {
+      color: var(--text-secondary, #aaa);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin: 0;
+
+      &.empty {
+        font-style: italic;
+        opacity: 0.7;
+      }
+    }
+
+    .profile-actions {
+      margin-top: var(--spacing-sm, 8px);
+    }
+  }
+}
+
+.profile-stats {
+  display: flex;
+  gap: var(--spacing-lg, 16px);
+  padding: var(--spacing-md, 16px);
+  margin-top: var(--spacing-md, 16px);
+  background-color: var(--bg-secondary, #1a1a1a);
+  border: 1px solid var(--border-color, #2a2a2a);
+  border-radius: 12px;
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary, #fff);
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text-secondary, #aaa);
+    }
+  }
+}
+
+.profile-content {
+  margin-top: var(--spacing-md, 16px);
+}
+
+.load-error {
+  max-width: 600px;
+  margin: 40px auto;
+  text-align: center;
+  color: #ef4444;
+}
+
+.btn-primary {
+  padding: 10px 20px;
+  background-color: var(--accent-primary, #9147ff);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+.btn-follow {
+  padding: 10px 20px;
+  background-color: var(--accent-primary, #9147ff);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    opacity: 0.85;
+  }
+
+  &.following {
+    background-color: transparent;
+    color: var(--text-secondary, #aaa);
+    border: 1px solid var(--border-color, #2a2a2a);
+
+    &:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+  }
+}
+
+.btn-logout {
+  width: 100%;
+  padding: 14px 20px;
+  background-color: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #ef4444;
+    color: white;
+  }
+}
+
+.not-found {
+  max-width: 600px;
+  margin: 60px auto;
+  text-align: center;
+  color: var(--text-secondary, #aaa);
+
+  h2 {
+    color: var(--text-primary, #fff);
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+
+    .avatar {
+      width: 90px;
+      height: 90px;
+      font-size: 2rem;
+      margin-top: -50px;
+    }
+
+    .profile-info h1 {
+      font-size: 1.4rem;
+    }
+  }
+}

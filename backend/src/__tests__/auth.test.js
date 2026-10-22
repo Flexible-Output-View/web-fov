@@ -19,7 +19,8 @@ jest.unstable_mockModule('../utils/auth.js', () => ({
         if (!row) {
             return null;
         }
-        const { password_hash, ...user } = row;
+        const user = { ...row };
+        delete user.password_hash;
         return user;
     })
 }));

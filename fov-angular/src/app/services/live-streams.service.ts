@@ -33,9 +33,10 @@ export class LiveStreamsService {
   getAvailableStreams(): Observable<AvailableStreamsResponse> {
     return this.http.get<any>(`${this.API_URL}/streams/available`).pipe(
       map((response) => {
-        const streams = Array.isArray(response)
+        const streams = (Array.isArray(response)
           ? response
-          : response?.streams || [];
+          : response?.streams || [])
+          .filter((stream: LiveStreamInfo) => stream.trackCount > 0);
         return {
           streams: streams,
           streamCount: streams.length,

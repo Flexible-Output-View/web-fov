@@ -19,7 +19,6 @@ describe('streamTrackUtils', () => {
     let resolveTrackIsAudio;
     let resolveTrackName;
     let probeTrackHasVideo;
-    let probeTrackHasAudio;
 
     beforeEach(async () => {
         jest.resetModules();
@@ -39,8 +38,7 @@ describe('streamTrackUtils', () => {
             resolveTrackIsVideo,
             resolveTrackIsAudio,
             resolveTrackName,
-            probeTrackHasVideo,
-            probeTrackHasAudio
+            probeTrackHasVideo
         } = await import('../streamTrackUtils.js'));
     });
 

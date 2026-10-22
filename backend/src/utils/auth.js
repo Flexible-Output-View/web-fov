@@ -5,6 +5,21 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BCRYPT_ROUNDS = 10;
 
+// Usernames that would collide with frontend routes (e.g. /login, /profile).
+// A user with one of these names would have an unreachable public profile.
+const RESERVED_USERNAMES = new Set([
+    'login',
+    'register',
+    'profile',
+    'discover',
+    'followed',
+    'stream',
+    'how-does-it-work',
+    'settings',
+    'admin',
+    'api'
+]);
+
 function getJwtSecret() {
     const secret = process.env.JWT_SECRET;
     if (!secret && process.env.NODE_ENV !== 'test') {
@@ -18,6 +33,8 @@ export function validateRegister({ username, email, password }) {
 
     if (!username || !USERNAME_REGEX.test(username)) {
         errors.username = 'Username must be 3-30 characters and contain only letters, numbers, and underscores';
+    } else if (RESERVED_USERNAMES.has(username.toLowerCase())) {
+        errors.username = 'This username is reserved';
     }
 
     if (!email || !EMAIL_REGEX.test(email)) {
@@ -71,11 +88,16 @@ export function signToken(userId) {
     );
 }
 
+export function verifyToken(token) {
+    return jwt.verify(token, getJwtSecret());
+}
+
 export function sanitizeUser(row) {
     if (!row) {
         return null;
     }
 
-    const { password_hash, ...user } = row;
+    const user = { ...row };
+    delete user.password_hash;
     return user;
 }
