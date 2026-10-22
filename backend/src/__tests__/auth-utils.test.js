@@ -6,6 +6,7 @@ import {
     hashPassword,
     comparePassword,
     signToken,
+    verifyToken,
     sanitizeUser
 } from '../utils/auth.js';
 
@@ -26,6 +27,14 @@ describe('Auth utilities', () => {
 
         expect(result.ok).toBe(false);
         expect(result.errors).toEqual(expect.objectContaining({ username: expect.any(String), email: expect.any(String), password: expect.any(String) }));
+    });
+
+    test('rejects reserved usernames on registration', () => {
+        for (const username of ['login', 'PROFILE', 'register', 'how-does-it-work']) {
+            const result = validateRegister({ username, email: 'alice@example.com', password: 'secret123' });
+            expect(result.ok).toBe(false);
+            expect(result.errors.username).toEqual(expect.any(String));
+        }
     });
 
     test('reports each invalid login field', () => {
@@ -52,6 +61,13 @@ describe('Auth utilities', () => {
 
         expect(payload.userId).toBe(42);
         expect(payload.exp).toBeGreaterThan(payload.iat);
+    });
+
+    test('verifies a signed token and rejects tampered ones', () => {
+        const token = signToken(7);
+
+        expect(verifyToken(token).userId).toBe(7);
+        expect(() => verifyToken('not-a-token')).toThrow();
     });
 
     test('sanitizes the password hash', () => {

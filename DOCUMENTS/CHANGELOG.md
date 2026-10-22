@@ -10,12 +10,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 - User registration and login: `POST /api/auth/register`, `POST /api/auth/login` (JWT issuance, bcrypt hashing, validation, `409` on duplicates, `401` on bad credentials)
+- User profiles: `GET /api/users/me`, `PUT /api/users/me` (bio, avatar, banner), `PUT /api/users/me/password`, and public `GET /api/users/:username`
+- Follow/unfollow: `POST` / `DELETE /api/users/:username/follow` with `followersCount`, `followingCount` and `isFollowing` on profile responses
+- JWT auth middleware (`requireAuth` / `optionalAuth`) guarding profile update, password change, and follow endpoints
+- `follows` table and profile columns (`bio`, `avatar_url`, `banner_url`, `updated_at`) with an idempotent startup migration (`ensureSchema`)
+- Angular `UserService` now calls the real profile API (with an `Authorization` interceptor) instead of using `localStorage`
 - Swagger documentation for auth endpoints (`/api-docs`)
 - Angular `AuthService` with `/login` and `/register` pages (token persisted as `fov_auth_token` / `fov_auth_user`)
 - Postgres 18 as the documented and deployed database (`pg` Pool, `fovwebdb.sql` Postgres schema)
 
 ### Planned Features
-- Global JWT guard for protected endpoints
 - Input validation & sanitization middleware (beyond auth)
 - Rate limiting per IP
 - Comprehensive API documentation (Swagger/OpenAPI)

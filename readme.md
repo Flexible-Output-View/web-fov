@@ -1,9 +1,16 @@
 # FOV - Flexible Output View
 
-[![Backend coverage](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev/graph/badge.svg?flag=backend)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev)
-[![Frontend coverage](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev/graph/badge.svg?flag=frontend)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev)
-
 A flexible, customizable video streaming platform that allows streamers to broadcast multi-track video/audio streams and viewers to personalize their viewing experience.
+
+## CI Status
+| Component / Pipeline | Main (Production) | Dev (Development) |
+| ---: | :--- | :--- |
+| **Deployment** | [![Deploy Public](https://github.com/Flexible-Output-View/web-fov/actions/workflows/fov-deploy-public.yml/badge.svg)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/fov-deploy-public.yml) | [![Deploy Dev](https://github.com/Flexible-Output-View/web-fov/actions/workflows/fov-deploy.yml/badge.svg?branch=dev)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/fov-deploy.yml) |
+| **Backend Tests & Lint** | [![Backend Tests](https://github.com/Flexible-Output-View/web-fov/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/backend-tests.yml) | [![Backend Tests](https://github.com/Flexible-Output-View/web-fov/actions/workflows/backend-tests.yml/badge.svg?branch=dev)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/backend-tests.yml) |
+| **Angular Tests** | [![Angular Tests](https://github.com/Flexible-Output-View/web-fov/actions/workflows/angular-tests.yml/badge.svg)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/angular-tests.yml) | [![Angular Tests](https://github.com/Flexible-Output-View/web-fov/actions/workflows/angular-tests.yml/badge.svg?branch=dev)](https://github.com/Flexible-Output-View/web-fov/actions/workflows/angular-tests.yml) |
+| **Backend Coverage** | [![Backend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/main?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/main) | [![Backend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/dev?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev) |
+| **Frontend Coverage** | [![Frontend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/main?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/main) | [![Frontend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/dev?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev) |
+
 
 ## 📋 Project Overview
 
@@ -201,7 +208,12 @@ Encoders should use these settings:
 |----------|--------|-------------|
 | `/auth/register` | POST | Register a new user (`username`, `email`, `password`) → `201 {token, user}` |
 | `/auth/login` | POST | Login with username or email (`login`, `password`) → `200 {token, user}` |
-| `/users/:id` | GET | Get user profile |
+| `/users/me` | GET | Get the authenticated user's profile (Bearer token) |
+| `/users/me` | PUT | Update own profile (`bio`, `avatarUrl`, `bannerUrl`) (Bearer token) |
+| `/users/me/password` | PUT | Change own password (`currentPassword`, `newPassword`) (Bearer token) |
+| `/users/{username}` | GET | Get a public profile by username |
+| `/users/{username}/follow` | POST | Follow a user (Bearer token) |
+| `/users/{username}/follow` | DELETE | Unfollow a user (Bearer token) |
 | `/streams` | GET | List all streams |
 | `/streams/available` | GET | Get active streams with HLS URLs |
 | `/streams/:id` | GET | Get stream details |
@@ -230,6 +242,8 @@ curl -X POST http://localhost:4000/api/auth/login \
 ```
 
 `login` accepts a username or an email (email match is case-insensitive). Wrong credentials return `401 {error: "Invalid credentials"}`. The JWT (`JWT_SECRET`, expiry `JWT_EXPIRES_IN`, default `7d`) is returned as `token` and persisted by the Angular client (`fov_auth_token` / `fov_auth_user`). Interactive docs: `http://localhost:4000/api-docs`.
+
+**Profile endpoints (protected):** send the token as `Authorization: Bearer <token>`. `PUT /api/users/me` accepts `{bio, avatarUrl, bannerUrl}` (bio ≤ 300 chars, images are URLs or data URLs ≤ 5 MB). `PUT /api/users/me/password` accepts `{currentPassword, newPassword}` (min 8 chars). `GET /api/users/{username}` returns the public profile (`followersCount`, `followingCount`, and `isFollowing` when authenticated) without the email.
 
 See [DOCUMENTS/API-TESTING.md](DOCUMENTS/API-TESTING.md) for detailed examples.
 
@@ -303,6 +317,8 @@ docker-compose -f docker-compose.prod.yml up -d
 - Environment variable separation
 - User registration and login (`POST /api/auth/register`, `POST /api/auth/login`)
 - JWT issuance (`JWT_SECRET` / `JWT_EXPIRES_IN`, default `7d`)
+- JWT bearer auth middleware (`requireAuth` / `optionalAuth`) protecting profile update, password change, and follow endpoints
+- Profile management (`GET/PUT /api/users/me`, avatar/banner/bio) and follow/unfollow
 - Password hashing with bcrypt
 - Input validation for auth (username, email, password rules)
 
