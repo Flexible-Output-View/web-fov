@@ -6,6 +6,10 @@ describe('Swagger document', () => {
         expect(swaggerDocument.info.title).toBe('FOV Backend API');
         expect(swaggerDocument.paths['/api']).toBeDefined();
         expect(swaggerDocument.paths['/api/streams/available'].get).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/{id}/viewers/heartbeat'].post).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/{id}/viewers/leave'].post).toBeDefined();
+        expect(swaggerDocument.components.schemas.ViewerCount).toBeDefined();
+        expect(swaggerDocument.components.schemas.ViewerHeartbeatRequest.required).toEqual(['visitorId']);
         expect(swaggerDocument.paths['/api/twitch/top-categories'].get).toBeDefined();
         expect(swaggerDocument.components.parameters.Id).toEqual({
             name: 'id',

@@ -47,8 +47,10 @@
       <h1>{{ streamInfo.title || streamId }}</h1>
       <span class="stream-category-badge" *ngIf="streamInfo.category">{{ streamInfo.category }}</span>
       <span class="track-info">{{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}</span>
-      <span class="viewer-info" *ngIf="streamInfo.viewers > 0">{{ streamInfo.viewers }} spectateur{{ streamInfo.viewers
-        > 1 ? 's' : '' }}</span>
+      <span class="viewer-info" *ngIf="viewerCount$ | async as viewerCount">
+        <span class="viewer-dot"></span>
+        {{ viewerCount.total }} spectateur{{ viewerCount.total > 1 ? 's' : '' }}
+      </span>
     </div>
   </div>
 </div>

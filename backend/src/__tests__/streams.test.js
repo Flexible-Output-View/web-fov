@@ -3,6 +3,8 @@ import request from 'supertest';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { jest } from '@jest/globals';
+import { signToken } from '../utils/auth.js';
+import { viewerPresence } from '../viewerPresence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const mediaRoot = path.join(__dirname, 'test-media');
@@ -37,8 +39,12 @@ jest.unstable_mockModule('../streamTrackUtils.js', () => ({
 
 const { default: streamsRouter } = await import('../routes/streams.js');
 
-function createApp() {
+function createApp(ioMock) {
     const app = express();
+    app.use(express.json());
+    if (ioMock) {
+        app.set('io', ioMock);
+    }
     app.use('/', streamsRouter);
     app.use((err, req, res, _next) => {
         res.status(500).json({ error: err.message });
@@ -82,6 +88,7 @@ describe('Streams Routes', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        viewerPresence.clear();
         buildSeparatedAvailableTracks.mockReturnValue(null);
         probeTrackHasVideo.mockResolvedValue(true);
         probeTrackHasAudio.mockResolvedValue(true);
@@ -314,5 +321,119 @@ describe('Streams Routes', () => {
 
         expect(response.status).toBe(500);
         expect(response.body).toEqual({ error: 'HLS directory unavailable' });
+    });
+
+    describe('viewer presence', () => {
+        test('counts an anonymous viewer on heartbeat', async () => {
+            const response = await request(createApp())
+                .post('/1/viewers/heartbeat')
+                .send({ visitorId: 'visitor-a' });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toMatchObject({
+                streamId: '1',
+                total: 1,
+                authenticated: 0,
+                anonymous: 1
+            });
+            expect(typeof response.body.updatedAt).toBe('string');
+        });
+
+        test('never double counts a visitor sending repeated heartbeats', async () => {
+            const app = createApp();
+            await request(app).post('/1/viewers/heartbeat').send({ visitorId: 'visitor-a' });
+            const response = await request(app).post('/1/viewers/heartbeat').send({ visitorId: 'visitor-a' });
+
+            expect(response.body.total).toBe(1);
+        });
+
+        test('counts a valid bearer token as an authenticated viewer', async () => {
+            const token = signToken(42);
+
+            const response = await request(createApp())
+                .post('/1/viewers/heartbeat')
+                .set('Authorization', `Bearer ${token}`)
+                .send({ visitorId: 'visitor-a' });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toMatchObject({ total: 1, authenticated: 1, anonymous: 0 });
+        });
+
+        test('treats an invalid bearer token as anonymous', async () => {
+            const response = await request(createApp())
+                .post('/1/viewers/heartbeat')
+                .set('Authorization', 'Bearer not-a-token')
+                .send({ visitorId: 'visitor-a' });
+
+            expect(response.status).toBe(200);
+            expect(response.body).toMatchObject({ total: 1, authenticated: 0, anonymous: 1 });
+        });
+
+        test('broadcasts the updated count to the stream room', async () => {
+            const emitted = [];
+            const ioMock = {
+                to: jest.fn(() => ({
+                    emit: jest.fn((event, payload) => emitted.push({ event, payload }))
+                }))
+            };
+
+            const response = await request(createApp(ioMock))
+                .post('/1/viewers/heartbeat')
+                .send({ visitorId: 'visitor-a' });
+
+            expect(ioMock.to).toHaveBeenCalledWith('stream:1');
+            expect(emitted).toHaveLength(1);
+            expect(emitted[0].event).toBe('viewer-count');
+            expect(emitted[0].payload).toEqual(response.body);
+        });
+
+        test('removes a viewer on leave and broadcasts the new count', async () => {
+            const emitted = [];
+            const ioMock = {
+                to: jest.fn(() => ({
+                    emit: jest.fn((event, payload) => emitted.push({ event, payload }))
+                }))
+            };
+            const app = createApp(ioMock);
+
+            await request(app).post('/1/viewers/heartbeat').send({ visitorId: 'visitor-a' });
+            const leave = await request(app).post('/1/viewers/leave').send({ visitorId: 'visitor-a' });
+
+            expect(leave.status).toBe(204);
+            expect(viewerPresence.getCounts('1').total).toBe(0);
+            expect(emitted[emitted.length - 1]).toMatchObject({
+                event: 'viewer-count',
+                payload: { total: 0, authenticated: 0, anonymous: 0 }
+            });
+        });
+
+        test('rejects a missing or invalid visitor id', async () => {
+            const missing = await request(createApp()).post('/1/viewers/heartbeat').send({});
+            expect(missing.status).toBe(400);
+            expect(missing.body).toEqual({ error: 'Invalid visitor id' });
+
+            const invalid = await request(createApp())
+                .post('/1/viewers/heartbeat')
+                .send({ visitorId: 'x'.repeat(121) });
+            expect(invalid.status).toBe(400);
+
+            const leave = await request(createApp()).post('/1/viewers/leave').send({});
+            expect(leave.status).toBe(400);
+        });
+
+        test('rejects an invalid stream id', async () => {
+            const longStreamId = encodeURIComponent('x'.repeat(121));
+
+            const heartbeat = await request(createApp())
+                .post(`/${longStreamId}/viewers/heartbeat`)
+                .send({ visitorId: 'visitor-a' });
+            expect(heartbeat.status).toBe(400);
+            expect(heartbeat.body).toEqual({ error: 'Invalid stream id' });
+
+            const leave = await request(createApp())
+                .post(`/${longStreamId}/viewers/leave`)
+                .send({ visitorId: 'visitor-a' });
+            expect(leave.status).toBe(400);
+        });
     });
 });

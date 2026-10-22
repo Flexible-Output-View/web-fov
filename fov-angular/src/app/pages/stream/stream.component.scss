@@ -261,9 +261,20 @@
 }
 
 .viewer-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   background: var(--bg-tertiary, #252525);
   border-radius: var(--radius-sm, 4px);
   font-size: 0.8rem;
   color: var(--text-secondary, #888);
+
+  .viewer-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #1db954;
+    animation: pulse 2s infinite;
+  }
 }

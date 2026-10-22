@@ -23,3 +23,11 @@ export interface AvailableStreamsResponse {
   streams: LiveStreamInfo[];
   streamCount: number;
 }
+
+export interface ViewerCount {
+  streamId: string;
+  total: number;
+  authenticated: number;
+  anonymous: number;
+  updatedAt: string;
+}
