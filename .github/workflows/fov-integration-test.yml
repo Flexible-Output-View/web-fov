@@ -9,6 +9,7 @@ on:
     branches:
       - dev
       - master
+      - 'dependabot/**'
 
 jobs:
   integration_test:
