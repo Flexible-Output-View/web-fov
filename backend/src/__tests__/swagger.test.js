@@ -15,6 +15,17 @@ describe('Swagger document', () => {
         });
         expect(swaggerDocument.paths['/api/auth/register'].post).toBeDefined();
         expect(swaggerDocument.paths['/api/auth/login'].post).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/me'].put).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/me'].delete).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/me/password'].put).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/{username}/follow'].post).toBeDefined();
+        expect(swaggerDocument.paths['/api/users/{username}'].get).toBeDefined();
+        expect(swaggerDocument.components.schemas.UserProfile).toBeDefined();
+        expect(swaggerDocument.components.securitySchemes.bearerAuth).toEqual({
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT'
+        });
         expect(swaggerDocument.components.schemas.RegisterRequest.required).toEqual(['username', 'email', 'password']);
         expect(swaggerDocument.components.responses.ServerError).toBeDefined();
     });

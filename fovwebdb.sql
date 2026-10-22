@@ -1,5 +1,6 @@
 -- Drop existing tables
 DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS follows;
 DROP TABLE IF EXISTS streams;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS categories;
@@ -28,10 +29,25 @@ CREATE TABLE users (
   email VARCHAR(255) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   display_name VARCHAR(100),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  bio VARCHAR(300) NOT NULL DEFAULT '',
+  avatar_url TEXT,
+  banner_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_users_email ON users (LOWER(email));
+
+-- Table structure for follows (follower -> following)
+CREATE TABLE follows (
+  follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (follower_id, following_id),
+  CONSTRAINT chk_no_self_follow CHECK (follower_id <> following_id)
+);
+
+CREATE INDEX idx_follows_following_id ON follows (following_id);
 
 -- Table structure for streams
 CREATE TABLE streams (

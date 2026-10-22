@@ -34,30 +34,107 @@ curl http://localhost:4000/
 
 ## Users & Auth Endpoints
 
-### Get User by ID (GET)
+### Get Public Profile by Username (GET)
 
 **Request:**
 ```bash
-curl http://localhost:4000/api/users/1
+curl http://localhost:4000/api/users/john_doe
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "data": {
-    "id": 1,
-    "username": "john_doe",
-    "display_name": "John Doe",
-    "created_at": "2026-01-15T10:30:00Z"
-  }
+  "id": 1,
+  "username": "john_doe",
+  "bio": "Streaming enthusiast",
+  "avatarUrl": "data:image/png;base64,...",
+  "bannerUrl": "",
+  "followersCount": 12,
+  "followingCount": 4,
+  "isFollowing": false
 }
 ```
+
+`isFollowing` is `true` when the request carries a valid `Authorization: Bearer <token>` for a user who follows this profile. The `email` field is never returned on public profiles.
 
 **Response (404 Not Found):**
 ```json
 {
   "error": "User not found"
 }
+```
+
+### Get Own Profile (GET, auth)
+
+**Request:**
+```bash
+curl http://localhost:4000/api/users/me \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "username": "john_doe",
+  "email": "john@example.com",
+  "bio": "Streaming enthusiast",
+  "avatarUrl": "",
+  "bannerUrl": "",
+  "followersCount": 12,
+  "followingCount": 4,
+  "isFollowing": false
+}
+```
+
+### Update Own Profile (PUT, auth)
+
+`avatarUrl` / `bannerUrl` accept a URL or a base64 data URL (max 5 MB each). `bio` is capped at 300 characters.
+
+**Request:**
+```bash
+curl -X PUT http://localhost:4000/api/users/me \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"bio":"Streaming enthusiast","avatarUrl":"","bannerUrl":""}'
+```
+
+**Response (200 OK):** the updated profile (same shape as `GET /api/users/me`).
+
+### Change Password (PUT, auth)
+
+**Request:**
+```bash
+curl -X PUT http://localhost:4000/api/users/me/password \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"secret123","newPassword":"new-secret-123"}'
+```
+
+**Response (200 OK):**
+```json
+{ "ok": true }
+```
+
+**Error (401 Unauthorized):**
+```json
+{ "error": "Current password is incorrect" }
+```
+
+### Follow / Unfollow a User (POST / DELETE, auth)
+
+**Request:**
+```bash
+curl -X POST http://localhost:4000/api/users/jane_smith/follow \
+  -H "Authorization: Bearer $TOKEN"
+
+curl -X DELETE http://localhost:4000/api/users/jane_smith/follow \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response (200 OK):**
+```json
+{ "following": true }
 ```
 
 ### Register (POST)
@@ -334,8 +411,12 @@ curl -X POST $BASE_URL/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"login":"testuser","password":"secret123"}'
 
-# Get user
-curl $BASE_URL/api/users/1
+# Get public profile
+curl $BASE_URL/api/users/testuser
+
+# Get own profile (with a token)
+TOKEN="<jwt>"
+curl $BASE_URL/api/users/me -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Debugging with Verbose Output
@@ -556,8 +637,12 @@ Before considering API ready:
 - [ ] **Login**: `POST /api/auth/login` returns 200 with token + user
 - [ ] **Duplicate register**: returns 409
 - [ ] **Wrong credentials**: returns 401
-- [ ] **Get User**: `GET /api/users/:id` returns 200
-- [ ] **Not Found**: `GET /api/users/999` returns 404
+- [ ] **Get User**: `GET /api/users/:username` returns 200
+- [ ] **My Profile**: `GET /api/users/me` returns 200 with a valid token
+- [ ] **Update Profile**: `PUT /api/users/me` updates bio/avatar/banner
+- [ ] **Change Password**: `PUT /api/users/me/password` updates the password
+- [ ] **Follow**: `POST /api/users/:username/follow` sets `following: true`
+- [ ] **Not Found**: `GET /api/users/unknown_user` returns 404
 - [ ] **Validation**: Missing fields return 400
 - [ ] **Errors**: Database errors return 500 (not stacktrace)
 - [ ] **Categories**: CRUD operations work
