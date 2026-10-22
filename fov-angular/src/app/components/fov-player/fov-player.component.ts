@@ -138,12 +138,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     return `fov_layout_${this.streamId}`;
   }
 
-  ngAfterViewInit() {
-    // enable moq
-    if (true) {
-    setTimeout(() => {
-
-        async function initializeSynchronizedMultiTrack() {
+  private async initializeSynchronizedMultiTrack() {
       // 1. Establish a single shared connection and broadcast
       const connection = new Moq.Connection({ url: new URL("http://localhost:4443") });
       const broadcastName = Moq.Path.from("test123.hang");
@@ -235,10 +230,13 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     return players;
   }
 
-    initializeSynchronizedMultiTrack();
-      })
-      return;
-    };
+
+  ngAfterViewInit() {
+    // enable moq
+
+    setTimeout(() => (this.initializeSynchronizedMultiTrack()), 5000);
+
+    return;
 
 
 
