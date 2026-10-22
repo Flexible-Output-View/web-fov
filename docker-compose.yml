@@ -30,6 +30,7 @@ services:
       - MEDIA_ROOT=/var/media
       - SRT_URL=${SRT_URL}
       - MOQ_URL=${MOQ_URL}
+      - MOQ_PORT=${MOQ_PORT}
       - API_HOSTNAME=${API_URL}
       - TWITCH_ID=${TWITCH_ID}
       - TWITCH_SECRET=${TWITCH_SECRET}

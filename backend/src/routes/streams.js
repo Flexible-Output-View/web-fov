@@ -13,6 +13,9 @@ import {
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
 const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
+const MOQPORT = parseInt(process.env.MOQ_PORT || '4443', 10);
+const MOQHOST = process.env.MOQ_URL || 'http://127.0.0.1';
+const MOQURLEXTERNAL = `${MOQHOST}:${MOQPORT}`;
 
 async function buildTracks(streamId, trackDirs, url) {
     const trackOptions = { hlsDir: HLS_DIR, ffmpegProcesses };
@@ -92,8 +95,9 @@ function buildStreamEntryMOQ(stream, streamInfo) {
     return {
         streamId: stream.streamId,
         trackCount: stream.tracksA + stream.tracksV,
-        tracks: [], // TODO get from moq relay
+        tracks: [],
         protocol: 'moq',
+        moqRelay: MOQURLEXTERNAL,
         title: streamInfo?.title || '',
         category: streamInfo?.category || '',
         viewers: streamInfo?.viewers || 0,

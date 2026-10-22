@@ -11,7 +11,6 @@ import {
   ChangeDetectorRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import Hls from 'hls.js';
 import {
   StreamEngine,
@@ -22,6 +21,8 @@ import { HlsStreamEngine } from '../../services/hls-stream-service';
 import { AppMountDirective } from '../../app-mount.directive';
 import * as Moq from '@moq/net';
 import * as Watch from '@moq/watch';
+import { MoqStreamEngine } from '../../services/moq-stream-service';
+import { StreamEngineDispatcher } from '../../services/stream-engine-dispatcher';
 
 export interface Track {
   index: number;
@@ -92,7 +93,11 @@ const AUDIO_UNLOCKED_SESSION_KEY = 'fov_audio_unlocked';
   selector: 'app-fov-player',
   standalone: true,
   imports: [CommonModule, AppMountDirective],
-  providers: [{ provide: STREAM_ENGINE, useClass: HlsStreamEngine }],
+  providers: [
+    HlsStreamEngine,
+    MoqStreamEngine,
+    { provide: STREAM_ENGINE, useClass: StreamEngineDispatcher }
+  ],
   templateUrl: './fov-player.component.html',
   styleUrls: ['./fov-player.component.scss'],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -138,108 +143,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     return `fov_layout_${this.streamId}`;
   }
 
-  private async initializeSynchronizedMultiTrack() {
-      // 1. Establish a single shared connection and broadcast
-      const connection = new Moq.Connection({ url: new URL("http://localhost:4443") });
-      const broadcastName = Moq.Path.from("test123.hang");
-
-      const broadcast = new Watch.Broadcast({
-          origin: connection.origin,
-          name: broadcastName,
-      });
-
-      // 2. Fetch catalog once
-      let catalog = (await broadcast.out.catalog) as any;
-      if (!catalog?.video?.renditions || !catalog?.audio?.renditions) {
-          for (let i = 0; i < 20; i++) {
-              catalog = broadcast.out.catalog.peek();
-              if (catalog?.video?.renditions && catalog?.audio?.renditions) break;
-              await new Promise((resolve) => setTimeout(resolve, 250));
-          }
-      }
-
-      const videoRenditions = catalog?.video?.renditions ? Object.keys(catalog.video.renditions) : [];
-      const audioRenditions = catalog?.audio?.renditions ? Object.keys(catalog.audio.renditions) : [];
-
-      if (videoRenditions.length === 0 && audioRenditions.length === 0) {
-          console.warn("No tracks found in catalog.");
-          return;
-    }
-
-    const container = document.querySelector("#players-container") ?? document.body;
-    const players: Watch.Player[] = [];
-
-    // 3. Create a single shared synchronization clock for all tracks
-    const sharedSync = new Watch.Sync();
-
-    // 4. Initialize video players sharing the connection probe and sync clock
-    for (const renditionKey of videoRenditions) {
-        const canvas = document.createElement("canvas");
-        canvas.width = 1920;
-        canvas.height = 1088;
-        canvas.style.display = "block";
-        canvas.style.width = "100%";
-        canvas.style.maxWidth = "800px";
-        canvas.style.marginBottom = "10px";
-        canvas.style.backgroundColor = "#000";
-        container.appendChild(canvas);
-
-        const player = new Watch.Player({
-            origin: connection.origin,
-            probe: connection.probe,
-            name: broadcastName,
-            canvas: canvas,
-            target: { name: renditionKey },
-            visible: "always",
-            muted: true,
-        });
-        players.push(player);
-    }
-
-    // 5. Initialize audio players for concurrent multi-track audio mixing
-    for (const audioKey of audioRenditions) {
-        const player = new Watch.Player({
-            origin: connection.origin,
-            probe: connection.probe,
-            name: broadcastName,
-            muted: false,
-            volume: 1.0,
-        });
-
-        try {
-            if (player.audio?.source) {
-                (player.audio.source.in.target as any).set({ name: audioKey });
-            }
-        } catch (e) {
-            console.warn(`Could not set target for audio key ${audioKey}:`, e);
-        }
-
-        players.push(player);
-    }
-
-    // 6. Unlock browser audio contexts on first click
-    document.addEventListener("click", () => {
-        players.forEach((p) => {
-            const emitter = p.emitter as any;
-            if (emitter?.context?.state === "suspended") {
-                emitter.context.resume();
-            }
-        });
-    }, { once: true });
-
-    return players;
-  }
-
-
   ngAfterViewInit() {
-    // enable moq
-
-    setTimeout(() => (this.initializeSynchronizedMultiTrack()), 5000);
-
-    return;
-
-
-
     this.audioUnlocked =
       sessionStorage.getItem(AUDIO_UNLOCKED_SESSION_KEY) === '1';
 

@@ -440,8 +440,8 @@ function createMediaRoutes() {
         }
 
         try {
-            const host = process.env.MOQ_URL || '127.0.0.1';
-            const moqUrlExternal = `http://${host}:${moqPort}`;
+            const host = process.env.MOQ_URL || 'http://127.0.0.1';
+            const moqUrlExternal = `${host}:${moqPort}`;
 
             registeredStreams.set(streamId, {
                 streamId,

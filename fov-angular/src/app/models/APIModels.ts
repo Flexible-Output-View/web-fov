@@ -37,6 +37,8 @@ export interface LiveStreamInfo {
   category: string;
   viewers: number;
   avatarUrl: string;
+  protocol: string;
+  moqRelay?: string;
   thumbnailUrl: string;
 }
 
