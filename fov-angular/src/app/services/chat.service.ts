@@ -21,6 +21,9 @@ export class ChatService implements OnDestroy {
   private connectedSubject = new BehaviorSubject<boolean>(false);
   public connected$ = this.connectedSubject.asObservable();
 
+  private viewerCountSubject = new BehaviorSubject<ViewerCount | null>(null);
+  public viewerCount$ = this.viewerCountSubject.asObservable();
+
   constructor(
     private http: HttpClient,
     private authService: AuthService,
@@ -77,6 +80,13 @@ export class ChatService implements OnDestroy {
       }
       this.appendMessage(message);
     });
+
+    this.socket.on('viewer-count', (counts: ViewerCount) => {
+      if (!counts || String(counts.streamId) !== String(this.currentStreamId)) {
+        return;
+      }
+      this.viewerCountSubject.next(counts);
+    });
   }
 
   leaveStream(): void {
@@ -91,6 +101,7 @@ export class ChatService implements OnDestroy {
     this.currentStreamId = null;
     this.connectedSubject.next(false);
     this.messagesSubject.next([]);
+    this.viewerCountSubject.next(null);
   }
 
   disconnect(): void {

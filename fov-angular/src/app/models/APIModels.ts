@@ -63,3 +63,11 @@ export interface RawAuthResponse {
   email?: string;
   avatarUrl?: string;
 }
+
+export interface ViewerCount {
+  streamId: string;
+  total: number;
+  authenticated: number;
+  anonymous: number;
+  updatedAt: string;
+}

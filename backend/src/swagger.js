@@ -100,13 +100,136 @@ const swaggerDocument = {
                 responses: { 200: { description: 'HLS URL' } }
             }
         },
-        '/api/users/{id}': {
+        '/api/streams/{id}/viewers/heartbeat': {
+            post: {
+                tags: ['Streams'],
+                summary: 'Report viewer presence and get the live viewer count',
+                description: 'Keeps the in-memory presence registry up to date. A valid bearer token marks the viewer as authenticated; anonymous viewers are counted too. The updated count is broadcast to the stream room as a viewer-count Socket.IO event.',
+                parameters: [{ $ref: '#/components/parameters/Id' }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/ViewerHeartbeatRequest' } } }
+                },
+                responses: {
+                    200: {
+                        description: 'Live viewer count',
+                        content: { 'application/json': { schema: { $ref: '#/components/schemas/ViewerCount' } } }
+                    },
+                    400: { $ref: '#/components/responses/BadRequest' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/streams/{id}/viewers/leave': {
+            post: {
+                tags: ['Streams'],
+                summary: 'Remove a viewer from the live count',
+                description: 'Called when a viewer leaves the stream page (or via sendBeacon on tab close).',
+                parameters: [{ $ref: '#/components/parameters/Id' }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/ViewerHeartbeatRequest' } } }
+                },
+                responses: {
+                    204: { description: 'Viewer removed' },
+                    400: { $ref: '#/components/responses/BadRequest' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/users/me': {
             get: {
                 tags: ['Users'],
-                summary: 'Get a user by ID',
-                parameters: [{ $ref: '#/components/parameters/Id' }],
+                summary: 'Get the authenticated user profile',
+                security: [{ bearerAuth: [] }],
                 responses: {
-                    200: { description: 'User' },
+                    200: { description: 'Own profile', content: { 'application/json': { schema: { $ref: '#/components/schemas/UserProfile' } } } },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            },
+            put: {
+                tags: ['Users'],
+                summary: 'Update the authenticated user public profile',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateProfileRequest' } } }
+                },
+                responses: {
+                    200: { description: 'Updated profile', content: { 'application/json': { schema: { $ref: '#/components/schemas/UserProfile' } } } },
+                    400: { description: 'Validation error' },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            },
+            delete: {
+                tags: ['Users'],
+                summary: 'Permanently delete the authenticated user account',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/DeleteAccountRequest' } } }
+                },
+                responses: {
+                    200: { description: 'Account deleted' },
+                    400: { description: 'Validation error or incorrect password' },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/users/me/password': {
+            put: {
+                tags: ['Users'],
+                summary: 'Change the authenticated user password',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/ChangePasswordRequest' } } }
+                },
+                responses: {
+                    200: { description: 'Password updated' },
+                    400: { description: 'Validation error' },
+                    401: { description: 'Current password is incorrect' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/users/{username}/follow': {
+            post: {
+                tags: ['Users'],
+                summary: 'Follow a user',
+                security: [{ bearerAuth: [] }],
+                parameters: [{ $ref: '#/components/parameters/Username' }],
+                responses: {
+                    200: { description: 'Now following', content: { 'application/json': { schema: { $ref: '#/components/schemas/FollowResponse' } } } },
+                    400: { description: 'Cannot follow yourself' },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    404: { $ref: '#/components/responses/NotFound' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            },
+            delete: {
+                tags: ['Users'],
+                summary: 'Unfollow a user',
+                security: [{ bearerAuth: [] }],
+                parameters: [{ $ref: '#/components/parameters/Username' }],
+                responses: {
+                    200: { description: 'No longer following', content: { 'application/json': { schema: { $ref: '#/components/schemas/FollowResponse' } } } },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    404: { $ref: '#/components/responses/NotFound' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/users/{username}': {
+            get: {
+                tags: ['Users'],
+                summary: 'Get a public user profile by username',
+                parameters: [{ $ref: '#/components/parameters/Username' }],
+                responses: {
+                    200: { description: 'Public profile', content: { 'application/json': { schema: { $ref: '#/components/schemas/UserProfile' } } } },
                     404: { $ref: '#/components/responses/NotFound' },
                     500: { $ref: '#/components/responses/ServerError' }
                 }
@@ -217,7 +340,8 @@ const swaggerDocument = {
     },
     components: {
         parameters: {
-            Id: { name: 'id', in: 'path', required: true, schema: { type: 'string' } }
+            Id: { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            Username: { name: 'username', in: 'path', required: true, schema: { type: 'string' } }
         },
         schemas: {
             Error: errorResponse,
@@ -261,6 +385,23 @@ const swaggerDocument = {
                     message: { type: 'string', minLength: 1, maxLength: 500, description: 'Chat message text' }
                 }
             },
+            ViewerHeartbeatRequest: {
+                type: 'object',
+                required: ['visitorId'],
+                properties: {
+                    visitorId: { type: 'string', minLength: 1, maxLength: 120, description: 'Stable per-tab viewer identifier' }
+                }
+            },
+            ViewerCount: {
+                type: 'object',
+                properties: {
+                    streamId: { type: 'string' },
+                    total: { type: 'integer', description: 'Authenticated plus anonymous viewers' },
+                    authenticated: { type: 'integer', description: 'Viewers with a valid session token' },
+                    anonymous: { type: 'integer', description: 'Viewers without a session token' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
             ChatMessage: {
                 type: 'object',
                 properties: {
@@ -271,6 +412,47 @@ const swaggerDocument = {
                     message: { type: 'string' },
                     createdAt: { type: 'string', format: 'date-time' }
                 }
+            },
+            UserProfile: {
+                type: 'object',
+                properties: {
+                    id: { type: 'integer' },
+                    username: { type: 'string' },
+                    email: { type: 'string', format: 'email', description: 'Only present for the authenticated user' },
+                    bio: { type: 'string', maxLength: 300 },
+                    avatarUrl: { type: 'string', description: 'Image URL or data URL' },
+                    bannerUrl: { type: 'string', description: 'Image URL or data URL' },
+                    followersCount: { type: 'integer' },
+                    followingCount: { type: 'integer' },
+                    isFollowing: { type: 'boolean', description: 'Whether the caller follows this user' }
+                }
+            },
+            UpdateProfileRequest: {
+                type: 'object',
+                properties: {
+                    bio: { type: 'string', maxLength: 300 },
+                    avatarUrl: { type: 'string', description: 'Image URL or data URL (max 5 MB)' },
+                    bannerUrl: { type: 'string', description: 'Image URL or data URL (max 5 MB)' }
+                }
+            },
+            ChangePasswordRequest: {
+                type: 'object',
+                required: ['currentPassword', 'newPassword'],
+                properties: {
+                    currentPassword: { type: 'string' },
+                    newPassword: { type: 'string', minLength: 8 }
+                }
+            },
+            DeleteAccountRequest: {
+                type: 'object',
+                required: ['password'],
+                properties: {
+                    password: { type: 'string', description: 'Current password, used to confirm the deletion' }
+                }
+            },
+            FollowResponse: {
+                type: 'object',
+                properties: { following: { type: 'boolean' } }
             },
             RegisterStreamRequest: {
                 type: 'object',
@@ -305,8 +487,12 @@ const swaggerDocument = {
         },
         responses: {
             BadRequest: { description: 'Invalid request', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+            Unauthorized: { description: 'Authentication required or invalid', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
             NotFound: { description: 'Resource not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
             ServerError: { description: 'Internal server error', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }
+        },
+        securitySchemes: {
+            bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
         }
     }
 };

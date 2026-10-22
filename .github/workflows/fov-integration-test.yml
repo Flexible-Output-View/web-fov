@@ -4,10 +4,12 @@ on:
   push:
       branches:
         - master
+        - bump-dependencies
   pull_request:
     branches:
       - dev
       - master
+      - 'dependabot/**'
 
 jobs:
   integration_test:

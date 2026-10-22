@@ -6,6 +6,7 @@ on:
       - "fov-angular/**"
       - ".github/workflows/angular-tests.yml"
       - "codecov.yml"
+      - bump-dependencies
   pull_request:
     branches: [main, dev]
 
@@ -39,7 +40,7 @@ jobs:
           mkdir -p fov-angular/src/environments
           cat > fov-angular/src/environments/environment.ts << 'EOF'
           export const environment = {
-            apiUrl: 'http://localhost:4000/api',
+            apiUrl: 'http://localhost:4000/api'
           };
           EOF
 

@@ -1,16 +1,7 @@
-import jwt from 'jsonwebtoken';
+import { verifyToken } from '../utils/auth.js';
 
-function getJwtSecret() {
-    const secret = process.env.JWT_SECRET;
-    if (!secret && process.env.NODE_ENV !== 'test') {
-        throw new Error('JWT_SECRET is not configured');
-    }
-    return secret || 'test-secret';
-}
-
-export function verifyToken(token) {
-    return jwt.verify(token, getJwtSecret());
-}
+// Re-exported so socket authentication (`chatSocket.js`) keeps a single entry point.
+export { verifyToken };
 
 export function extractBearerToken(req) {
     const header = req.headers?.authorization || req.headers?.Authorization;
@@ -18,22 +9,52 @@ export function extractBearerToken(req) {
         return null;
     }
     const [scheme, token] = header.split(' ');
-    if (scheme !== 'Bearer' || !token) {
+    if (!token || scheme.toLowerCase() !== 'bearer') {
         return null;
     }
-    return token;
+    return token.trim() || null;
 }
 
-export function requireAuth(req, res, next) {
+function resolveUserId(req) {
     const token = extractBearerToken(req);
     if (!token) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return null;
     }
+
     try {
         const payload = verifyToken(token);
-        req.user = { id: payload.userId };
-        next();
-    } catch (err) {
-        return res.status(401).json({ error: 'Invalid or expired token' });
+        const userId = parseInt(payload?.userId, 10);
+        return Number.isInteger(userId) ? userId : null;
+    } catch {
+        return null;
     }
+}
+
+/**
+ * Reject the request with 401 unless a valid JWT is provided.
+ * On success attaches `req.userId` (current convention) and `req.user.id`
+ * (legacy shape still used by the chat routes).
+ */
+export function requireAuth(req, res, next) {
+    const userId = resolveUserId(req);
+    if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    req.userId = userId;
+    req.user = { id: userId };
+    next();
+}
+
+/**
+ * Attach `req.userId` when a valid JWT is provided, but never reject the
+ * request. Useful for public endpoints that enrich their response when the
+ * caller is authenticated (e.g. `isFollowing` on a public profile).
+ */
+export function optionalAuth(req, res, next) {
+    const userId = resolveUserId(req);
+    if (userId) {
+        req.userId = userId;
+        req.user = { id: userId };
+    }
+    next();
 }
