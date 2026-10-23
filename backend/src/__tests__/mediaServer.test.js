@@ -117,7 +117,7 @@ describe('Media server lifecycle', () => {
         expect(duplicate.status).toBe(409);
     });
 
-    test('links a valid stream key to the owner public stream id', async () => {
+    test('links an arriving stream key to the owner public stream id', async () => {
         const process = createProcess();
         spawnMock.mockReturnValue(process);
         const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
@@ -125,8 +125,7 @@ describe('Media server lifecycle', () => {
         const streamKey = `fov_${'a'.repeat(43)}`;
 
         const response = await request(app).post('/ffmpeg/register').send({
-            streamKey,
-            streamId: 'should-be-ignored',
+            streamId: streamKey,
             tracks: 1,
             audioTracks: 1
         });
@@ -139,30 +138,12 @@ describe('Media server lifecycle', () => {
         expect(fs.existsSync(path.join(mediaRoot, 'hls', 'u12'))).toBe(true);
     });
 
-    test('accepts a generated key through the legacy streamId field', async () => {
-        const process = createProcess();
-        spawnMock.mockReturnValue(process);
-        const resolveStreamKey = jest.fn(async () => ({ userId: 7, streamId: 'u7' }));
-        const app = createApp({ resolveStreamKey });
-        const streamKey = `fov_${'b'.repeat(43)}`;
-
-        const response = await request(app).post('/ffmpeg/register').send({
-            streamId: streamKey,
-            tracks: 1,
-            audioTracks: 1
-        });
-
-        expect(response.status).toBe(200);
-        expect(response.body.streamId).toBe('u7');
-        expect(resolveStreamKey).toHaveBeenCalledWith(streamKey);
-    });
-
-    test('rejects an unknown stream key without registering anything', async () => {
+    test('rejects an unknown arriving stream key without registering anything', async () => {
         const resolveStreamKey = jest.fn(async () => null);
         const app = createApp({ resolveStreamKey });
 
         const response = await request(app).post('/ffmpeg/register').send({
-            streamKey: `fov_${'c'.repeat(43)}`,
+            streamId: `fov_${'c'.repeat(43)}`,
             tracks: 1,
             audioTracks: 1
         });
@@ -189,28 +170,23 @@ describe('Media server lifecycle', () => {
         expect(ffmpegProcesses.size).toBe(0);
     });
 
-    test('requires the stream key to stop an owned stream', async () => {
+    test('resolves the arriving key when stopping an owned stream', async () => {
         const process = createProcess({ exitsOnSigint: true });
         spawnMock.mockReturnValue(process);
-        const resolveStreamKey = jest.fn(async (key) => (
-            key ? { userId: 12, streamId: 'u12' } : null
-        ));
+        const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
         const app = createApp({ resolveStreamKey });
         const streamKey = `fov_${'d'.repeat(43)}`;
 
         await request(app).post('/ffmpeg/register').send({
-            streamKey,
+            streamId: streamKey,
             tracks: 1,
             audioTracks: 1
         });
         expect(registeredStreams.has('u12')).toBe(true);
 
-        const denied = await request(app).post('/ffmpeg/stop').send({ streamId: 'u12' });
-        expect(denied.status).toBe(401);
-        expect(registeredStreams.has('u12')).toBe(true);
-
-        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: 'u12', streamKey });
+        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: streamKey });
         expect(stopped.status).toBe(200);
+        expect(stopped.body.streamId).toBe('u12');
         expect(registeredStreams.has('u12')).toBe(false);
     });
 

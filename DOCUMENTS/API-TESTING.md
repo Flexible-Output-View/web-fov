@@ -737,22 +737,25 @@ The previous key is revoked immediately. The returned `streamId` (`u<userId>`)
 does not change. A stream that is already running keeps running; rotate only
 prevents new ingest registrations with the old key.
 
-### Register an ingest with the key
+### Register an arriving stream
+
+The encoder uses the key shown on the configuration page as its `streamId`.
+The backend resolves it when the stream arrives:
 
 ```bash
 curl -X POST http://localhost:4000/ffmpeg/register \
   -H "Content-Type: application/json" \
-  -d '{"streamKey": "fov_...", "tracks": 2, "audioTracks": 2}'
+  -d '{"streamId": "fov_...", "tracks": 2, "audioTracks": 2}'
 ```
 
 The response contains `streamId: "u12"` and the SRT URL. The stream key never
 appears in HLS paths or public stream URLs. To stop an owned stream, send the
-same key:
+same key back:
 
 ```bash
 curl -X POST http://localhost:4000/ffmpeg/stop \
   -H "Content-Type: application/json" \
-  -d '{"streamId": "u12", "streamKey": "fov_..."}'
+  -d '{"streamId": "fov_..."}'
 ```
 
 ### Direct-link live stream (GET)

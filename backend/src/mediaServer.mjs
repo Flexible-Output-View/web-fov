@@ -27,7 +27,6 @@ const STREAM_KEY_PATTERN = /^fov_[A-Za-z0-9_-]{20,}$/;
 
 function parseRegisterRequest(body) {
     const { tracks: tracksV, audioTracks: tracksA, streamId: providedStreamId } = body ?? {};
-    const streamKey = typeof body?.streamKey === 'string' ? body.streamKey.trim() : '';
     const trackVNum = Number.parseInt(tracksV, 10);
     const trackANum = Number.parseInt(tracksA, 10);
     const videoTrackNames = parseNamedTrackArray(body?.videoTrackNames, 'videoTrackNames');
@@ -51,7 +50,6 @@ function parseRegisterRequest(body) {
         trackANum,
         videoTrackNames,
         audioTrackNames,
-        streamKey,
         providedStreamId: typeof providedStreamId === 'string' ? providedStreamId.trim() : '',
         streamId: providedStreamId || randomUUID()
     };
@@ -325,33 +323,34 @@ function createMediaRoutes(options = {}) {
         : resolveStreamKeyFromDatabase;
 
     /**
-     * Resolve an optional stream key to the owner's public stream id.
-     * Without a key, callers keep the legacy behaviour (arbitrary streamId).
+     * Link a stream that is arriving now.
+     *
+     * The encoder uses the key shown on the configuration page as its stream
+     * id, so the key identifies its owner at registration time. Without a key,
+     * callers keep the legacy behaviour (arbitrary streamId).
      */
     async function resolveRegistration(parsed) {
-        const requestedUserStream = /^u\d+$/.test(parsed.providedStreamId);
-        const keyAsStreamId = STREAM_KEY_PATTERN.test(parsed.providedStreamId);
-        const streamKey = parsed.streamKey
-            || (keyAsStreamId ? parsed.providedStreamId : '');
+        const arrivingStreamId = parsed.providedStreamId;
 
-        // `u<userId>` stream ids belong to an account: never accept one
-        // without a key, otherwise anyone could broadcast into that channel.
-        if (!streamKey && !requestedUserStream) {
+        if (!arrivingStreamId) {
             return { streamId: parsed.streamId };
         }
-        if (!streamKey || !STREAM_KEY_PATTERN.test(streamKey)) {
+
+        // `u<userId>` ids are public and belong to an account: they can never
+        // be claimed directly, otherwise anyone could broadcast in that channel.
+        if (/^u\d+$/.test(arrivingStreamId)) {
             return { error: 'Invalid stream key' };
         }
 
-        const identity = await resolveStreamKey(streamKey);
-        if (!identity || !identity.streamId) {
-            return { error: 'Invalid stream key' };
-        }
-        if (requestedUserStream && identity.streamId !== parsed.providedStreamId) {
-            return { error: 'Invalid stream key' };
+        if (STREAM_KEY_PATTERN.test(arrivingStreamId)) {
+            const identity = await resolveStreamKey(arrivingStreamId);
+            if (!identity || !identity.streamId) {
+                return { error: 'Invalid stream key' };
+            }
+            return { streamId: identity.streamId, userId: identity.userId };
         }
 
-        return { streamId: identity.streamId, userId: identity.userId };
+        return { streamId: parsed.streamId };
     }
 
     router.use(cors({
@@ -510,40 +509,27 @@ function createMediaRoutes(options = {}) {
 
     // POST /ffmpeg/stop — request FFmpeg to stop for a specific stream
     router.post('/ffmpeg/stop', async (req, res) => {
-        const { streamId: requestedStreamId, streamKey } = req.body ?? {};
+        const { streamId: requestedStreamId } = req.body ?? {};
 
         if (!requestedStreamId) {
             return res.status(400).json({ error: "Missing 'streamId' parameter" });
         }
 
         const requested = String(requestedStreamId);
-        const isUserStream = /^u\d+$/.test(requested);
-        const looksLikeKey = STREAM_KEY_PATTERN.test(requested);
-
         let streamId = requestedStreamId;
 
-        // Owned streams can only be stopped by presenting their stream key.
-        if (isUserStream || looksLikeKey) {
-            const candidateKey = typeof streamKey === 'string' && streamKey.trim()
-                ? streamKey.trim()
-                : (looksLikeKey ? requested : '');
-
-            let identity;
+        // The encoder may stop with the same key it arrived with; resolve it
+        // to the public stream id used internally.
+        if (STREAM_KEY_PATTERN.test(requested)) {
             try {
-                identity = await resolveStreamKey(candidateKey);
+                const identity = await resolveStreamKey(requested);
+                if (identity?.streamId) {
+                    streamId = identity.streamId;
+                }
             } catch (err) {
-                console.error(`⚠️ Failed to validate stream key for stop ${requested}:`, err);
-                return res.status(500).json({ error: 'Failed to validate stream key' });
+                console.error(`⚠️ Failed to resolve stream key for stop ${requested}:`, err);
+                return res.status(500).json({ error: 'Failed to resolve stream key' });
             }
-
-            if (!identity || !identity.streamId) {
-                return res.status(401).json({ error: 'Invalid stream key' });
-            }
-            if (isUserStream && identity.streamId !== requested) {
-                return res.status(401).json({ error: 'Invalid stream key' });
-            }
-
-            streamId = identity.streamId;
         }
 
         const streamData = ffmpegProcesses.get(streamId);

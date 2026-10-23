@@ -383,7 +383,8 @@ const swaggerDocument = {
         '/ffmpeg/register': {
             post: {
                 tags: ['FFmpeg'],
-                summary: 'Register a stream and create an SRT listener',
+                summary: 'Register an arriving stream and create an SRT listener',
+                description: 'The encoder sends the key shown on the configuration page as `streamId`. The backend resolves it to the owner and links the stream at registration time.',
                 requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterStreamRequest' } } } },
                 responses: {
                     200: { description: 'Stream registered' },
@@ -584,8 +585,7 @@ const swaggerDocument = {
                 properties: {
                     tracks: { type: 'integer', minimum: 1 },
                     audioTracks: { type: 'integer', minimum: 1 },
-                    streamKey: { type: 'string', description: 'Backend-generated key. When supplied, the stream is linked to its owner and the returned streamId is `u<userId>`.' },
-                    streamId: { type: 'string', description: 'Legacy arbitrary id, used only when no streamKey is supplied.' },
+                    streamId: { type: 'string', description: 'The stream key shown on the configuration page when an owned stream arrives. When it matches a key, the stream is linked to its owner and the response streamId is `u<userId>`. Legacy arbitrary ids keep working.' },
                     videoTrackNames: {
                         type: 'array',
                         items: {
@@ -608,8 +608,7 @@ const swaggerDocument = {
                 type: 'object',
                 required: ['streamId'],
                 properties: {
-                    streamId: { type: 'string', description: '`u<userId>` for owned streams, or a legacy arbitrary id' },
-                    streamKey: { type: 'string', description: 'Required to stop an owned stream (`u<userId>`)' }
+                    streamId: { type: 'string', description: 'The key the stream arrived with, `u<userId>`, or a legacy arbitrary id' }
                 }
             }
         },
