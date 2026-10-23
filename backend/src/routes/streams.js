@@ -3,7 +3,7 @@ const router = express.Router();
 import db from '../db.js';
 import fs from 'fs';
 import path from 'path';
-import { ffmpegProcesses } from '../mediaServer.mjs';
+import { ffmpegProcesses, registeredStreams } from '../mediaServer.mjs';
 import {
     buildSeparatedAvailableTracks,
     probeTrackHasVideo,
@@ -15,128 +15,9 @@ import { sanitizeVisitorId, viewerPresence } from '../viewerPresence.js';
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
 const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
-
-/*function isPlaylistReady(playlistPath, minSegments = 2) {
-    try {
-        if (!fs.existsSync(playlistPath)) {
-            return false;
-        }
-
-        const content = fs.readFileSync(playlistPath, 'utf8');
-
-        if (!content.includes('#EXTM3U')) {
-            return false;
-        }
-
-        const segmentMatches = content.match(/\.ts/g);
-        if (!segmentMatches) {
-            return false;
-        }
-
-        return segmentMatches.length >= minSegments;
-    } catch (err) {
-        console.error(`Error checking playlist ${playlistPath}:`, err.message);
-        return false;
-    }
-}*/
-
-/*function getSegmentCount(playlistPath) {
-    try {
-        if (!fs.existsSync(playlistPath)) {
-            return 0;
-        }
-        const content = fs.readFileSync(playlistPath, 'utf8');
-        const segmentMatches = content.match(/\.ts/g);
-        return segmentMatches ? segmentMatches.length : 0;
-    } catch (err) {
-        return 0;
-    }
-}*/
-
-/*function getCurrentTracksState(protocol = 'http') {
-    try {
-        if (!fs.existsSync(HLS_DIR)) {
-            return {
-                tracks: [],
-                videoCount: 0,
-                ready: false,
-                pending: 0,
-                totalDirs: 0,
-                message: 'HLS directory does not exist yet'
-            };
-        }
-
-        let dirs;
-        try {
-            dirs = fs.readdirSync(HLS_DIR, { withFileTypes: true })
-                .filter(dirent => dirent.isDirectory())
-                .map(dirent => dirent.name)
-                .sort((a, b) => parseInt(a) - parseInt(b));
-        } catch (err) {
-            return {
-                tracks: [],
-                videoCount: 0,
-                ready: false,
-                pending: 0,
-                totalDirs: 0,
-                message: 'Cannot read HLS directory'
-            };
-        }
-
-        if (dirs.length === 0) {
-            return {
-                tracks: [],
-                videoCount: 0,
-                ready: false,
-                pending: 0,
-                totalDirs: 0,
-                message: 'No track directories found'
-            };
-        }
-
-        const httpPort = `localhost:${process.env.PORT || 4000}`;
-        const readyTracks = [];
-        const pendingTracks = [];
-
-        for (const id of dirs) {
-            const playlistPath = path.join(HLS_DIR, id, 'playlist.m3u8');
-            const segmentCount = getSegmentCount(playlistPath);
-
-            if (isPlaylistReady(playlistPath, 2)) {
-                readyTracks.push({
-                    index: readyTracks.length,
-                    name: id,
-                    videoUrl: `${protocol}://${httpPort}/api/hls/${id}/playlist.m3u8`,
-                    segments: segmentCount
-                });
-            } else {
-                pendingTracks.push({
-                    name: id,
-                    segments: segmentCount,
-                    exists: fs.existsSync(playlistPath)
-                });
-            }
-        }
-
-        return {
-            tracks: readyTracks,
-            videoCount: readyTracks.length,
-            ready: readyTracks.length > 0 && pendingTracks.length === 0 && readyTracks.length === dirs.length,
-            pending: pendingTracks.length,
-            totalDirs: dirs.length
-        };
-    } catch (err) {
-        console.error('[getCurrentTracksState] Error:', err);
-        return {
-            tracks: [],
-            videoCount: 0,
-            ready: false,
-            pending: 0,
-            totalDirs: 0,
-            message: 'Error reading tracks'
-        };
-    }
-}*/
+const MOQPORT = parseInt(process.env.MOQ_PORT || '4443', 10);
+const MOQHOST = process.env.MOQ_URL || 'http://127.0.0.1';
+const MOQURLEXTERNAL = `${MOQHOST}:${MOQPORT}`;
 
 async function buildTracks(streamId, trackDirs, url) {
     const trackOptions = { hlsDir: HLS_DIR, ffmpegProcesses };
@@ -220,6 +101,22 @@ function buildStreamEntry(streamId, tracks, streamInfo) {
         streamId,
         trackCount: tracks.length,
         tracks,
+        protocol: 'hls',
+        title: streamInfo?.title || '',
+        category: streamInfo?.category || '',
+        viewers: streamInfo?.viewers || 0,
+        avatarUrl: streamInfo?.avatar_url || '',
+        thumbnailUrl: streamInfo?.thumbnail_url || ''
+    };
+}
+
+function buildStreamEntryMOQ(stream, streamInfo) {
+    return {
+        streamId: stream.streamId,
+        trackCount: stream.tracksA + stream.tracksV,
+        tracks: [],
+        protocol: 'moq',
+        moqRelay: MOQURLEXTERNAL,
         title: streamInfo?.title || '',
         category: streamInfo?.category || '',
         viewers: streamInfo?.viewers || 0,
@@ -303,6 +200,9 @@ router.get('/available', async (req, res, next) => {
             .filter(dirent => dirent.isDirectory())
             .map(dirent => dirent.name);
 
+        // Get all MoQ streams
+        const moqStreams = Array.from(registeredStreams.values()).filter((elm) => (elm.protocol !== undefined && elm.protocol === 'moq'));
+
         // For each stream, get database info and HLS tracks
         for (const streamId of streamDirs) {
             try {
@@ -326,6 +226,13 @@ router.get('/available', async (req, res, next) => {
                 streams.push(buildStreamEntry(streamId, tracks, null));
             }
         }
+
+        for (const stream of moqStreams) {
+            streams.push(
+                buildStreamEntryMOQ(stream, [], null)
+            );
+        }
+        console.log(streams); // TODO: rm debug line
 
         res.status(200).json(streams);
     } catch (err) {

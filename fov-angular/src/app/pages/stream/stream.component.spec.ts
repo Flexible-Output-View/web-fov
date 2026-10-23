@@ -4,7 +4,7 @@ import { StreamComponent } from './stream.component';
 import { ActivatedRoute, Router, RouterModule, provideRouter } from '@angular/router';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { ViewerPresenceService } from '../../services/viewer-presence.service';
-import { ViewerCount } from '../../models/live-stream.model';
+import { ViewerCount } from '../../models/APIModels';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { Component, Input, Output, EventEmitter } from '@angular/core';
