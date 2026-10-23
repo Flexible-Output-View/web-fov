@@ -12,6 +12,7 @@ const hlsRoot = path.join(mediaRoot, 'hls');
 
 const dbQuery = jest.fn();
 const readdirSync = jest.fn();
+const existsSync = jest.fn(() => true);
 const buildSeparatedAvailableTracks = jest.fn();
 const probeTrackHasVideo = jest.fn();
 const probeTrackHasAudio = jest.fn();
@@ -25,7 +26,7 @@ jest.unstable_mockModule('../db.js', () => ({
     default: { query: dbQuery }
 }));
 jest.unstable_mockModule('fs', () => ({
-    default: { readdirSync }
+    default: { readdirSync, existsSync }
 }));
 jest.unstable_mockModule('../mediaServer.mjs', () => ({
     ffmpegProcesses: new Map()
@@ -89,6 +90,7 @@ describe('Streams Routes', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         viewerPresence.clear();
+        existsSync.mockReturnValue(true);
         buildSeparatedAvailableTracks.mockReturnValue(null);
         probeTrackHasVideo.mockResolvedValue(true);
         probeTrackHasAudio.mockResolvedValue(true);
@@ -217,6 +219,8 @@ describe('Streams Routes', () => {
                     buildSeparatedTrack('a:1', 'Game Audio', '12', '10', 'edge.example.test:8080', 'audio')
                 ],
                 title: 'Concert',
+                description: '',
+                visibility: 'public',
                 category: 'Music',
                 viewers: 123,
                 streamer: 'DJ Test',
@@ -234,6 +238,8 @@ describe('Streams Routes', () => {
                     buildSeparatedTrack('a:1', 'Audio 2', '2', '10', 'edge.example.test:8080', 'audio')
                 ],
                 title: '',
+                description: '',
+                visibility: 'public',
                 category: '',
                 viewers: 0,
                 streamer: '',
@@ -251,6 +257,8 @@ describe('Streams Routes', () => {
                     buildSeparatedTrack('a:1', 'Live Audio 2', 'live', '10', 'edge.example.test:8080', 'audio')
                 ],
                 title: '',
+                description: '',
+                visibility: 'public',
                 category: '',
                 viewers: 0,
                 streamer: '',
@@ -329,6 +337,138 @@ describe('Streams Routes', () => {
 
         expect(response.status).toBe(500);
         expect(response.body).toEqual({ error: 'HLS directory unavailable' });
+    });
+
+    test('mounts the authenticated stream settings under /me', async () => {
+        const response = await request(createApp()).get('/me');
+
+        expect(response.status).toBe(401);
+        expect(response.body).toEqual({ error: 'Authentication required' });
+    });
+
+    describe('user streams and visibility', () => {
+        function userStreamRow(overrides = {}) {
+            return {
+                user_id: 12,
+                username: 'alice',
+                title: 'Ranked grind',
+                description: 'Climbing the ladder',
+                visibility: 'public',
+                category: 'Just Chatting',
+                avatar_url: 'avatar.png',
+                thumbnail_url: 'thumb.png',
+                ...overrides
+            };
+        }
+
+        test('enriches u<id> folders from the user stream settings', async () => {
+            setDirectoryEntries([{ name: 'u12', isDirectory: () => true }]);
+            dbQuery.mockResolvedValue([userStreamRow()]);
+
+            const response = await request(createApp()).get('/available');
+
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(1);
+            expect(response.body[0]).toMatchObject({
+                streamId: 'u12',
+                trackCount: 4,
+                title: 'Ranked grind',
+                description: 'Climbing the ladder',
+                visibility: 'public',
+                category: 'Just Chatting',
+                streamer: 'alice',
+                streamerUsername: 'alice',
+                avatarUrl: 'avatar.png',
+                thumbnailUrl: 'thumb.png'
+            });
+            expect(dbQuery).toHaveBeenCalledWith(
+                expect.stringContaining('FROM stream_settings ss'),
+                [12]
+            );
+        });
+
+        test('hides unlisted and private streams from discovery', async () => {
+            setDirectoryEntries([
+                { name: 'u12', isDirectory: () => true },
+                { name: 'u13', isDirectory: () => true }
+            ]);
+            dbQuery
+                .mockResolvedValueOnce([userStreamRow({ user_id: 12, visibility: 'unlisted' })])
+                .mockResolvedValueOnce([userStreamRow({ user_id: 13, visibility: 'private' })]);
+
+            const anonymous = await request(createApp()).get('/available');
+            expect(anonymous.body).toEqual([]);
+
+            dbQuery
+                .mockResolvedValueOnce([userStreamRow({ user_id: 12, visibility: 'unlisted' })])
+                .mockResolvedValueOnce([userStreamRow({ user_id: 13, visibility: 'private' })]);
+
+            const owner = await request(createApp())
+                .get('/available')
+                .set('Authorization', `Bearer ${signToken(13)}`);
+
+            expect(owner.body).toHaveLength(1);
+            expect(owner.body[0].streamId).toBe('u13');
+        });
+
+        test('does not expose a user folder without settings', async () => {
+            setDirectoryEntries([{ name: 'u99', isDirectory: () => true }]);
+            dbQuery.mockResolvedValue([]);
+
+            const response = await request(createApp()).get('/available');
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual([]);
+        });
+
+        test('serves a public stream through the direct-link endpoint', async () => {
+            dbQuery.mockResolvedValue([userStreamRow()]);
+
+            const response = await request(createApp()).get('/u12/live');
+
+            expect(response.status).toBe(200);
+            expect(response.body).toMatchObject({
+                streamId: 'u12',
+                title: 'Ranked grind',
+                visibility: 'public'
+            });
+        });
+
+        test('serves an unlisted stream by direct link', async () => {
+            dbQuery.mockResolvedValue([userStreamRow({ visibility: 'unlisted' })]);
+
+            const response = await request(createApp()).get('/u12/live');
+
+            expect(response.status).toBe(200);
+            expect(response.body.visibility).toBe('unlisted');
+        });
+
+        test('restricts a private stream to its owner', async () => {
+            dbQuery.mockResolvedValue([userStreamRow({ visibility: 'private' })]);
+
+            const anonymous = await request(createApp()).get('/u12/live');
+            expect(anonymous.status).toBe(404);
+
+            const otherUser = await request(createApp())
+                .get('/u12/live')
+                .set('Authorization', `Bearer ${signToken(99)}`);
+            expect(otherUser.status).toBe(404);
+
+            const owner = await request(createApp())
+                .get('/u12/live')
+                .set('Authorization', `Bearer ${signToken(12)}`);
+            expect(owner.status).toBe(200);
+            expect(owner.body.title).toBe('Ranked grind');
+        });
+
+        test('returns 404 for an offline user stream', async () => {
+            existsSync.mockReturnValue(false);
+
+            const response = await request(createApp()).get('/u12/live');
+
+            expect(response.status).toBe(404);
+            expect(response.body).toEqual({ error: 'Stream not found' });
+        });
     });
 
     describe('viewer presence', () => {

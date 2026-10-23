@@ -1,6 +1,7 @@
 -- Drop existing tables
 DROP TABLE IF EXISTS chat_messages;
 DROP TABLE IF EXISTS follows;
+DROP TABLE IF EXISTS stream_settings;
 DROP TABLE IF EXISTS streams;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS categories;
@@ -48,6 +49,23 @@ CREATE TABLE follows (
 );
 
 CREATE INDEX idx_follows_following_id ON follows (following_id);
+
+-- Per-user stream configuration (title, description, visibility, thumbnail)
+-- and the backend-generated stream key used by the ingest pipeline.
+CREATE TABLE stream_settings (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  stream_key VARCHAR(64) NOT NULL UNIQUE,
+  title VARCHAR(255) NOT NULL DEFAULT '',
+  description VARCHAR(2000) NOT NULL DEFAULT '',
+  visibility VARCHAR(16) NOT NULL DEFAULT 'public',
+  thumbnail_url TEXT,
+  category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_stream_visibility CHECK (visibility IN ('public', 'unlisted', 'private'))
+);
+
+CREATE INDEX idx_stream_settings_category_id ON stream_settings (category_id);
 
 -- Table structure for streams
 CREATE TABLE streams (
