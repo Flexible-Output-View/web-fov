@@ -36,6 +36,60 @@
   }
 }
 
+.streamer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: var(--bg-tertiary, #252525);
+  color: var(--text-primary, #fff);
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    background: var(--bg-hover, #333);
+    color: var(--accent-primary, #9147ff);
+
+    .streamer-name {
+      text-decoration: underline;
+    }
+  }
+
+  .streamer-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-primary, #9147ff);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .streamer-avatar-initial {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .streamer-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .stream-title {
   display: flex;
   align-items: center;
@@ -224,6 +278,18 @@
 
     .track-info {
       font-size: 0.7rem;
+    }
+  }
+
+  .streamer-link {
+    .streamer-name {
+      max-width: 110px;
+      font-size: 0.8rem;
+    }
+
+    .streamer-avatar {
+      width: 26px;
+      height: 26px;
     }
   }
 

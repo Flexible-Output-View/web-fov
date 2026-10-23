@@ -1,12 +1,12 @@
-<a class="live-stream-card" [routerLink]="['/stream', stream.streamId]">
-  <div class="card-thumbnail">
-    <img *ngIf="stream.thumbnailUrl" 
-         [src]="stream.thumbnailUrl" 
-         [alt]="stream.title || stream.streamId"
+<div class="live-stream-card">
+  <a class="card-thumbnail" [routerLink]="['/stream', stream.streamId]">
+    <img *ngIf="stream.thumbnailUrl"
+         [src]="stream.thumbnailUrl"
+         [alt]="streamerName"
          class="thumbnail-img">
-    
+
     <div class="placeholder-thumbnail" *ngIf="!stream.thumbnailUrl">
-      <span class="streamer-initial">{{ stream.streamId.charAt(0) }}</span>
+      <span class="streamer-initial">{{ streamerInitial }}</span>
     </div>
 
     <div class="live-badge">
@@ -17,26 +17,42 @@
       <span class="icon">📹</span>
       {{ stream.trackCount }} flux
     </div>
-  </div>
+  </a>
   <div class="card-info">
     <div class="card-info-row">
-      <div class="avatar-wrapper" *ngIf="stream.avatarUrl">
-        <img [src]="stream.avatarUrl" [alt]="stream.streamId" class="avatar-img">
-      </div>
-      <div class="avatar-placeholder" *ngIf="!stream.avatarUrl">
-        {{ stream.streamId.charAt(0).toUpperCase() }}
-      </div>
-      
+      <a class="avatar-wrapper"
+         *ngIf="stream.avatarUrl"
+         [routerLink]="['/', streamerRoute]"
+         [attr.aria-label]="'Voir le profil de ' + streamerName"
+         [title]="'Voir le profil de ' + streamerName">
+        <img [src]="stream.avatarUrl" [alt]="streamerName" class="avatar-img">
+      </a>
+      <a class="avatar-placeholder"
+         *ngIf="!stream.avatarUrl"
+         [routerLink]="['/', streamerRoute]"
+         [attr.aria-label]="'Voir le profil de ' + streamerName"
+         [title]="'Voir le profil de ' + streamerName">
+        {{ streamerInitial }}
+      </a>
+
       <div class="card-text">
-        <h3 class="streamer-name">{{ stream.streamId }}</h3>
-        <p class="stream-title" *ngIf="stream.title">{{ stream.title }}</p>
+        <a class="streamer-name"
+           [routerLink]="['/', streamerRoute]"
+           [title]="'Voir le profil de ' + streamerName">
+          {{ streamerName }}
+        </a>
+        <a class="stream-title"
+           *ngIf="stream.title"
+           [routerLink]="['/stream', stream.streamId]">
+          {{ stream.title }}
+        </a>
         <p class="stream-category" *ngIf="stream.category">{{ stream.category }}</p>
         <p class="stream-description" *ngIf="!stream.title && !stream.category">{{ stream.trackCount }} flux vidéo</p>
       </div>
     </div>
-    
+
     <div class="viewer-count-info" *ngIf="stream.viewers > 0">
       {{ stream.viewers }} spectateur{{ stream.viewers > 1 ? 's' : '' }}
     </div>
   </div>
-</a>
+</div>

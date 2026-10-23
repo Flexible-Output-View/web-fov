@@ -121,6 +121,33 @@ curl -X PUT http://localhost:4000/api/users/me/password \
 { "error": "Current password is incorrect" }
 ```
 
+### List Followed Users (GET, auth)
+
+Returns every user followed by the authenticated account, with the same public
+profile shape and `isFollowing: true`.
+
+**Request:**
+```bash
+curl http://localhost:4000/api/users/me/following \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 2,
+    "username": "jane_smith",
+    "bio": "",
+    "avatarUrl": "",
+    "bannerUrl": "",
+    "followersCount": 12,
+    "followingCount": 4,
+    "isFollowing": true
+  }
+]
+```
+
 ### Follow / Unfollow a User (POST / DELETE, auth)
 
 **Request:**
@@ -132,9 +159,9 @@ curl -X DELETE http://localhost:4000/api/users/jane_smith/follow \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-**Response (200 OK):**
+**Response (200 OK):** the updated follower count of the target profile.
 ```json
-{ "following": true }
+{ "following": true, "followersCount": 13 }
 ```
 
 ### Register (POST)
@@ -641,7 +668,8 @@ Before considering API ready:
 - [ ] **My Profile**: `GET /api/users/me` returns 200 with a valid token
 - [ ] **Update Profile**: `PUT /api/users/me` updates bio/avatar/banner
 - [ ] **Change Password**: `PUT /api/users/me/password` updates the password
-- [ ] **Follow**: `POST /api/users/:username/follow` sets `following: true`
+- [ ] **Follow**: `POST /api/users/:username/follow` sets `following: true` and returns `followersCount`
+- [ ] **Following list**: `GET /api/users/me/following` returns the followed accounts
 - [ ] **Not Found**: `GET /api/users/unknown_user` returns 404
 - [ ] **Validation**: Missing fields return 400
 - [ ] **Errors**: Database errors return 500 (not stacktrace)

@@ -18,13 +18,13 @@
       <li *ngFor="let channel of liveChannels" class="channel-item">
         <a [routerLink]="['/stream', channel.streamId]" 
            class="channel-link is-live"
-           [title]="isCollapsed ? (channel.streamId + ' - En live') : channel.streamId">
+           [title]="isCollapsed ? ((channel.streamer || channel.streamId) + ' - En live') : (channel.streamer || channel.streamId)">
           
-          <img *ngIf="channel.avatarUrl" [src]="channel.avatarUrl" [alt]="channel.streamId" class="avatar">
-          <div class="avatar-circle" *ngIf="!channel.avatarUrl">{{ channel.streamId.charAt(0).toUpperCase() }}</div>
+          <img *ngIf="channel.avatarUrl" [src]="channel.avatarUrl" [alt]="channel.streamer || channel.streamId" class="avatar">
+          <div class="avatar-circle" *ngIf="!channel.avatarUrl">{{ (channel.streamer || channel.streamId).charAt(0).toUpperCase() }}</div>
           
           <div class="channel-info" *ngIf="!isCollapsed">
-            <span class="channel-name">{{ channel.streamId }}</span>
+            <span class="channel-name">{{ channel.streamer || channel.streamId }}</span>
             <span class="channel-category" *ngIf="channel.category">{{ channel.category }}</span>
             <span class="channel-category" *ngIf="!channel.category">{{ channel.trackCount }} flux</span>
           </div>

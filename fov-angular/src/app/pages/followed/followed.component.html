@@ -1,76 +1,102 @@
 <div class="followed-page">
   <h1>Suivis</h1>
 
-  <div class="tabs">
-    <button class="tab-btn"
-            [class.active]="activeTab === 'channels'"
-            (click)="setActiveTab('channels')">
-      Chaînes
-    </button>
-    <button class="tab-btn"
-            [class.active]="activeTab === 'categories'"
-            (click)="setActiveTab('categories')">
-      Catégories
-    </button>
-  </div>
-
-  <div class="tab-content">
-
-    <div *ngIf="activeTab === 'channels'">
-
-      <section class="section">
-        <div class="section-header">
-          <h2>Actuellement en direct</h2>
-        </div>
-        
-        <div *ngIf="liveChannels.length > 0; else noLive">
-          <div class="streams-grid">
-            <app-stream-card 
-              *ngFor="let stream of liveChannels" 
-              [stream]="stream">
-            </app-stream-card>
-          </div>
-        </div>
-        <ng-template #noLive>
-          <p class="no-channels-msg">Aucune des chaînes que vous suivez n'est en direct.</p>
-        </ng-template>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <h2>Hors ligne</h2>
-        </div>
-        
-        <div *ngIf="offlineChannels.length > 0; else noOffline">
-          <div class="offline-grid">
-            <a *ngFor="let channel of offlineChannels" 
-               [routerLink]="['/profile', channel.streamer]" 
-               class="offline-card">
-              <img [src]="channel.avatar" [alt]="channel.streamer" class="avatar">
-              <span class="channel-name">{{ channel.streamer }}</span>
-            </a>
-          </div>
-        </div>
-        <ng-template #noOffline>
-          <p class="no-channels-msg">Aucune chaîne hors ligne.</p>
-        </ng-template>
-      </section>
-
+  <ng-container *ngIf="isAuthenticated; else loginRequired">
+    <div class="tabs">
+      <button class="tab-btn"
+              [class.active]="activeTab === 'channels'"
+              (click)="setActiveTab('channels')">
+        Chaînes
+      </button>
+      <button class="tab-btn"
+              [class.active]="activeTab === 'categories'"
+              (click)="setActiveTab('categories')">
+        Catégories
+      </button>
     </div>
 
-    <div *ngIf="activeTab === 'categories'">
-      <div *ngIf="followedCategories.length > 0; else noCategories">
-        <div class="categories-grid">
-          <app-category-card 
-            *ngFor="let category of followedCategories" 
-            [category]="category">
-          </app-category-card>
+    <div class="tab-content">
+
+      <div *ngIf="activeTab === 'channels'">
+
+        <div class="loading-state" *ngIf="isLoading">
+          <div class="loading-spinner"></div>
+          <p>Chargement de vos chaînes suivies...</p>
         </div>
+
+        <p class="no-channels-msg" *ngIf="!isLoading && loadError">{{ loadError }}</p>
+
+        <ng-container *ngIf="!isLoading && !loadError">
+          <p class="no-channels-msg"
+             *ngIf="liveChannels.length === 0 && offlineChannels.length === 0">
+            Vous ne suivez encore aucune chaîne.
+          </p>
+
+          <section class="section" *ngIf="liveChannels.length > 0">
+            <div class="section-header">
+              <h2>Actuellement en direct</h2>
+            </div>
+
+            <div class="streams-grid">
+              <app-live-stream-card
+                *ngFor="let stream of liveChannels"
+                [stream]="stream">
+              </app-live-stream-card>
+            </div>
+          </section>
+
+          <section class="section" *ngIf="offlineChannels.length > 0">
+            <div class="section-header">
+              <h2>Hors ligne</h2>
+            </div>
+
+            <div class="offline-grid">
+              <a *ngFor="let channel of offlineChannels"
+                 [routerLink]="['/', channel.username]"
+                 [attr.aria-label]="'Voir le profil de ' + channel.username"
+                 class="offline-card">
+                <img *ngIf="channel.avatarUrl"
+                     [src]="channel.avatarUrl"
+                     [alt]="channel.username"
+                     class="avatar">
+                <span *ngIf="!channel.avatarUrl" class="avatar avatar-placeholder">
+                  {{ channel.username.charAt(0).toUpperCase() }}
+                </span>
+                <span class="channel-name">{{ channel.username }}</span>
+              </a>
+            </div>
+          </section>
+        </ng-container>
+
       </div>
-      <ng-template #noCategories>
-        <p class="no-channels-msg">Vous ne suivez encore aucune catégorie.</p>
-      </ng-template>
-    </div>
 
-  </div>
+      <div *ngIf="activeTab === 'categories'">
+        <div *ngIf="followedCategories.length > 0; else noCategories">
+          <div class="categories-grid">
+            <app-category-card
+              *ngFor="let category of followedCategories"
+              [category]="category">
+            </app-category-card>
+          </div>
+        </div>
+        <ng-template #noCategories>
+          <p class="no-channels-msg">Vous ne suivez encore aucune catégorie.</p>
+        </ng-template>
+      </div>
+
+    </div>
+  </ng-container>
+
+  <ng-template #loginRequired>
+    <div class="login-required-state">
+      <div class="login-icon">🔒</div>
+      <h2>Connectez-vous pour voir vos chaînes suivies</h2>
+      <p>Vos abonnements sont liés à votre compte FOV.</p>
+      <a class="btn-login"
+         routerLink="/login"
+         [queryParams]="{ returnUrl: '/followed' }">
+        Se connecter
+      </a>
+    </div>
+  </ng-template>
 </div>

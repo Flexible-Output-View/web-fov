@@ -1,7 +1,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ComponentFixture } from '@angular/core/testing';
 import { StreamComponent } from './stream.component';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule, provideRouter } from '@angular/router';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { ViewerPresenceService } from '../../services/viewer-presence.service';
 import { ViewerCount } from '../../models/live-stream.model';
@@ -25,19 +25,20 @@ const mockStream = {
   title: 'Test Stream',
   trackCount: 2,
   viewers: 10,
-  category: 'Gaming'
+  category: 'Gaming',
+  streamer: 'Test Streamer',
+  streamerUsername: 'test_streamer'
 };
 
 describe('StreamComponent', () => {
   let component: StreamComponent;
   let fixture: ComponentFixture<StreamComponent>;
-  let routerSpy: jasmine.SpyObj<Router>;
+  let routerSpy: jasmine.Spy;
   let liveStreamsSpy: jasmine.SpyObj<LiveStreamsService>;
   let presenceSpy: jasmine.SpyObj<ViewerPresenceService>;
   let countsSubject: BehaviorSubject<ViewerCount | null>;
 
   beforeEach(async () => {
-    routerSpy = jasmine.createSpyObj('Router', ['navigate']);
     liveStreamsSpy = jasmine.createSpyObj('LiveStreamsService', ['getStreamById']);
     liveStreamsSpy.getStreamById.and.returnValue(of(mockStream as any));
 
@@ -49,21 +50,25 @@ describe('StreamComponent', () => {
     await TestBed.configureTestingModule({
       imports: [CommonModule, MockFovPlayerComponent, MockStreamChatComponent],
       providers: [
+        provideRouter([]),
         {
           provide: ActivatedRoute,
           useValue: { params: of({ streamId: 'test-stream' }) }
         },
-        { provide: Router, useValue: routerSpy },
         { provide: LiveStreamsService, useValue: liveStreamsSpy },
         { provide: ViewerPresenceService, useValue: presenceSpy }
       ]
     })
     .overrideComponent(StreamComponent, {
       set: {
-        imports: [CommonModule, MockFovPlayerComponent, MockStreamChatComponent]
+        imports: [CommonModule, RouterModule, MockFovPlayerComponent, MockStreamChatComponent]
       }
     })
     .compileComponents();
+
+    routerSpy = spyOn(TestBed.inject(Router), 'navigate').and.returnValue(
+      Promise.resolve(true)
+    );
 
     fixture = TestBed.createComponent(StreamComponent);
     component = fixture.componentInstance;
@@ -86,7 +91,7 @@ describe('StreamComponent', () => {
 
   it('should navigate to home on goBack()', () => {
     component.goBack();
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/']);
+    expect(routerSpy).toHaveBeenCalledWith(['/']);
   });
 
   it('should handle stream ended and start countdown', fakeAsync(() => {
@@ -101,7 +106,7 @@ describe('StreamComponent', () => {
     expect(component.redirectCountdown).toBe(4);
 
     tick(4000);
-    expect(routerSpy.navigate).toHaveBeenCalledWith(['/']);
+    expect(routerSpy).toHaveBeenCalledWith(['/']);
   }));
 
   it('should clear interval on goBack after stream ended', fakeAsync(() => {
@@ -111,7 +116,7 @@ describe('StreamComponent', () => {
     component.goBack();
     tick(5000);
     // navigate appelé une seule fois (goBack)
-    expect(routerSpy.navigate).toHaveBeenCalledTimes(1);
+    expect(routerSpy).toHaveBeenCalledTimes(1);
   }));
 
   it('should set error message after max retries on HTTP error', fakeAsync(() => {
@@ -132,6 +137,16 @@ describe('StreamComponent', () => {
 
   it('starts viewer presence when the stream is live', () => {
     expect(presenceSpy.start).toHaveBeenCalledWith('test-stream');
+  });
+
+  it('renders a link to the streamer public profile', () => {
+    const link = fixture.nativeElement.querySelector(
+      '.streamer-link'
+    ) as HTMLAnchorElement;
+
+    expect(link).toBeTruthy();
+    expect(link.textContent).toContain('test_streamer');
+    expect(link.getAttribute('href')).toBe('/test_streamer');
   });
 
   it('renders the live viewer total in the header', () => {
