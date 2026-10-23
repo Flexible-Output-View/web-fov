@@ -9,6 +9,8 @@ import { LoginComponent } from './pages/login/login.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { StreamComponent } from './pages/stream/stream.component';
 import { HowDoesItWorkComponent } from './pages/how-does-it-work/how-does-it-work.component';
+import { StreamConfigComponent } from './pages/stream-config/stream-config.component';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', component: HomeComponent },
@@ -25,5 +27,6 @@ export const routes: Routes = [
   // Angular matches routes in declaration order, so any single-segment static
   // route placed after it (e.g. 'login') would be shadowed by a profile lookup.
   { path: ':username', component: PublicProfileComponent },
+  { path: 'dashboard/stream', component: StreamConfigComponent, canActivate: [authGuard], title: 'Configuration du stream' },
   { path: '**', redirectTo: '' }
 ];

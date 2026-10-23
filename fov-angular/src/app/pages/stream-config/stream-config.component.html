@@ -1,0 +1,201 @@
+<div class="stream-config-page" *ngIf="!isLoading; else loadingTpl">
+
+  <!-- Header -->
+  <div class="stream-config-header">
+    <h1>Configuration du stream</h1>
+    <p class="hint">Gérez les informations de votre chaîne et votre clé de stream</p>
+  </div>
+
+  <!-- ═══ Stream Key ═══ -->
+  <div class="settings-section">
+    <div class="section-header">
+      <h2>🔑 Clé de stream</h2>
+      <span class="status-badge" [class.live]="streamSettings?.isLive">
+        {{ streamSettings?.isLive ? '🔴 En direct' : '⚫ Hors ligne' }}
+      </span>
+    </div>
+
+    <div class="form-group">
+      <label>Clé secrète</label>
+      <div class="key-row">
+        <input
+          type="text"
+          [value]="maskedKey"
+          readonly
+          class="input-readonly key-input"
+        />
+        <button class="btn-icon" (click)="toggleKeyVisibility()" title="Afficher / masquer">
+          {{ streamKeyVisible ? '🙈' : '👁️' }}
+        </button>
+        <button class="btn-icon" (click)="copyStreamKey()" title="Copier">📋</button>
+      </div>
+      <span class="help">Ne partagez jamais cette clé. Elle est unique à votre compte.</span>
+    </div>
+
+    <div class="form-group">
+      <label>Lien du stream</label>
+      <div class="key-row">
+        <input type="text" [value]="streamLink" readonly class="input-readonly" />
+        <button class="btn-icon" (click)="copyStreamLink()" title="Copier">🔗</button>
+      </div>
+      <span class="help">Partagez ce lien avec vos spectateurs.</span>
+    </div>
+
+    <div class="key-rotate">
+      <button
+        class="btn-danger"
+        (click)="rotateStreamKey()"
+        [disabled]="isRotatingKey"
+      >
+        🔄 {{ isRotatingKey ? 'Régénération…' : 'Régénérer la clé' }}
+      </button>
+      <span class="help warning">⚠️ La régénération révoque immédiatement l'ancienne clé.</span>
+    </div>
+  </div>
+
+  <!-- ═══ Stream Info ═══ -->
+  <div class="settings-section">
+    <h2>⚙️ Informations du stream</h2>
+
+    <form [formGroup]="streamForm" (ngSubmit)="save()">
+
+      <!-- Title -->
+      <div class="form-group">
+        <label for="title">Titre du stream *</label>
+        <input
+          id="title"
+          type="text"
+          formControlName="title"
+          placeholder="Mon super stream"
+        />
+        <div class="char-count">
+          {{ streamForm.get('title')?.value?.length || 0 }}/255
+        </div>
+        <span class="field-error" *ngIf="fieldErrors['title']">
+          {{ fieldErrors['title'] }}
+        </span>
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea
+          id="description"
+          formControlName="description"
+          placeholder="Décrivez votre stream..."
+          rows="4"
+        ></textarea>
+        <div class="char-count">
+          {{ streamForm.get('description')?.value?.length || 0 }}/2000
+        </div>
+        <span class="field-error" *ngIf="fieldErrors['description']">
+          {{ fieldErrors['description'] }}
+        </span>
+      </div>
+
+      <!-- Visibility -->
+      <div class="form-group">
+        <label>Visibilité</label>
+        <div class="visibility-cards">
+          <label
+            class="visibility-card"
+            [class.active]="streamForm.get('visibility')?.value === 'public'"
+          >
+            <input type="radio" formControlName="visibility" value="public" />
+            <strong>🌍 Public</strong>
+            <span>Visible dans le feed et les recherches</span>
+          </label>
+          <label
+            class="visibility-card"
+            [class.active]="streamForm.get('visibility')?.value === 'unlisted'"
+          >
+            <input type="radio" formControlName="visibility" value="unlisted" />
+            <strong>🔗 Non listé</strong>
+            <span>Accessible uniquement via le lien direct</span>
+          </label>
+          <label
+            class="visibility-card"
+            [class.active]="streamForm.get('visibility')?.value === 'private'"
+          >
+            <input type="radio" formControlName="visibility" value="private" />
+            <strong>🔒 Privé</strong>
+            <span>Visible uniquement par vous</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Category -->
+      <div class="form-group">
+        <label for="categoryId">Catégorie</label>
+        <select id="categoryId" formControlName="categoryId">
+            <option [ngValue]="null">Aucune catégorie</option>
+            <option *ngFor="let cat of backendCategories" [ngValue]="cat.id">
+            {{ cat.name }}
+            </option>
+        </select>
+      </div>
+
+      <!-- Thumbnail -->
+      <div class="form-group">
+        <label>Miniature du stream</label>
+        <div class="thumbnail-section">
+          <div class="thumbnail-preview">
+            <img
+              *ngIf="thumbnailPreview"
+              [src]="thumbnailPreview"
+              alt="Miniature"
+            />
+            <span *ngIf="!thumbnailPreview">🖼️ Aucune miniature</span>
+          </div>
+          <div class="thumbnail-actions">
+            <label class="btn-file">
+              Choisir une image
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                (change)="onThumbnailSelected($event)"
+                hidden
+              />
+            </label>
+            <button
+              type="button"
+              class="btn-remove"
+              *ngIf="thumbnailPreview"
+              (click)="clearThumbnail()"
+            >
+              Supprimer
+            </button>
+          </div>
+        </div>
+        <span class="help">Max 5 Mo. Formats recommandés : JPG, PNG.</span>
+      </div>
+
+      <!-- Submit -->
+      <button
+        type="submit"
+        class="btn-primary"
+        [disabled]="isSaving || streamForm.invalid"
+      >
+        {{ isSaving ? 'Sauvegarde…' : '💾 Sauvegarder' }}
+        <span *ngIf="streamForm.dirty && !isSaving" class="dirty-dot"></span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Loading -->
+<ng-template #loadingTpl>
+  <div class="stream-config-page">
+    <p class="hint">Chargement…</p>
+  </div>
+</ng-template>
+
+<!-- Toast -->
+<div
+  class="toast"
+  *ngIf="toastMessage"
+  [class.success]="toastType === 'success'"
+  [class.error]="toastType === 'error'"
+>
+  {{ toastMessage }}
+</div>
