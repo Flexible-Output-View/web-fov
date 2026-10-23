@@ -72,7 +72,24 @@ async function fetchStreamInfo(streamId) {
     }
 
     const dbRows = await db.query(
-        'SELECT s.id, s.title, s.viewers, s.avatar_url, s.thumbnail_url, c.name as category FROM streams s LEFT JOIN categories c ON s.category_id = c.id WHERE s.id = ?',
+        `SELECT
+            s.id,
+            s.streamer,
+            s.title,
+            s.viewers,
+            s.avatar_url,
+            s.thumbnail_url,
+            c.name as category,
+            (
+                SELECT u.username
+                FROM users u
+                WHERE LOWER(u.username) = LOWER(s.streamer)
+                ORDER BY u.id
+                LIMIT 1
+            ) AS streamer_username
+        FROM streams s
+        LEFT JOIN categories c ON s.category_id = c.id
+        WHERE s.id = ?`,
         [streamId]
     );
 
@@ -103,6 +120,8 @@ function buildStreamEntryMOQ(stream, streamInfo) {
         title: streamInfo?.title || '',
         category: streamInfo?.category || '',
         viewers: streamInfo?.viewers || 0,
+        streamer: streamInfo?.streamer || '',
+        streamerUsername: streamInfo?.streamer_username || null,
         avatarUrl: streamInfo?.avatar_url || '',
         thumbnailUrl: streamInfo?.thumbnail_url || ''
     };
@@ -227,7 +246,27 @@ router.get('/:id', async (req, res, next) => {
         if (!isNumericStreamId(req.params.id)) {
             return res.status(404).json({ error: 'Stream not found' });
         }
-        const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams WHERE id = ?', [req.params.id]);
+        const rows = await db.query(
+            `SELECT
+                s.id,
+                s.streamer,
+                s.title,
+                s.category_id,
+                s.viewers,
+                s.thumbnail_url,
+                s.avatar_url,
+                s.is_live,
+                (
+                    SELECT u.username
+                    FROM users u
+                    WHERE LOWER(u.username) = LOWER(s.streamer)
+                    ORDER BY u.id
+                    LIMIT 1
+                ) AS "streamerUsername"
+            FROM streams s
+            WHERE s.id = ?`,
+            [req.params.id]
+        );
         if (!rows || rows.length === 0) {
             return res.status(404).json({ error: 'Stream not found' });
         }

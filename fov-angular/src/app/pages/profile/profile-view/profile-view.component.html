@@ -21,13 +21,31 @@
           Modifier mon profil
         </button>
 
-        <button *ngIf="!isOwnProfile && isAuthenticated"
+        <button *ngIf="!isOwnProfile"
+                type="button"
                 class="btn-follow"
                 [class.following]="following"
+                [class.pending]="isFollowPending"
+                [disabled]="isFollowPending"
+                [attr.aria-pressed]="following"
+                [attr.aria-label]="following ? 'Ne plus suivre ' + profile.username : 'Suivre ' + profile.username"
                 (click)="toggleFollow()">
-          {{ following ? '✓ Abonné' : 'Suivre' }}
+          <span class="follow-heart" aria-hidden="true">{{ following ? '❤️' : '🤍' }}</span>
+          <span class="follow-label">{{ following ? 'Abonné' : 'Suivre' }}</span>
         </button>
       </div>
+
+      <p class="follow-feedback success"
+         *ngIf="feedbackMessage"
+         role="status"
+         aria-live="polite">
+        {{ feedbackMessage }}
+      </p>
+      <p class="follow-feedback error"
+         *ngIf="feedbackError"
+         role="alert">
+        {{ feedbackError }}
+      </p>
     </div>
   </div>
 
@@ -56,4 +74,5 @@
 <div class="not-found" *ngIf="notFound">
   <h2>Utilisateur introuvable</h2>
   <p>Aucun profil ne correspond à « {{ username }} ».</p>
+  <a class="btn-primary" routerLink="/">Retour à l'accueil</a>
 </div>

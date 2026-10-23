@@ -40,6 +40,10 @@ export interface LiveStreamInfo {
   protocol: string;
   moqRelay?: string;
   thumbnailUrl: string;
+  /** Channel name as stored on the stream row. */
+  streamer: string;
+  /** Exact username of the matching account, when the streamer registered. */
+  streamerUsername?: string | null;
 }
 
 export interface AvailableStreams {

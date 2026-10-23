@@ -44,6 +44,19 @@
   </div>
   <div class="stream-header">
     <div class="stream-title" *ngIf="isLive && streamInfo">
+      <a class="streamer-link"
+         *ngIf="streamerName"
+         [routerLink]="['/', streamerName]"
+         [attr.aria-label]="'Voir le profil de ' + streamerName"
+         [title]="'Voir le profil de ' + streamerName">
+        <span class="streamer-avatar">
+          <img *ngIf="streamInfo.avatarUrl" [src]="streamInfo.avatarUrl" [alt]="streamerName">
+          <span *ngIf="!streamInfo.avatarUrl" class="streamer-avatar-initial">
+            {{ streamerName.charAt(0).toUpperCase() }}
+          </span>
+        </span>
+        <span class="streamer-name">{{ streamerName }}</span>
+      </a>
       <h1>{{ streamInfo.title || streamId }}</h1>
       <span class="stream-category-badge" *ngIf="streamInfo.category">{{ streamInfo.category }}</span>
       <span class="track-info">{{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}</span>

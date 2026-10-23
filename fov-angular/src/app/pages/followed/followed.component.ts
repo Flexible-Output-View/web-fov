@@ -1,36 +1,104 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { StreamService } from '../../services/stream-service.service';
-import { Stream, StreamCardComponent } from '../../components/stream-card/stream-card.component';
-import { Category, CategoryCardComponent } from '../../components/category-card/category-card.component';
 import { RouterModule } from '@angular/router';
+import { Subject, forkJoin, takeUntil } from 'rxjs';
+import {
+  Category,
+  CategoryCardComponent,
+} from '../../components/category-card/category-card.component';
+import { LiveStreamCardComponent } from '../../components/live-stream-card/live-stream-card.component';
+import { LiveStreamInfo } from '../../models/APIModels';
+import { AuthService } from '../../services/auth.service';
+import { LiveStreamsService } from '../../services/live-streams.service';
+import { UserService } from '../../services/user.service';
+
+interface FollowedChannel {
+  username: string;
+  avatarUrl: string;
+  bio: string;
+  live: LiveStreamInfo | null;
+}
 
 @Component({
   selector: 'app-followed',
   standalone: true,
-  imports: [CommonModule, StreamCardComponent, CategoryCardComponent, RouterModule],
+  imports: [CommonModule, RouterModule, LiveStreamCardComponent, CategoryCardComponent],
   templateUrl: './followed.component.html',
-  styleUrls: ['./followed.component.scss']
+  styleUrls: ['./followed.component.scss'],
 })
-//TODO: HIDE IF THE USER IS NOT CONNECTED
-export class FollowedComponent implements OnInit {
-
-  liveChannels: Stream[] = [];
-  offlineChannels: Stream[] = [];
+export class FollowedComponent implements OnInit, OnDestroy {
+  liveChannels: LiveStreamInfo[] = [];
+  offlineChannels: FollowedChannel[] = [];
   followedCategories: Category[] = [];
-  activeTab: string = 'channels';
+  activeTab = 'channels';
+  isAuthenticated = false;
+  isLoading = false;
+  loadError = '';
 
-  constructor(private streamService: StreamService) {}
+  private destroy$ = new Subject<void>();
 
-  ngOnInit() {
-    const allFollowed = this.streamService.getFollowedChannels();
-    this.liveChannels = allFollowed.filter(channel => channel.isLive);
-    this.offlineChannels = allFollowed.filter(channel => !channel.isLive);
-    //TODO: fetch followed categories from user data
-    //this.followedCategories = this.streamService.getFallbackCategories();
+  constructor(
+    private authService: AuthService,
+    private userService: UserService,
+    private liveStreamsService: LiveStreamsService,
+  ) {}
+
+  ngOnInit(): void {
+    this.isAuthenticated = this.authService.isAuthenticated();
+    if (this.isAuthenticated) {
+      this.loadFollowedChannels();
+    }
   }
 
-  setActiveTab(tab: string) {
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private loadFollowedChannels(): void {
+    this.isLoading = true;
+    this.loadError = '';
+
+    forkJoin({
+      following: this.userService.getFollowing(),
+      available: this.liveStreamsService.getAvailableStreams(),
+    })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: ({ following, available }) => {
+          const liveByUsername = new Map<string, LiveStreamInfo>();
+          for (const stream of available.streams) {
+            const username = (
+              stream.streamerUsername ||
+              stream.streamer ||
+              ''
+            ).toLowerCase();
+            if (username) {
+              liveByUsername.set(username, stream);
+            }
+          }
+
+          const channels: FollowedChannel[] = following.map((user) => ({
+            username: user.username,
+            avatarUrl: user.avatarUrl,
+            bio: user.bio,
+            live: liveByUsername.get(user.username.toLowerCase()) ?? null,
+          }));
+
+          this.liveChannels = channels
+            .filter((channel) => !!channel.live)
+            .map((channel) => channel.live as LiveStreamInfo);
+          this.offlineChannels = channels.filter((channel) => !channel.live);
+          this.isLoading = false;
+        },
+        error: () => {
+          this.isLoading = false;
+          this.loadError = 'Impossible de charger les chaînes suivies.';
+        },
+      });
+  }
+
+  setActiveTab(tab: string): void {
     this.activeTab = tab;
   }
 }
