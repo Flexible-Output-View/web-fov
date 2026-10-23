@@ -16,7 +16,7 @@
     "@angular/forms": "^20.3.34",
     "@angular/platform-browser": "^20.3.34",
     "@angular/router": "^20.3.34",
-    "@moq/watch": "^0.6.2",
+    "@moq/watch": "^0.6.5",
     "hls.js": "^1.6.15",
     "rxjs": "~7.8.0",
     "socket.io-client": "^4.8.3",
