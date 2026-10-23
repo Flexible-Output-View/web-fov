@@ -73,7 +73,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
   moq-relay:
-    image: moqdev/moq-relay:0.15.8
+    image: moqdev/moq-relay:0.17.8
     restart: unless-stopped
     ports:
       - 0.0.0.0:4443:4443
