@@ -142,6 +142,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     bufferSizeMs: 0,
     tracks: [],
     syncDriftMs: {},
+    bandwidthKbps: 0,
   };
 
   @ViewChild('playerRoot') playerRoot?: ElementRef<HTMLElement>;

@@ -53,6 +53,7 @@ export class HlsStreamEngine implements StreamEngine {
     bufferSizeMs: 0,
     tracks: [],
     syncDriftMs: {},
+    bandwidthKbps: 0,
   });
   public stats$ = this.statsSubject.asObservable();
   private statsInterval: any = null;
@@ -106,6 +107,7 @@ export class HlsStreamEngine implements StreamEngine {
         hls: null as Hls | null,
         bufferStart: 0,
         bufferEnd: 0,
+        lastMeasuredBitrate: 0,
       };
 
       this.initHlsForVideo(wrapper, track.videoUrl);
@@ -195,6 +197,14 @@ export class HlsStreamEngine implements StreamEngine {
         }
       });
 
+      hls.on(Hls.Events.FRAG_LOADED, (_, data) => {
+        const frag = data.frag;
+        if (frag && frag.stats && frag.stats.total && frag.duration) {
+          const bitrateBps = (frag.stats.total * 8) / frag.duration;
+          wrapper.lastMeasuredBitrate = Math.round(bitrateBps);
+        }
+      });
+
       hls.loadSource(videoUrl);
       hls.attachMedia(videoEl);
     } else {
@@ -245,7 +255,6 @@ export class HlsStreamEngine implements StreamEngine {
 
       if (!videosReady || !audiosReady) {
         if (checkCount > 100) {
-          // Fallback if readyState check stalls
           this.proceedWithPlayback();
           return;
         }
@@ -362,7 +371,6 @@ export class HlsStreamEngine implements StreamEngine {
       return targets;
     }
 
-    // Fallback sync sans PDT
     const syncPoint = Math.min(...infos.map((i) => i.end)) - 3;
     const maxStart = Math.max(...infos.map((i) => i.start));
     if (syncPoint <= maxStart) return null;
@@ -382,7 +390,12 @@ export class HlsStreamEngine implements StreamEngine {
           const currentLevel = w.hls?.currentLevel;
           const level =
             currentLevel >= 0 ? w.hls?.levels?.[currentLevel] : null;
-          const levelBitrate = level?.bitrate || 0;
+          const levelBitrate =
+            level?.bitrate ||
+            level?.attrs?.BANDWIDTH ||
+            w.lastMeasuredBitrate ||
+            0;
+
           const vCodec = level?.videoCodec || 'H.264';
           const aCodec = level?.audioCodec || 'AAC';
 
@@ -412,7 +425,7 @@ export class HlsStreamEngine implements StreamEngine {
           const currentLevel = w.hls?.currentLevel;
           const level =
             currentLevel >= 0 ? w.hls?.levels?.[currentLevel] : null;
-          const levelBitrate = level?.bitrate || 0;
+          const levelBitrate = level?.bitrate || level?.attrs?.BANDWIDTH || 0;
           const aCodec = level?.audioCodec || 'AAC';
 
           const bufferedEnd = w.audioElement.buffered.length
@@ -434,6 +447,11 @@ export class HlsStreamEngine implements StreamEngine {
           };
         }),
       ];
+
+      const activeHls = this.hlsInstances.find((h: any) => h.bandwidthEstimate);
+      const bandwidthBps = (activeHls as any)?.bandwidthEstimate || 0;
+      const bandwidthKbps =
+        bandwidthBps > 0 ? Math.round(bandwidthBps / 1000) : 0;
 
       const master = this.videoWrappers.find(
         (w) => w.playerId === this.masterPlayerId,
@@ -467,7 +485,8 @@ export class HlsStreamEngine implements StreamEngine {
         bufferSizeMs: Math.round(avgBuffer),
         tracks,
         syncDriftMs: driftMs,
-      });
+        bandwidthKbps: bandwidthKbps,
+      } as any);
     }, 1000);
   }
 
@@ -548,7 +567,6 @@ export class HlsStreamEngine implements StreamEngine {
     const masterTime = master.videoElement.currentTime;
     const masterPdt = this.getTrackStartPdt(master);
 
-    // Synchronisation des pistes vidéo secondaires avec PDT
     this.videoWrappers.forEach((w) => {
       if (w.playerId === this.masterPlayerId || !w.videoElement) return;
       const slavePdt = this.getTrackStartPdt(w);
@@ -570,7 +588,6 @@ export class HlsStreamEngine implements StreamEngine {
       }
     });
 
-    // Synchronisation des pistes audio avec PDT
     this.audioWrappers.forEach((w) => {
       if (!w.audioElement) return;
       const audioPdt = this.getTrackStartPdt(w);
@@ -621,7 +638,5 @@ export class HlsStreamEngine implements StreamEngine {
     });
   }
 
-  resize(stageWidth: number, stageH: number): void {
-    // Layout géré par le CSS
-  }
+  resize(stageWidth: number, stageH: number): void {}
 }

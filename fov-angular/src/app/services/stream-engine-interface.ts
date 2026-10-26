@@ -17,6 +17,7 @@ export interface StreamEngineStats {
   bufferSizeMs: number;
   tracks: TrackStat[];
   syncDriftMs: Record<string, number>;
+  bandwidthKbps: number | undefined;
 }
 
 export interface StreamTrackView {

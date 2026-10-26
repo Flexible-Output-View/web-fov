@@ -35,6 +35,7 @@ export class StreamEngineDispatcher implements StreamEngine {
     bufferSizeMs: 0,
     tracks: [],
     syncDriftMs: {},
+    bandwidthKbps: 0,
   });
   public stats$ = this.statsSubject.asObservable();
 

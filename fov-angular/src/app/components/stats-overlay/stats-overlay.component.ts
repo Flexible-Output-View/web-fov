@@ -11,7 +11,7 @@ import { StreamEngineStats } from '../../services/stream-engine-interface';
 })
 export class StatsOverlayComponent {
   @Input() isOpen = false;
-  @Input() stats!: StreamEngineStats;
+  @Input() stats!: StreamEngineStats & { bandwidthKbps?: number };
   @Output() close = new EventEmitter<void>();
 
   closeOverlay(): void {
@@ -43,5 +43,34 @@ export class StatsOverlayComponent {
     if (sec >= 5) return 'tier-good';
     if (sec >= 2) return 'tier-poor';
     return 'tier-very-poor';
+  }
+
+  calculateTotalExpectedBitrateKbps(): number {
+    if (!this.stats?.tracks) return 0;
+    return this.stats.tracks.reduce((total, track) => {
+      if (!track.bitrate || track.bitrate === 'N/A') return total;
+      const match = track.bitrate.match(/(\d+)/);
+      if (match) {
+        return total + parseInt(match[1], 10);
+      }
+      return total;
+    }, 0);
+  }
+
+  getConnectionSpeedClass(): string {
+    const speed = this.stats?.bandwidthKbps ?? 0;
+    const expected = this.calculateTotalExpectedBitrateKbps();
+
+    if (expected <= 0) return 'tier-excellent';
+
+    const ratio = speed / expected;
+
+    if (ratio >= 1.0) {
+      return 'tier-excellent';
+    } else if (ratio >= 0.85) {
+      return 'tier-poor';
+    } else {
+      return 'tier-very-poor';
+    }
   }
 }

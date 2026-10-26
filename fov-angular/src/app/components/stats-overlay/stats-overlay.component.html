@@ -18,6 +18,13 @@
       </span>
     </div>
 
+    <div class="stat-line" *ngIf="stats.bandwidthKbps">
+      <span class="stat-label">Estimated Connection Speed:</span>
+      <span class="stat-value speed-value" [ngClass]="getConnectionSpeedClass()">
+        {{ stats.bandwidthKbps }} Kbps
+      </span>
+    </div>
+
     <div class="stat-line">
       <span class="stat-label">Live Latency:</span>
       <span class="stat-value" [ngClass]="getLatencyClass(stats.currentLatencyMs)">

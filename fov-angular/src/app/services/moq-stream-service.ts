@@ -41,7 +41,8 @@ export class MoqStreamEngine implements StreamEngine {
     bufferSizeMs: 0,
     tracks: [],
     syncDriftMs: {},
-  });
+    bandwidthKbps: 0,
+  } as any);
   public stats$ = this.statsSubject.asObservable();
   private statsInterval: any = null;
 
@@ -99,6 +100,7 @@ export class MoqStreamEngine implements StreamEngine {
       const tracks: TrackStat[] = [];
       const driftMs: Record<string, number> = {};
       let totalBuffer = 0;
+      let totalBytesDelta = 0;
 
       const masterWatch = watchElements[0];
       const masterTs = masterWatch
@@ -130,10 +132,11 @@ export class MoqStreamEngine implements StreamEngine {
           this.trackStatsTrackers.set(name, tracker);
         }
 
-        // Calcul du débit instantané (Delta octets / Delta temps)
         let bitrateStr = tracker.bitrate;
+        let byteDiff = 0;
         if (deltaTime > 0) {
-          const byteDiff = Math.max(0, currentBytes - tracker.prevBytes);
+          byteDiff = Math.max(0, currentBytes - tracker.prevBytes);
+          totalBytesDelta += byteDiff;
           const kbps = Math.round((byteDiff * 8) / (deltaTime * 1000));
           bitrateStr = `${kbps} kbps`;
           tracker.prevBytes = currentBytes;
@@ -141,11 +144,14 @@ export class MoqStreamEngine implements StreamEngine {
           tracker.bitrate = bitrateStr;
         }
 
-        const libraryJitter = Number(w.sync?.out?.jitter?.peek() || 0);
-        const bufferSize = Math.round(libraryJitter);
-        totalBuffer += bufferSize;
+        const bufferSec = Number(
+          w.sync?.out?.buffered?.peek() || w.sync?.out?.jitter?.peek() || 0,
+        );
+        const bufferMs = Math.round(
+          bufferSec > 100 ? bufferSec : bufferSec * 1000,
+        );
+        totalBuffer += bufferMs;
 
-        // Calcul de la dérive brute en temps réel
         const trackTs = Number(w.sync?.out?.timestamp?.peek() || 0);
         let rawDrift = 0;
         if (masterTs > 0 && trackTs > 0) {
@@ -169,7 +175,7 @@ export class MoqStreamEngine implements StreamEngine {
                 ? '1920x1088'
                 : undefined,
           bitrate: bitrateStr,
-          bufferMs: bufferSize,
+          bufferMs: bufferMs,
         });
       });
 
@@ -177,6 +183,11 @@ export class MoqStreamEngine implements StreamEngine {
         ? Math.round(totalBuffer / watchElements.length)
         : 0;
       const rtt = Number(this.connection?.probe.peek()?.rtt || 0);
+
+      const bandwidthKbps =
+        deltaTime > 0
+          ? Math.round((totalBytesDelta * 8) / (deltaTime * 1000))
+          : 0;
 
       this.statsSubject.next({
         protocol: 'moq',
@@ -186,7 +197,8 @@ export class MoqStreamEngine implements StreamEngine {
         bufferSizeMs: avgBuffer,
         tracks,
         syncDriftMs: driftMs,
-      });
+        bandwidthKbps: bandwidthKbps,
+      } as any);
     }, 1000);
   }
 
@@ -378,7 +390,5 @@ export class MoqStreamEngine implements StreamEngine {
     this.connection = null;
   }
 
-  resize(stageWidth: number, stageH: number): void {
-    // Géré par l'UI / CSS
-  }
+  resize(stageWidth: number, stageH: number): void {}
 }
