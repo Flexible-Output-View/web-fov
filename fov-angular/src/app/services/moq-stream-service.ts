@@ -107,7 +107,14 @@ export class MoqStreamEngine implements StreamEngine {
         ? Number(masterWatch.sync?.out?.timestamp?.peek() || 0)
         : 0;
 
+      const rtt = Number(this.connection?.probe.peek()?.rtt || 0);
+      const dynamicTargetMs = Math.max(200, Math.round(250 + rtt * 0.5));
+
       watchElements.forEach((w, idx) => {
+        try {
+          w.delay = Moq.Time.Milli(dynamicTargetMs);
+        } catch (e) {}
+
         const isVideo = idx < videoRenditions.length;
         const name = isVideo
           ? videoRenditions[idx]
@@ -144,8 +151,12 @@ export class MoqStreamEngine implements StreamEngine {
           tracker.bitrate = bitrateStr;
         }
 
+        const syncOut = w.sync?.out as any;
         const bufferSec = Number(
-          w.sync?.out?.buffered?.peek() || w.sync?.out?.jitter?.peek() || 0,
+          syncOut?.buffered?.peek() ||
+            syncOut?.buffer?.peek() ||
+            w.sync?.out?.jitter?.peek() ||
+            dynamicTargetMs / 1000,
         );
         const bufferMs = Math.round(
           bufferSec > 100 ? bufferSec : bufferSec * 1000,
@@ -181,8 +192,7 @@ export class MoqStreamEngine implements StreamEngine {
 
       const avgBuffer = watchElements.length
         ? Math.round(totalBuffer / watchElements.length)
-        : 0;
-      const rtt = Number(this.connection?.probe.peek()?.rtt || 0);
+        : dynamicTargetMs;
 
       const bandwidthKbps =
         deltaTime > 0
@@ -198,6 +208,7 @@ export class MoqStreamEngine implements StreamEngine {
         tracks,
         syncDriftMs: driftMs,
         bandwidthKbps: bandwidthKbps,
+        dynamicBufferMs: dynamicTargetMs,
       } as any);
     }, 1000);
   }
@@ -276,7 +287,7 @@ export class MoqStreamEngine implements StreamEngine {
         watchEl.url = relayUri;
         watchEl.name = broadcastName;
         watchEl.muted = true;
-        watchEl.delay = Moq.Time.Milli(250);
+        watchEl.delay = Moq.Time.Milli(200);
         watchEl.appendChild(canvas);
 
         watchEl.controls.target.set({ name: renditionKey });
@@ -306,7 +317,7 @@ export class MoqStreamEngine implements StreamEngine {
         watchEl.name = broadcastName;
         watchEl.muted = false;
         watchEl.volume = 1.0;
-        watchEl.delay = Moq.Time.Milli(250);
+        watchEl.delay = Moq.Time.Milli(200);
 
         try {
           if (watchEl.audio?.source) {
@@ -352,7 +363,7 @@ export class MoqStreamEngine implements StreamEngine {
       );
 
       console.log(
-        '[MoqStreamEngine] ✓ MoQ multi-track playback initialized via <moq-watch>',
+        '[MoqStreamEngine] ✓ MoQ multi-track playback initialized with adaptive 200ms+ buffer floor',
       );
     } catch (err) {
       console.error('[MoqStreamEngine] Initialization error:', err);
