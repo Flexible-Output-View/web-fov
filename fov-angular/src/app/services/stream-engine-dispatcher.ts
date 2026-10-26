@@ -1,6 +1,10 @@
 import { Injectable, Injector } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { StreamEngine, StreamTrackView } from './stream-engine-interface';
+import {
+  StreamEngine,
+  StreamTrackView,
+  StreamEngineStats,
+} from './stream-engine-interface';
 import { HlsStreamEngine } from './hls-stream-service';
 import { MoqStreamEngine } from './moq-stream-service';
 import { LiveStreamsService } from './live-streams.service';
@@ -24,20 +28,28 @@ export class StreamEngineDispatcher implements StreamEngine {
   private playbackStartedSubject = new BehaviorSubject<boolean>(false);
   public playbackStarted$ = this.playbackStartedSubject.asObservable();
 
+  private statsSubject = new BehaviorSubject<StreamEngineStats>({
+    protocol: 'unknown',
+    connectionHealth: 'disconnected',
+    currentLatencyMs: 0,
+    bufferSizeMs: 0,
+    tracks: [],
+    syncDriftMs: {},
+  });
+  public stats$ = this.statsSubject.asObservable();
+
   constructor(
     private liveStreamsService: LiveStreamsService,
-    private injector: Injector
+    private injector: Injector,
   ) {}
 
   connect(streamId: string): void {
     this.loadingSubject.next(true);
     this.bufferingSubject.next(true);
 
-    // Fetch available streams or stream info to check protocol/relay metadata
     this.liveStreamsService.getAvailableStreams().subscribe({
       next: (response) => {
         const stream = response.streams.find((s) => s.streamId === streamId);
-
         if (!stream) {
           this.errorSubject.next('Stream introuvable.');
           this.loadingSubject.next(false);
@@ -45,28 +57,30 @@ export class StreamEngineDispatcher implements StreamEngine {
           return;
         }
 
-        // Automatically choose between MoQ and HLS based on stream properties
         if (stream.protocol === 'moq' || stream.moqRelay) {
-          console.log('[StreamEngineDispatcher] Routing to MoqStreamEngine');
           this.activeEngine = this.injector.get(MoqStreamEngine);
         } else {
-          console.log('[StreamEngineDispatcher] Routing to HlsStreamEngine');
           this.activeEngine = this.injector.get(HlsStreamEngine);
         }
 
-        // Pipe active engine's observables to dispatcher's observables
         this.activeEngine.tracks$.subscribe((t) => this.tracksSubject.next(t));
-        this.activeEngine.isLoading$.subscribe((l) => this.loadingSubject.next(l));
-        this.activeEngine.isBuffering$.subscribe((b) => this.bufferingSubject.next(b));
+        this.activeEngine.isLoading$.subscribe((l) =>
+          this.loadingSubject.next(l),
+        );
+        this.activeEngine.isBuffering$.subscribe((b) =>
+          this.bufferingSubject.next(b),
+        );
         this.activeEngine.error$.subscribe((e) => this.errorSubject.next(e));
-        this.activeEngine.playbackStarted$.subscribe((p) => this.playbackStartedSubject.next(p));
+        this.activeEngine.playbackStarted$.subscribe((p) =>
+          this.playbackStartedSubject.next(p),
+        );
+        this.activeEngine.stats$.subscribe((s) => this.statsSubject.next(s));
 
-        // Connect active engine
         this.activeEngine.connect(streamId);
       },
       error: (err) => {
-        console.error('[StreamEngineDispatcher] Error inspecting stream:', err);
-        this.errorSubject.next('Erreur lors de la sélection du protocole de streaming.');
+        console.error('[Dispatcher] Error:', err);
+        this.errorSubject.next('Erreur de sélection du protocole.');
         this.loadingSubject.next(false);
         this.bufferingSubject.next(false);
       },

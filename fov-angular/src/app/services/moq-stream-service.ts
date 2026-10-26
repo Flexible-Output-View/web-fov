@@ -2,7 +2,12 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import * as API from '../models/APIModels';
 import { LiveStreamsService } from './live-streams.service';
-import { StreamEngine, StreamTrackView } from './stream-engine-interface';
+import {
+  StreamEngine,
+  StreamEngineStats,
+  StreamTrackView,
+  TrackStat,
+} from './stream-engine-interface';
 import * as Moq from '@moq/net';
 import * as Watch from '@moq/watch';
 import '@moq/watch/element';
@@ -28,6 +33,27 @@ export class MoqStreamEngine implements StreamEngine {
   private watchElements: MoqWatch[] = [];
   private audioWatchesMap: Map<string, MoqWatch> = new Map();
   private connection: Moq.Connection | null = null;
+
+  private statsSubject = new BehaviorSubject<StreamEngineStats>({
+    protocol: 'moq',
+    connectionHealth: 'disconnected',
+    currentLatencyMs: 0,
+    bufferSizeMs: 0,
+    tracks: [],
+    syncDriftMs: {},
+  });
+  public stats$ = this.statsSubject.asObservable();
+  private statsInterval: any = null;
+
+  private trackStatsTrackers = new Map<
+    string,
+    {
+      prevBytes: number;
+      prevTime: number;
+      bitrate: string;
+    }
+  >();
+  private syncBaseOffsets = new Map<string, number>();
 
   constructor(private liveStreamsService: LiveStreamsService) {}
 
@@ -56,6 +82,114 @@ export class MoqStreamEngine implements StreamEngine {
     });
   }
 
+  private startMoqStatsReporting(
+    watchElements: MoqWatch[],
+    videoRenditions: string[],
+    audioRenditions: string[],
+  ) {
+    if (this.statsInterval) clearInterval(this.statsInterval);
+
+    let lastReportTime = Date.now();
+
+    this.statsInterval = setInterval(() => {
+      const now = Date.now();
+      const deltaTime = (now - lastReportTime) / 1000;
+      lastReportTime = now;
+
+      const tracks: TrackStat[] = [];
+      const driftMs: Record<string, number> = {};
+      let totalBuffer = 0;
+
+      const masterWatch = watchElements[0];
+      const masterTs = masterWatch
+        ? Number(masterWatch.sync?.out?.timestamp?.peek() || 0)
+        : 0;
+
+      watchElements.forEach((w, idx) => {
+        const isVideo = idx < videoRenditions.length;
+        const name = isVideo
+          ? videoRenditions[idx]
+          : audioRenditions[idx - videoRenditions.length];
+
+        const stats = isVideo
+          ? (w.video?.out?.stats?.peek() as any)
+          : (w.audio?.out?.stats?.peek() as any);
+        const config = isVideo
+          ? (w.video?.source?.out?.config?.peek() as any)
+          : (w.audio?.source?.out?.config?.peek() as any);
+
+        const currentBytes = Number(stats?.bytesReceived || stats?.bytes || 0);
+
+        let tracker = this.trackStatsTrackers.get(name);
+        if (!tracker) {
+          tracker = {
+            prevBytes: currentBytes,
+            prevTime: now,
+            bitrate: '0 kbps',
+          };
+          this.trackStatsTrackers.set(name, tracker);
+        }
+
+        // Calcul du débit instantané (Delta octets / Delta temps)
+        let bitrateStr = tracker.bitrate;
+        if (deltaTime > 0) {
+          const byteDiff = Math.max(0, currentBytes - tracker.prevBytes);
+          const kbps = Math.round((byteDiff * 8) / (deltaTime * 1000));
+          bitrateStr = `${kbps} kbps`;
+          tracker.prevBytes = currentBytes;
+          tracker.prevTime = now;
+          tracker.bitrate = bitrateStr;
+        }
+
+        const libraryJitter = Number(w.sync?.out?.jitter?.peek() || 0);
+        const bufferSize = Math.round(libraryJitter);
+        totalBuffer += bufferSize;
+
+        // Calcul de la dérive brute en temps réel
+        const trackTs = Number(w.sync?.out?.timestamp?.peek() || 0);
+        let rawDrift = 0;
+        if (masterTs > 0 && trackTs > 0) {
+          const rawDiff = trackTs - masterTs;
+          if (!this.syncBaseOffsets.has(name)) {
+            this.syncBaseOffsets.set(name, rawDiff);
+          }
+          const baseOffset = this.syncBaseOffsets.get(name)!;
+          rawDrift = Math.round(rawDiff - baseOffset);
+        }
+        driftMs[name] = rawDrift;
+
+        tracks.push({
+          name,
+          type: isVideo ? 'video' : 'audio',
+          codec: config?.codec || (isVideo ? 'avc3.640028' : 'mp4a.40.2'),
+          resolution:
+            isVideo && config?.codedWidth
+              ? `${config.codedWidth}x${config.codedHeight}`
+              : isVideo
+                ? '1920x1088'
+                : undefined,
+          bitrate: bitrateStr,
+          bufferMs: bufferSize,
+        });
+      });
+
+      const avgBuffer = watchElements.length
+        ? Math.round(totalBuffer / watchElements.length)
+        : 0;
+      const rtt = Number(this.connection?.probe.peek()?.rtt || 0);
+
+      this.statsSubject.next({
+        protocol: 'moq',
+        connectionHealth:
+          rtt < 150 ? 'connected' : rtt < 300 ? 'degraded' : 'buffering',
+        currentLatencyMs: avgBuffer,
+        bufferSizeMs: avgBuffer,
+        tracks,
+        syncDriftMs: driftMs,
+      });
+    }, 1000);
+  }
+
   private async initializeMoqStream(stream: API.LiveStreamInfo) {
     try {
       const relayUrl = stream.moqRelay || 'http://localhost:4443';
@@ -71,12 +205,10 @@ export class MoqStreamEngine implements StreamEngine {
       let catalog: any = null;
       while (true) {
         try {
-          console.debug('Fetching MOQ catalog');
           catalog = broadcast.out.catalog.peek();
           if (catalog?.video?.renditions && catalog?.audio?.renditions) {
             break;
           }
-          console.log('MOQ catalog is empty, retrying...');
           catalog = await Promise.race([
             broadcast.out.catalog,
             new Promise((_, reject) =>
@@ -86,8 +218,7 @@ export class MoqStreamEngine implements StreamEngine {
           if (catalog?.video?.renditions && catalog?.audio?.renditions) {
             break;
           }
-        } catch (e) {
-        }
+        } catch (e) {}
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
@@ -116,6 +247,8 @@ export class MoqStreamEngine implements StreamEngine {
 
       this.watchElements = [];
       this.audioWatchesMap.clear();
+      this.trackStatsTrackers.clear();
+      this.syncBaseOffsets.clear();
       const trackViews: StreamTrackView[] = [];
 
       videoRenditions.forEach((renditionKey, i) => {
@@ -200,6 +333,12 @@ export class MoqStreamEngine implements StreamEngine {
       this.bufferingSubject.next(false);
       this.playbackStartedSubject.next(true);
 
+      this.startMoqStatsReporting(
+        this.watchElements,
+        videoRenditions,
+        audioRenditions,
+      );
+
       console.log(
         '[MoqStreamEngine] ✓ MoQ multi-track playback initialized via <moq-watch>',
       );
@@ -228,11 +367,14 @@ export class MoqStreamEngine implements StreamEngine {
   }
 
   disconnect(): void {
+    if (this.statsInterval) clearInterval(this.statsInterval);
     this.watchElements.forEach((w) => {
       w.remove();
     });
     this.watchElements = [];
     this.audioWatchesMap.clear();
+    this.trackStatsTrackers.clear();
+    this.syncBaseOffsets.clear();
     this.connection = null;
   }
 

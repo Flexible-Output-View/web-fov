@@ -1,5 +1,8 @@
 <div class="fov-player" #playerRoot>
   <div class="fov-toolbar">
+    <button class="btn-edit" (click)="toggleStatsModal()" title="Statistiques pour les nerds">
+      📊 Stats
+    </button>
     <div class="toolbar-left">
       <span class="live-indicator" *ngIf="playbackStarted">🔴 LIVE</span>
     </div>
@@ -27,11 +30,17 @@
     </div>
   </div>
 
+  <app-fov-stats-overlay
+    [isOpen]="showStatsModal"
+    [stats]="engineStats"
+    (close)="toggleStatsModal()">
+  </app-fov-stats-overlay>
+
   @if (isLoading) {
-    <div class="loading-state">
-      <div class="loading-spinner"></div>
-      <span>{{ getLoadingMessage() }}</span>
-    </div>
+  <div class="loading-state">
+    <div class="loading-spinner"></div>
+    <span>{{ getLoadingMessage() }}</span>
+  </div>
   }
 
   <div class="error-state" *ngIf="!isLoading && errorMessage">
@@ -55,25 +64,24 @@
           [style.display]="track.visible ? 'flex' : 'none'" [style.left.px]="track.x" [style.top.px]="track.y"
           [style.width.px]="track.width" [style.height.px]="track.height" (pointerdown)="startDrag($event, track)">
 
-        @if (editMode) {
+          @if (editMode) {
           <div class="drag-bar" *ngIf="editMode">
             <span class="drag-label">{{ track.name }}</span>
             <div class="drag-bar-actions">
               @if (!isTrackMaximized(track)) {
-                <button class="drag-action-btn"
-                  (click)="$event.stopPropagation(); maximizeTrack(track)" title="Plein écran dans le stage">
-                  ⛶
-                </button>
+              <button class="drag-action-btn" (click)="$event.stopPropagation(); maximizeTrack(track)"
+                title="Plein écran dans le stage">
+                ⛶
+              </button>
               }
               @if (isTrackMaximized(track)) {
-                <button class="drag-action-btn"
-                  (click)="$event.stopPropagation(); minimizeTrack(track)" title="Réduire">
-                  ⊡
-                </button>
+              <button class="drag-action-btn" (click)="$event.stopPropagation(); minimizeTrack(track)" title="Réduire">
+                ⊡
+              </button>
               }
             </div>
           </div>
-        }
+          }
 
           <div class="media-outlet" [appMount]="track.element"></div>
 

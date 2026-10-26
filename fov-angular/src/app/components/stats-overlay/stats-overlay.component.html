@@ -1,0 +1,47 @@
+<div class="stats-for-nerds-panel" *ngIf="isOpen" (click)="$event.stopPropagation()">
+  <button class="corner-close-btn" (click)="closeOverlay()" title="Fermer">✕</button>
+
+  <div class="stats-header">
+    <span class="stats-title">Stats for nerds</span>
+  </div>
+
+  <div class="stats-body">
+    <div class="stat-line">
+      <span class="stat-label">Protocol:</span>
+      <span class="stat-value uppercase">{{ stats.protocol }}</span>
+    </div>
+
+    <div class="stat-line">
+      <span class="stat-label">Connection Health:</span>
+      <span class="stat-value" [class.healthy]="stats.connectionHealth === 'connected'">
+        ● {{ stats.connectionHealth }}
+      </span>
+    </div>
+
+    <div class="stat-line">
+      <span class="stat-label">Live Latency:</span>
+      <span class="stat-value" [ngClass]="getLatencyClass(stats.currentLatencyMs)">
+        {{ stats.currentLatencyMs }} ms ({{ (stats.currentLatencyMs / 1000).toFixed(1) }}s)
+      </span>
+    </div>
+
+    <div class="section-divider">Tracks Info</div>
+    <div class="track-card" *ngFor="let track of stats.tracks">
+      <div class="track-title">[{{ track.type.toUpperCase() }}] {{ track.name }}</div>
+      <div class="track-info-grid">
+        <div>Codec: <b>{{ track.codec || 'N/A' }}</b></div>
+        <div>Bitrate: <b>{{ track.bitrate || 'N/A' }}</b></div>
+        <div>Buffer: <b [ngClass]="getBufferClass(track.bufferMs)">{{ track.bufferMs || 0 }}ms</b></div>
+        <div *ngIf="track.resolution">Res: <b>{{ track.resolution }}</b></div>
+      </div>
+    </div>
+
+    <div class="section-divider">Sync Drift (Haas Effect)</div>
+    <div class="stat-line" *ngFor="let drift of stats.syncDriftMs | keyvalue">
+      <span class="stat-label">{{ drift.key }}:</span>
+      <span class="stat-value" [ngClass]="getDriftClass(drift.value)">
+        {{ drift.value }} ms
+      </span>
+    </div>
+  </div>
+</div>

@@ -1,6 +1,24 @@
 import { InjectionToken } from '@angular/core';
 import { Observable } from 'rxjs';
 
+export interface TrackStat {
+  name: string;
+  type: 'video' | 'audio';
+  codec?: string;
+  resolution?: string;
+  bitrate?: string;
+  bufferMs?: number;
+}
+
+export interface StreamEngineStats {
+  protocol: 'moq' | 'hls' | 'unknown';
+  connectionHealth: 'connected' | 'buffering' | 'degraded' | 'disconnected';
+  currentLatencyMs: number;
+  bufferSizeMs: number;
+  tracks: TrackStat[];
+  syncDriftMs: Record<string, number>;
+}
+
 export interface StreamTrackView {
   id: string;
   name: string;
@@ -23,6 +41,7 @@ export abstract class StreamEngine {
   abstract readonly isBuffering$: Observable<boolean>;
   abstract readonly error$: Observable<string>;
   abstract readonly playbackStarted$: Observable<boolean>;
+  abstract readonly stats$: Observable<StreamEngineStats>;
 
   abstract connect(streamId: string): void;
   abstract disconnect(): void;

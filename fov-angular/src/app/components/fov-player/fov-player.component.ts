@@ -16,6 +16,7 @@ import {
   StreamEngine,
   StreamTrackView,
   STREAM_ENGINE,
+  StreamEngineStats,
 } from '../../services/stream-engine-interface';
 import { HlsStreamEngine } from '../../services/hls-stream-service';
 import { AppMountDirective } from '../../app-mount.directive';
@@ -23,6 +24,7 @@ import * as Moq from '@moq/net';
 import * as Watch from '@moq/watch';
 import { MoqStreamEngine } from '../../services/moq-stream-service';
 import { StreamEngineDispatcher } from '../../services/stream-engine-dispatcher';
+import { StatsOverlayComponent } from '../stats-overlay/stats-overlay.component';
 
 export interface Track {
   index: number;
@@ -92,11 +94,11 @@ const AUDIO_UNLOCKED_SESSION_KEY = 'fov_audio_unlocked';
 @Component({
   selector: 'app-fov-player',
   standalone: true,
-  imports: [CommonModule, AppMountDirective],
+  imports: [CommonModule, AppMountDirective, StatsOverlayComponent],
   providers: [
     HlsStreamEngine,
     MoqStreamEngine,
-    { provide: STREAM_ENGINE, useClass: StreamEngineDispatcher }
+    { provide: STREAM_ENGINE, useClass: StreamEngineDispatcher },
   ],
   templateUrl: './fov-player.component.html',
   styleUrls: ['./fov-player.component.scss'],
@@ -131,6 +133,16 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
 
   private readonly MOBILE_BREAKPOINT = 768;
   private readonly MAX_WIDTH_RATIO = 0.8;
+
+  showStatsModal = false;
+  engineStats: StreamEngineStats = {
+    protocol: 'unknown',
+    connectionHealth: 'disconnected',
+    currentLatencyMs: 0,
+    bufferSizeMs: 0,
+    tracks: [],
+    syncDriftMs: {},
+  };
 
   @ViewChild('playerRoot') playerRoot?: ElementRef<HTMLElement>;
 
@@ -174,12 +186,21 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     });
 
     this.engine.connect(this.streamId);
+    this.engine.stats$.subscribe((stats) => {
+      this.engineStats = stats;
+      this.cdr.detectChanges();
+    });
   }
 
   ngOnDestroy() {
     this.engine.disconnect();
     if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
     if (this.isFullscreen) document.exitFullscreen?.().catch(() => {});
+  }
+
+  toggleStatsModal() {
+    this.showStatsModal = !this.showStatsModal;
+    this.cdr.detectChanges();
   }
 
   get videoTracks(): StreamTrackView[] {
