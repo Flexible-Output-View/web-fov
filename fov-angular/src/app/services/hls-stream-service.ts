@@ -205,6 +205,34 @@ export class HlsStreamEngine implements StreamEngine {
         }
       });
 
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.warn(
+                '[HlsStreamEngine] Fatal network error (recovery requested):',
+                data,
+              );
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.warn(
+                '[HlsStreamEngine] Fatal media error (recovery requested):',
+                data,
+              );
+              hls.recoverMediaError();
+              break;
+            default:
+              console.error(
+                '[HlsStreamEngine] Unrecoverable HLS error, destroying instance:',
+                data,
+              );
+              hls.destroy();
+              break;
+          }
+        }
+      });
+
       hls.loadSource(videoUrl);
       hls.attachMedia(videoEl);
     } else {
@@ -231,6 +259,22 @@ export class HlsStreamEngine implements StreamEngine {
         if (audioEl.buffered.length > 0) {
           wrapper.bufferStart = audioEl.buffered.start(0);
           wrapper.bufferEnd = audioEl.buffered.end(audioEl.buffered.length - 1);
+        }
+      });
+
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError();
+              break;
+            default:
+              hls.destroy();
+              break;
+          }
         }
       });
 
