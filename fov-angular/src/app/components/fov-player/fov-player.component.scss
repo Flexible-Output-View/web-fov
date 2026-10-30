@@ -33,19 +33,31 @@
   .toolbar-right {
     display: flex;
     gap: var(--spacing-sm, 8px);
+    align-items: center;
   }
 }
 
 .live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-error, #ef4444);
-  animation: pulse 2s infinite;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0.5; }
+  50%      { opacity: 0.4; }
 }
 
 /* ─────────────────────────────────────────────
@@ -59,7 +71,7 @@
   color: var(--text-primary);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease;
 
   &:hover   { background: var(--bg-hover, #333); }
   &.active  { background: var(--color-primary, #9147ff); border-color: var(--color-primary, #9147ff); color: #fff; }
@@ -74,7 +86,7 @@
   color: var(--text-secondary, #888);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease;
 
   &:hover { border-color: var(--color-error, #ef4444); color: var(--color-error, #ef4444); }
 }
@@ -170,7 +182,7 @@
   &.editable {
     box-shadow: 0 0 0 2px var(--color-primary, #9147ff);
     cursor: move;
-    overflow: visible; /* Le resize handle qui déborde (-2px) reste visible */
+    overflow: visible;
   }
 
   video {
@@ -183,7 +195,7 @@
 }
 
 /* ─────────────────────────────────────────────
-   DRAG BAR (avec boutons maximize/minimize)
+   DRAG BAR
 ───────────────────────────────────────────── */
 .drag-bar {
   position: absolute;
@@ -216,7 +228,6 @@
   }
 }
 
-/* Bouton maximize/minimize dans la drag-bar */
 .drag-action-btn {
   width: 24px;
   height: 24px;
@@ -231,7 +242,7 @@
   line-height: 1;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
-  pointer-events: all; /* Ne pas déclencher le drag */
+  pointer-events: all;
 
   &:hover {
     background: rgba(255, 255, 255, 0.3);
@@ -284,12 +295,9 @@
 /* ─────────────────────────────────────────────
    AUDIO UNLOCK OVERLAY
 ───────────────────────────────────────────── */
-/* ─────────────────────────────────────────────
-   AUDIO UNLOCK OVERLAY — version améliorée
-───────────────────────────────────────────── */
 .audio-unlock-overlay {
   position: absolute;
-  inset: 0;                  /* Couvre tout le stage */
+  inset: 0;
   z-index: 800;
   cursor: pointer;
   pointer-events: all;
@@ -340,7 +348,7 @@
 
 @keyframes icon-pulse {
   0%, 100% { transform: scale(1);    opacity: 0.9; }
-  50%       { transform: scale(1.12); opacity: 1;   }
+  50%      { transform: scale(1.12); opacity: 1;   }
 }
 
 .audio-unlock-title {
@@ -382,7 +390,6 @@
   }
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .audio-unlock-content {
     padding: 24px 28px;
@@ -490,7 +497,7 @@
   color: var(--text-primary, #fff);
   font-size: 0.75rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease;
 
   &:hover:not(:disabled) { background: var(--bg-hover, #333); border-color: var(--text-secondary, #888); }
   &:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -521,22 +528,45 @@
 
     &::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       background: var(--color-primary, #9147ff);
       border-radius: 50%;
-      transition: transform 0.1s ease;
+      border: 2px solid transparent;
+      transition: transform 0.1s ease, border-color 0.15s ease;
 
       &:hover { transform: scale(1.2); }
     }
 
     &::-moz-range-thumb {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       background: var(--color-primary, #9147ff);
-      border: none;
+      border: 2px solid transparent;
       border-radius: 50%;
     }
+
+    &:focus-visible {
+      outline: none;
+
+      &::-webkit-slider-thumb {
+        border-color: var(--focus-ring, #1FB8FF);
+        box-shadow: 0 0 0 2px var(--focus-ring, #1FB8FF);
+      }
+
+      &::-moz-range-thumb {
+        border-color: var(--focus-ring, #1FB8FF);
+        box-shadow: 0 0 0 2px var(--focus-ring, #1FB8FF);
+      }
+    }
+  }
+
+  .volume-value {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #888);
+    margin-top: 2px;
+    display: block;
+    text-align: right;
   }
 }
 
@@ -616,7 +646,7 @@
 }
 
 /* ─────────────────────────────────────────────
-   PANNEAU AUDIO FULLSCREEN FLOTTANT
+   PANNEAU AUDIO FULLSCREEN
 ───────────────────────────────────────────── */
 .btn-fs-audio-toggle {
   position: absolute;

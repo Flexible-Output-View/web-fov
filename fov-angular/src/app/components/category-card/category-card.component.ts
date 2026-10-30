@@ -17,7 +17,7 @@ export interface Category {
 })
 export class CategoryCardComponent {
   @Input() category!: Category;
-  
+
   showTooltip = false;
   tooltipX = 0;
   tooltipY = 0;
@@ -41,6 +41,20 @@ export class CategoryCardComponent {
   }
 
   onMouseLeave() {
+    this.showTooltip = false;
+  }
+
+  onFocus(event: FocusEvent) {
+    this.showTooltip = true;
+    const el = event.target as HTMLElement;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      this.tooltipX = rect.left + rect.width / 2;
+      this.tooltipY = rect.top - 10;
+    }
+  }
+
+  onBlur() {
     this.showTooltip = false;
   }
 

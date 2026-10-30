@@ -40,6 +40,12 @@
   text-decoration: none;
   color: inherit;
   display: block;
+  border-radius: 8px;
+
+  &:focus-visible .category-card {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
 }
 
 .tooltip {

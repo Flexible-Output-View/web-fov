@@ -1,32 +1,58 @@
-<div class="carousel" *ngIf="!isLoading && streams.length > 0">
-  <button class="carousel-btn carousel-btn-prev" (click)="prevSlide()" *ngIf="streams.length > 1">
-    ‹
+<div class="carousel"
+     *ngIf="!isLoading && streams.length > 0"
+     role="region"
+     aria-roledescription="carrousel"
+     aria-label="Streams en direct à la une">
+
+  <button class="carousel-btn carousel-btn-prev"
+          (click)="prevSlide()"
+          *ngIf="streams.length > 1"
+          aria-label="Stream précédent">
+    <span aria-hidden="true">‹</span>
   </button>
   
-  <div class="carousel-container">
+  <div class="carousel-container" aria-live="polite" aria-atomic="true">
     <div class="carousel-track" [style.transform]="'translateX(-' + currentSlide * 100 + '%)'">
-      <div class="carousel-slide" *ngFor="let stream of streams">
+      <div class="carousel-slide"
+           *ngFor="let stream of streams; let i = index"
+           [attr.aria-hidden]="i !== currentSlide"
+           [attr.inert]="i !== currentSlide ? '' : null">
         
-        <a [routerLink]="['/stream', stream.streamId]" class="featured-stream">
+        <a [routerLink]="['/stream', stream.streamId]"
+           class="featured-stream"
+           [attr.aria-label]="(stream.title || stream.streamId) + ', par ' + (stream.streamer || stream.streamId) + (stream.category ? ', ' + stream.category : '') + (stream.viewers > 0 ? ', ' + stream.viewers + ' spectateurs' : '') + ', en direct'"
+           [attr.tabindex]="i !== currentSlide ? -1 : 0">
           <div class="stream-thumbnail">
-            <div class="live-indicator">🔴 EN DIRECT</div>
-            <div class="viewer-count" *ngIf="stream.viewers > 0">{{ stream.viewers }} spectateurs</div>
-            <div class="viewer-count" *ngIf="stream.viewers === 0">{{ stream.trackCount }} flux</div>
+            <div class="live-indicator" aria-hidden="true">
+              <span class="live-dot"></span> EN DIRECT
+            </div>
+            <div class="viewer-count" *ngIf="stream.viewers > 0">
+              {{ stream.viewers }} spectateurs
+            </div>
+            <div class="viewer-count" *ngIf="stream.viewers === 0">
+              {{ stream.trackCount }} flux
+            </div>
             
             <img *ngIf="stream.thumbnailUrl" 
                  [src]="stream.thumbnailUrl" 
-                 [alt]="stream.title || stream.streamId" 
+                 alt=""
+                 aria-hidden="true"
                  class="thumbnail-img">
             
             <div class="thumbnail-placeholder" *ngIf="!stream.thumbnailUrl">
-              <span class="placeholder-icon">🎮</span>
+              <span class="placeholder-icon" aria-hidden="true">🎮</span>
               <span class="placeholder-text">{{ stream.streamId }}</span>
             </div>
           </div>
           <div class="stream-info">
             <div class="streamer-avatar">
-              <img *ngIf="stream.avatarUrl" [src]="stream.avatarUrl" [alt]="stream.streamer || stream.streamId">
-              <div class="avatar-placeholder" *ngIf="!stream.avatarUrl">{{ (stream.streamer || stream.streamId).charAt(0).toUpperCase() }}</div>
+              <img *ngIf="stream.avatarUrl"
+                   [src]="stream.avatarUrl"
+                   alt=""
+                   aria-hidden="true">
+              <div class="avatar-placeholder" *ngIf="!stream.avatarUrl" aria-hidden="true">
+                {{ (stream.streamer || stream.streamId).charAt(0).toUpperCase() }}
+              </div>
             </div>
             <div class="stream-details">
               <h3 class="stream-title">{{ stream.title || stream.streamId }}</h3>
@@ -40,18 +66,22 @@
     </div>
   </div>
   
-  <button class="carousel-btn carousel-btn-next" (click)="nextSlide()" *ngIf="streams.length > 1">
-    ›
+  <button class="carousel-btn carousel-btn-next"
+          (click)="nextSlide()"
+          *ngIf="streams.length > 1"
+          aria-label="Stream suivant">
+    <span aria-hidden="true">›</span>
   </button>
 </div>
 
-<div class="carousel-empty" *ngIf="!isLoading && streams.length === 0">
+<div class="carousel-empty" *ngIf="!isLoading && streams.length === 0" role="status">
   <div class="empty-content">
-    <span class="empty-icon">📡</span>
+    <span class="empty-icon" aria-hidden="true">📡</span>
     <p>Aucun live en cours pour le moment</p>
   </div>
 </div>
 
-<div class="carousel-loading" *ngIf="isLoading">
-  <div class="loading-spinner"></div>
+<div class="carousel-loading" *ngIf="isLoading" role="status" aria-label="Chargement des streams">
+  <div class="loading-spinner" aria-hidden="true"></div>
+  <span class="sr-only">Chargement en cours…</span>
 </div>

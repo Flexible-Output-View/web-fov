@@ -1,3 +1,16 @@
+/* Classe utilitaire pour texte accessible mais invisible */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .navbar {
   display: flex;
   justify-content: space-between;
@@ -20,6 +33,12 @@
     .logo-link {
       height: 32px;
       width: 32px;
+      border-radius: 4px;
+
+      &:focus-visible {
+        outline: 2px solid var(--focus-ring, #1FB8FF);
+        outline-offset: 2px;
+      }
 
       .logo {
         height: 32px;
@@ -38,7 +57,7 @@
         font-size: 0.9rem;
         padding: var(--spacing-xs) var(--spacing-sm);
         border-radius: 4px;
-        transition: all 0.2s ease;
+        transition: color 0.2s ease, background-color 0.2s ease;
         
         &:hover {
           color: var(--text-primary);
@@ -47,6 +66,11 @@
         
         &.active {
           color: var(--accent-primary);
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--focus-ring, #1FB8FF);
+          outline-offset: 2px;
         }
       }
     }
@@ -69,7 +93,8 @@
         font-size: 0.9rem;
         
         &:focus {
-          outline: none;
+          outline: 2px solid var(--focus-ring, #1FB8FF);
+          outline-offset: -1px;
           border-color: var(--accent-primary);
         }
         
@@ -88,9 +113,15 @@
         color: var(--text-secondary);
         cursor: pointer;
         padding: 4px;
+        border-radius: 50%;
         
         &:hover {
           color: var(--text-primary);
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--focus-ring, #1FB8FF);
+          outline-offset: 2px;
         }
       }
     }
@@ -102,29 +133,6 @@
     justify-content: flex-end;
     align-items: center;
     gap: var(--spacing-sm);
-    
-    .profile-link {
-      width: 32px;
-      height: 32px;
-
-      .profile-avatar {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        overflow: hidden;
-        transition: border-color 0.2s ease;
-        
-        &:hover {
-          border-color: var(--accent-primary);
-        }
-        
-        img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-      }
-    }
   }
 
   .theme-toggle {
@@ -135,6 +143,12 @@
     font-size: 1.2rem;
     padding: var(--spacing-xs);
     margin-bottom: 2px;
+    border-radius: 50%;
+
+    &:focus-visible {
+      outline: 2px solid var(--focus-ring, #1FB8FF);
+      outline-offset: 2px;
+    }
   }
 }
 
@@ -179,6 +193,12 @@
   display: flex;
   align-items: center;
   text-decoration: none;
+  border-radius: 50%;
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring, #1FB8FF);
+    outline-offset: 2px;
+  }
 
   .profile-avatar {
     width: 36px;
@@ -221,6 +241,11 @@
   &:hover {
     background-color: rgba(145, 71, 255, 0.1);
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring, #1FB8FF);
+    outline-offset: 2px;
+  }
 }
 
 .logout-button {
@@ -231,10 +256,15 @@
   padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease;
 
   &:hover {
     border-color: #ef4444;
     color: #ef4444;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--focus-ring, #1FB8FF);
+    outline-offset: 2px;
   }
 }

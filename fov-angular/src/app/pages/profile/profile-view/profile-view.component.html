@@ -2,13 +2,19 @@
 
   <div class="profile-banner"
        [style.background-image]="profile.bannerUrl ? 'url(' + profile.bannerUrl + ')' : null"
-       [class.empty]="!profile.bannerUrl">
+       [class.empty]="!profile.bannerUrl"
+       role="img"
+       [attr.aria-label]="profile.bannerUrl ? 'Bannière de ' + profile.username : null">
   </div>
 
   <div class="profile-header">
     <div class="avatar">
-      <img *ngIf="profile.avatarUrl" [src]="profile.avatarUrl" [alt]="profile.username">
-      <span *ngIf="!profile.avatarUrl">{{ profile.username.charAt(0).toUpperCase() }}</span>
+      <img *ngIf="profile.avatarUrl"
+           [src]="profile.avatarUrl"
+           [alt]="'Photo de profil de ' + profile.username">
+      <span *ngIf="!profile.avatarUrl" aria-hidden="true">
+        {{ profile.username.charAt(0).toUpperCase() }}
+      </span>
     </div>
 
     <div class="profile-info">
@@ -21,7 +27,9 @@
           Modifier mon profil
         </button>
 
-        <button *ngIf="isOwnProfile" class="btn-primary" style="margin-left: 0.5rem" routerLink="/dashboard/stream">
+        <button *ngIf="isOwnProfile"
+                class="btn-primary btn-stream"
+                routerLink="/dashboard/stream">
           Gérer mon stream
         </button>
 
@@ -53,7 +61,7 @@
     </div>
   </div>
 
-  <div class="profile-stats">
+  <div class="profile-stats" role="group" aria-label="Statistiques du profil">
     <div class="stat">
       <span class="stat-value">{{ profile.followersCount }}</span>
       <span class="stat-label">Abonnés</span>
@@ -71,11 +79,11 @@
   </div>
 </div>
 
-<div class="load-error" *ngIf="errorMessage">
+<div class="load-error" *ngIf="errorMessage" role="alert">
   <p>{{ errorMessage }}</p>
 </div>
 
-<div class="not-found" *ngIf="notFound">
+<div class="not-found" *ngIf="notFound" role="status">
   <h2>Utilisateur introuvable</h2>
   <p>Aucun profil ne correspond à « {{ username }} ».</p>
   <a class="btn-primary" routerLink="/">Retour à l'accueil</a>
