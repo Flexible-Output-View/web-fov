@@ -24,6 +24,14 @@ describe('Swagger document', () => {
         expect(swaggerDocument.paths['/api/users/me/password'].put).toBeDefined();
         expect(swaggerDocument.paths['/api/users/{username}/follow'].post).toBeDefined();
         expect(swaggerDocument.paths['/api/users/{username}'].get).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/me'].get).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/me'].put).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/me/stream-key'].get).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/me/stream-key/rotate'].post).toBeDefined();
+        expect(swaggerDocument.paths['/api/streams/{id}/live'].get).toBeDefined();
+        expect(swaggerDocument.components.schemas.StreamSettings).toBeDefined();
+        expect(swaggerDocument.components.schemas.UpdateStreamSettingsRequest.properties.visibility.enum)
+            .toEqual(['public', 'unlisted', 'private']);
         expect(swaggerDocument.components.schemas.UserProfile).toBeDefined();
         expect(swaggerDocument.components.securitySchemes.bearerAuth).toEqual({
             type: 'http',
