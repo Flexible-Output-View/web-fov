@@ -12,7 +12,7 @@ import { Subject, takeUntil, interval, startWith, switchMap } from 'rxjs';
   templateUrl: './sidebar.component.html',
   styleUrls: ['./sidebar.component.scss']
 })
-//TODO: HIDE IF THE USER IS NOT CONNECTED
+
 export class SidebarComponent implements OnInit, OnDestroy {
   @Input() isCollapsed = false;
   @Output() toggleCollapse = new EventEmitter<void>();

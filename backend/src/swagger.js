@@ -137,6 +137,73 @@ const swaggerDocument = {
                 }
             }
         },
+        '/api/streams/{id}/live': {
+            get: {
+                tags: ['Streams'],
+                summary: 'Get one live stream with its HLS tracks',
+                description: 'Direct-link lookup. Public and unlisted streams are readable by anyone; private streams are only returned to their authenticated owner.',
+                parameters: [{ $ref: '#/components/parameters/Id' }],
+                responses: {
+                    200: { description: 'Live stream with tracks' },
+                    404: { $ref: '#/components/responses/NotFound' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/streams/me': {
+            get: {
+                tags: ['Streams'],
+                summary: 'Get the authenticated user stream configuration',
+                description: 'Creates the configuration and the stream key on first access. The key is only returned to its owner.',
+                security: [{ bearerAuth: [] }],
+                responses: {
+                    200: { description: 'Stream configuration', content: { 'application/json': { schema: { $ref: '#/components/schemas/StreamSettings' } } } },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            },
+            put: {
+                tags: ['Streams'],
+                summary: 'Update the authenticated user stream configuration',
+                description: 'Partial update: only the provided properties are changed. The stream key cannot be set by the client.',
+                security: [{ bearerAuth: [] }],
+                requestBody: {
+                    required: true,
+                    content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateStreamSettingsRequest' } } }
+                },
+                responses: {
+                    200: { description: 'Updated stream configuration', content: { 'application/json': { schema: { $ref: '#/components/schemas/StreamSettings' } } } },
+                    400: { description: 'Validation error' },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/streams/me/stream-key': {
+            get: {
+                tags: ['Streams'],
+                summary: 'Retrieve the authenticated user stream key',
+                security: [{ bearerAuth: [] }],
+                responses: {
+                    200: { description: 'Stream key and ingest identity', content: { 'application/json': { schema: { $ref: '#/components/schemas/StreamKey' } } } },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
+        '/api/streams/me/stream-key/rotate': {
+            post: {
+                tags: ['Streams'],
+                summary: 'Rotate the authenticated user stream key',
+                description: 'Replaces the key immediately. The previous key stops working for new ingest registrations.',
+                security: [{ bearerAuth: [] }],
+                responses: {
+                    200: { description: 'New stream key', content: { 'application/json': { schema: { $ref: '#/components/schemas/StreamKey' } } } },
+                    401: { $ref: '#/components/responses/Unauthorized' },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
         '/api/users/me/following': {
             get: {
                 tags: ['Users'],
@@ -316,7 +383,8 @@ const swaggerDocument = {
         '/ffmpeg/register': {
             post: {
                 tags: ['FFmpeg'],
-                summary: 'Register a stream and create an SRT listener',
+                summary: 'Register an arriving stream and create an SRT listener',
+                description: 'The encoder sends the key shown on the configuration page as `streamId`. The backend resolves it to the owner and links the stream at registration time.',
                 requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterStreamRequest' } } } },
                 responses: {
                     200: { description: 'Stream registered' },
@@ -476,13 +544,48 @@ const swaggerDocument = {
                     followersCount: { type: 'integer', description: 'Updated follower count of the target user' }
                 }
             },
+            StreamSettings: {
+                type: 'object',
+                properties: {
+                    streamId: { type: 'string', example: 'u12', description: 'Public stream id used in URLs' },
+                    title: { type: 'string', maxLength: 255 },
+                    description: { type: 'string', maxLength: 2000 },
+                    visibility: { type: 'string', enum: ['public', 'unlisted', 'private'] },
+                    thumbnailUrl: { type: 'string', description: 'Image URL or data URL (max 5 MB)' },
+                    categoryId: { type: 'integer', nullable: true },
+                    category: { type: 'string' },
+                    streamKey: { type: 'string', description: 'Only returned to the authenticated owner' },
+                    isLive: { type: 'boolean' },
+                    createdAt: { type: 'string', format: 'date-time' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
+            UpdateStreamSettingsRequest: {
+                type: 'object',
+                properties: {
+                    title: { type: 'string', minLength: 1, maxLength: 255 },
+                    description: { type: 'string', maxLength: 2000 },
+                    visibility: { type: 'string', enum: ['public', 'unlisted', 'private'] },
+                    thumbnailUrl: { type: 'string', description: 'Image URL or data URL (max 5 MB)' },
+                    categoryId: { type: 'integer', nullable: true }
+                }
+            },
+            StreamKey: {
+                type: 'object',
+                properties: {
+                    streamKey: { type: 'string', example: 'fov_...' },
+                    streamId: { type: 'string', example: 'u12' },
+                    isLive: { type: 'boolean' },
+                    updatedAt: { type: 'string', format: 'date-time' }
+                }
+            },
             RegisterStreamRequest: {
                 type: 'object',
                 required: ['tracks', 'audioTracks'],
                 properties: {
                     tracks: { type: 'integer', minimum: 1 },
                     audioTracks: { type: 'integer', minimum: 1 },
-                    streamId: { type: 'string' },
+                    streamId: { type: 'string', description: 'The stream key shown on the configuration page when an owned stream arrives. When it matches a key, the stream is linked to its owner and the response streamId is `u<userId>`. Legacy arbitrary ids keep working.' },
                     videoTrackNames: {
                         type: 'array',
                         items: {
@@ -504,7 +607,9 @@ const swaggerDocument = {
             StopStreamRequest: {
                 type: 'object',
                 required: ['streamId'],
-                properties: { streamId: { type: 'string' } }
+                properties: {
+                    streamId: { type: 'string', description: 'The key the stream arrived with, `u<userId>`, or a legacy arbitrary id' }
+                }
             }
         },
         responses: {

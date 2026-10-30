@@ -189,4 +189,68 @@ app.use((err, req, res, _next) => {
             .send({ login: bobName, password: 'integration-secret' });
         expect(login.status).toBe(401);
     });
+
+    test('configures stream properties, retrieves the key, and rotates it', async () => {
+        const username = `streamer_${Date.now()}`;
+        const registration = await request(app).post('/api/auth/register').send({
+            username,
+            email: `${username}@example.com`,
+            password: 'integration-secret'
+        });
+        expect(registration.status).toBe(201);
+
+        const token = registration.body.token;
+        const userId = registration.body.user.id;
+        const auth = { Authorization: `Bearer ${token}` };
+
+        const initial = await request(app).get('/api/streams/me').set(auth);
+        expect(initial.status).toBe(200);
+        expect(initial.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
+        expect(initial.body.streamId).toBe(`u${userId}`);
+        expect(initial.body.title).toBe(username);
+        expect(initial.body.visibility).toBe('public');
+        expect(initial.body.isLive).toBe(false);
+
+        const update = await request(app)
+            .put('/api/streams/me')
+            .set(auth)
+            .send({
+                title: 'Ranked grind',
+                description: 'Climbing the ladder',
+                visibility: 'unlisted',
+                thumbnailUrl: 'data:image/png;base64,AAAA',
+                categoryId: 1
+            });
+        expect(update.status).toBe(200);
+        expect(update.body).toMatchObject({
+            title: 'Ranked grind',
+            description: 'Climbing the ladder',
+            visibility: 'unlisted',
+            thumbnailUrl: 'data:image/png;base64,AAAA',
+            categoryId: 1,
+            category: 'League of Legends'
+        });
+
+        const unknownCategory = await request(app)
+            .put('/api/streams/me')
+            .set(auth)
+            .send({ categoryId: 999999 });
+        expect(unknownCategory.status).toBe(400);
+
+        const currentKey = await request(app).get('/api/streams/me/stream-key').set(auth);
+        expect(currentKey.status).toBe(200);
+        expect(currentKey.body.streamKey).toBe(initial.body.streamKey);
+
+        const rotated = await request(app).post('/api/streams/me/stream-key/rotate').set(auth);
+        expect(rotated.status).toBe(200);
+        expect(rotated.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
+        expect(rotated.body.streamKey).not.toBe(initial.body.streamKey);
+        expect(rotated.body.streamId).toBe(`u${userId}`);
+
+        const afterRotation = await request(app).get('/api/streams/me/stream-key').set(auth);
+        expect(afterRotation.body.streamKey).toBe(rotated.body.streamKey);
+
+        const anonymous = await request(app).get('/api/streams/me');
+        expect(anonymous.status).toBe(401);
+    });
 });

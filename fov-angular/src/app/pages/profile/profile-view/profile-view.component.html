@@ -21,6 +21,10 @@
           Modifier mon profil
         </button>
 
+        <button *ngIf="isOwnProfile" class="btn-primary" style="margin-left: 0.5rem" routerLink="/dashboard/stream">
+          Gérer mon stream
+        </button>
+
         <button *ngIf="!isOwnProfile"
                 type="button"
                 class="btn-follow"
