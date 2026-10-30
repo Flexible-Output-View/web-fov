@@ -5,7 +5,10 @@
       <p>Connectez-vous à votre compte FOV</p>
     </div>
 
-    <form (ngSubmit)="onSubmit()" class="auth-form">
+    <form (ngSubmit)="onSubmit()"
+          class="auth-form"
+          [attr.aria-busy]="isLoading">
+
       <div class="form-group">
         <label for="login">Email ou nom d'utilisateur</label>
         <input
@@ -15,6 +18,7 @@
           name="login"
           placeholder="votre@email.com ou nom d'utilisateur"
           autocomplete="username"
+          [attr.aria-invalid]="errorMessage ? true : null"
         />
       </div>
 
@@ -27,15 +31,19 @@
           name="password"
           placeholder="••••••••"
           autocomplete="current-password"
+          [attr.aria-invalid]="errorMessage ? true : null"
         />
       </div>
 
-      <div class="error-message" *ngIf="errorMessage">
+      <div class="error-message"
+           *ngIf="errorMessage"
+           role="alert"
+           aria-live="assertive">
         {{ errorMessage }}
       </div>
 
       <button type="submit" class="btn-primary" [disabled]="isLoading">
-        {{ isLoading ? 'Connexion...' : 'Se connecter' }}
+        {{ isLoading ? 'Connexion en cours…' : 'Se connecter' }}
       </button>
     </form>
 

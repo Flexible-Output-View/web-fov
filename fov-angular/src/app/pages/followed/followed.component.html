@@ -2,14 +2,25 @@
   <h1>Suivis</h1>
 
   <ng-container *ngIf="isAuthenticated; else loginRequired">
-    <div class="tabs">
-      <button class="tab-btn"
+
+    <div class="tabs" role="tablist" aria-label="Sections des suivis">
+      <button role="tab"
+              id="followed-tab-channels"
+              class="tab-btn"
               [class.active]="activeTab === 'channels'"
+              [attr.aria-selected]="activeTab === 'channels'"
+              [attr.tabindex]="activeTab === 'channels' ? 0 : -1"
+              aria-controls="followed-panel-channels"
               (click)="setActiveTab('channels')">
         Chaînes
       </button>
-      <button class="tab-btn"
+      <button role="tab"
+              id="followed-tab-categories"
+              class="tab-btn"
               [class.active]="activeTab === 'categories'"
+              [attr.aria-selected]="activeTab === 'categories'"
+              [attr.tabindex]="activeTab === 'categories' ? 0 : -1"
+              aria-controls="followed-panel-categories"
               (click)="setActiveTab('categories')">
         Catégories
       </button>
@@ -17,14 +28,19 @@
 
     <div class="tab-content">
 
-      <div *ngIf="activeTab === 'channels'">
+      <div role="tabpanel"
+           id="followed-panel-channels"
+           aria-labelledby="followed-tab-channels"
+           *ngIf="activeTab === 'channels'">
 
-        <div class="loading-state" *ngIf="isLoading">
-          <div class="loading-spinner"></div>
-          <p>Chargement de vos chaînes suivies...</p>
+        <div class="loading-state" *ngIf="isLoading" role="status" aria-live="polite">
+          <div class="loading-spinner" aria-hidden="true"></div>
+          <p>Chargement de vos chaînes suivies…</p>
         </div>
 
-        <p class="no-channels-msg" *ngIf="!isLoading && loadError">{{ loadError }}</p>
+        <p class="no-channels-msg" *ngIf="!isLoading && loadError" role="alert">
+          {{ loadError }}
+        </p>
 
         <ng-container *ngIf="!isLoading && !loadError">
           <p class="no-channels-msg"
@@ -59,7 +75,9 @@
                      [src]="channel.avatarUrl"
                      [alt]="channel.username"
                      class="avatar">
-                <span *ngIf="!channel.avatarUrl" class="avatar avatar-placeholder">
+                <span *ngIf="!channel.avatarUrl"
+                      class="avatar avatar-placeholder"
+                      aria-hidden="true">
                   {{ channel.username.charAt(0).toUpperCase() }}
                 </span>
                 <span class="channel-name">{{ channel.username }}</span>
@@ -70,7 +88,11 @@
 
       </div>
 
-      <div *ngIf="activeTab === 'categories'">
+      <div role="tabpanel"
+           id="followed-panel-categories"
+           aria-labelledby="followed-tab-categories"
+           *ngIf="activeTab === 'categories'">
+
         <div *ngIf="followedCategories.length > 0; else noCategories">
           <div class="categories-grid">
             <app-category-card
@@ -89,7 +111,7 @@
 
   <ng-template #loginRequired>
     <div class="login-required-state">
-      <div class="login-icon">🔒</div>
+      <div class="login-icon" aria-hidden="true">🔒</div>
       <h2>Connectez-vous pour voir vos chaînes suivies</h2>
       <p>Vos abonnements sont liés à votre compte FOV.</p>
       <a class="btn-login"
