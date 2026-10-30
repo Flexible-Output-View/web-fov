@@ -82,15 +82,6 @@ CREATE TABLE streams (
 
 CREATE INDEX idx_streams_category_id ON streams(category_id);
 
--- Insert data into streams
-INSERT INTO streams (id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live) VALUES
-(1, 'Skyyart', 'Grand tournoi League of Legends ! 🏆', 1, 91200, 'assets/stream-thumbnail1.png', 'assets/profile-avatar.png', TRUE),
-(2, 'Domingo', 'Just chatting avec la communauté 💬', 2, 8600, 'assets/stream-thumbnail2.png', 'assets/profile-avatar.png', TRUE),
-(3, 'Squeezie', 'Tryhard Valorant avec les potes !', 3, 28100, 'assets/stream-thumbnail3.png', 'assets/profile-avatar.png', TRUE),
-(4, 'Mushway', 'Minecraft à l''ancienne !', 5, 5000, 'assets/stream-thumbnail4.png', 'assets/profile-avatar.png', TRUE),
-(5, 'Inoxtag', 'Z-Event !', 2, 120000, 'assets/stream-thumbnail5.png', 'assets/profile-avatar.png', FALSE),
-(6, 'Lofi Girl', 'Chill beats to relax/study to', 6, 7200, 'assets/stream-thumbnail6.png', 'assets/profile-avatar.png', FALSE);
-
 -- Sync auto-increment sequence counters
 SELECT setval(pg_get_serial_sequence('categories', 'id'), COALESCE(MAX(id), 1)) FROM categories;
 SELECT setval(pg_get_serial_sequence('streams', 'id'), COALESCE(MAX(id), 1)) FROM streams;
