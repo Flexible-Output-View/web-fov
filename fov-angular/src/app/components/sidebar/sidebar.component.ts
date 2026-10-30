@@ -2,7 +2,7 @@ import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angu
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { LiveStreamsService } from '../../services/live-streams.service';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import * as API from '../../models/APIModels'
 import { Subject, takeUntil, interval, startWith, switchMap } from 'rxjs';
 
 @Component({
@@ -16,8 +16,8 @@ import { Subject, takeUntil, interval, startWith, switchMap } from 'rxjs';
 export class SidebarComponent implements OnInit, OnDestroy {
   @Input() isCollapsed = false;
   @Output() toggleCollapse = new EventEmitter<void>();
-  
-  liveChannels: LiveStreamInfo[] = [];
+
+  liveChannels: API.LiveStreamInfo[] = [];
   private destroy$ = new Subject<void>();
 
   constructor(private liveStreamsService: LiveStreamsService) {}

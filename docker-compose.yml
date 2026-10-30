@@ -13,6 +13,8 @@ services:
       - frontend
       - backend
     depends_on:
+      moq-relay:
+        condition: service_started
       fov-db:
         condition: service_healthy
 
@@ -27,6 +29,8 @@ services:
       - FFMPEG_PATH=/usr/local/bin/ffmpeg
       - MEDIA_ROOT=/var/media
       - SRT_URL=${SRT_URL}
+      - MOQ_URL=${MOQ_URL}
+      - MOQ_PORT=${MOQ_PORT}
       - API_HOSTNAME=${API_URL}
       - TWITCH_ID=${TWITCH_ID}
       - TWITCH_SECRET=${TWITCH_SECRET}
@@ -68,11 +72,24 @@ services:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
+  moq-relay:
+    image: moqdev/moq-relay:0.17.8
+    restart: unless-stopped
+    ports:
+      - 0.0.0.0:4443:4443
+      - 0.0.0.0:4443:4443/udp
+    environment:
+      - MOQ_LISTEN_BIND=0.0.0.0:4443
+      - MOQ_WEB_HTTP_LISTEN=0.0.0.0:4443
+      - MOQ_LISTEN_TLS_GENERATE=localhost # Only for development
+      - MOQ_TLS_GENERATE=localhost # Only for development
+      - MOQ_AUTH_PUBLIC=* # Only for development
+      - MOQ_STATS_ENABLED=true
+      - MOQ_STATS_NODE=local/host
+
 networks:
   frontend:
-    #driver: bridge
   backend:
-    #driver: bridge
     internal: true
 
 volumes:

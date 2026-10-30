@@ -1,0 +1,136 @@
+.stats-for-nerds-panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 99500;
+  width: 340px;
+  max-height: calc(100% - 32px);
+  background: rgba(10, 10, 12, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e4e4e7;
+  font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  user-select: text;
+}
+
+.corner-close-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #f4f4f5;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: #ef4444;
+    color: #ffffff;
+  }
+}
+
+.stats-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-right: 32px; // Leave room for absolute close button
+
+  .stats-title {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #f4f4f5;
+    text-transform: uppercase;
+    font-size: 10px;
+  }
+}
+
+.stats-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  .stat-label {
+    color: #a1a1aa;
+  }
+
+  .stat-value {
+    font-weight: 600;
+    color: #ffffff;
+
+    &.uppercase {
+      text-transform: uppercase;
+    }
+
+    &.healthy {
+      color: #22c55e;
+    }
+  }
+}
+
+.section-divider {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15);
+  color: #818cf8;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.track-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 6px 8px;
+
+  .track-title {
+    color: #a5b4fc;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .track-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 8px;
+    color: #a1a1aa;
+
+    b {
+      color: #f4f4f5;
+    }
+  }
+}
+
+/* Direct text color coding based on performance thresholds */
+.tier-excellent { color: #22c55e !important; font-weight: 700; }
+.tier-very-good { color: #4ade80 !important; font-weight: 700; }
+.tier-good      { color: #facc15 !important; font-weight: 700; }
+.tier-poor      { color: #fb923c !important; font-weight: 700; }
+.tier-very-poor { color: #f87171 !important; font-weight: 700; }
