@@ -49,4 +49,17 @@ describe('AppComponent', () => {
     app.onSidebarToggle();
     expect(app.isSidebarCollapsed).toBeTrue();
   });
+
+    it('should default isSidebarCollapsed to true', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    expect(fixture.componentInstance.isSidebarCollapsed).toBeTrue();
+  });
+
+  it('should render navbar and sidebar child components', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('app-navbar')).toBeTruthy();
+    expect(compiled.querySelector('app-sidebar')).toBeTruthy();
+  });
 });
