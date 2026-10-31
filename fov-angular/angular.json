@@ -105,22 +105,22 @@
           "builder": "@angular/build:karma",
           "options": {
             "karmaConfig": "karma.conf.js",
-            "polyfills": [
-              "zone.js",
-              "zone.js/testing"
+            "codeCoverage": true,
+            "codeCoverageExclude": [
+              "src/**/*.spec.ts",
+              "src/main.ts",
+              "src/polyfills.ts",
+              "src/**/*.module.ts",
+              "src/environments/**"
             ],
+            "polyfills": ["zone.js", "zone.js/testing"],
             "tsConfig": "tsconfig.spec.json",
             "inlineStyleLanguage": "scss",
             "assets": [
-              {
-                "glob": "**/*",
-                "input": "public"
-              },
+              { "glob": "**/*", "input": "public" },
               "src/assets"
             ],
-            "styles": [
-              "src/styles.scss"
-            ],
+            "styles": ["src/styles.scss"],
             "scripts": []
           }
         }
