@@ -28,8 +28,10 @@ describe('FovPlayerComponent', () => {
   });
 
   function createStage(w = 1000, h = 500): HTMLElement {
+    const id = `stageArea_${component.playerId}`;
+    document.querySelectorAll(`#${CSS.escape(id)}`).forEach(el => el.remove());
     const stage = document.createElement('div');
-    stage.id = `stageArea_${component.playerId}`;
+    stage.id = id;
     Object.defineProperty(stage, 'offsetWidth', { value: w, configurable: true });
     Object.defineProperty(stage, 'offsetHeight', { value: h, configurable: true });
     stage.getBoundingClientRect = () => ({
@@ -378,16 +380,25 @@ describe('FovPlayerComponent', () => {
     });
 
     it('captureNormalized stores normalized coordinates when stage exists', () => {
-      createStage(1000, 500);
+      const stage = createStage(1000, 500);
+      // Sanity check : le stage récupéré par le composant doit être celui-ci
+      const found = document.getElementById(`stageArea_${component.playerId}`);
+      expect(found).toBe(stage);
+      expect(found!.offsetWidth).toBe(1000);
 
-      component.videoWrappers = [
-        { isVideo: true, x: 100, y: 50, width: 500, height: 250, nx: 0, ny: 0, nw: 0, nh: 0 } as any,
-      ];
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
+      component.isFullscreen = false;
+      const wrapper = {
+        isVideo: true, x: 100, y: 250, width: 500, height: 250,
+        nx: 0, ny: 0, nw: 0, nh: 0
+      } as any;
+      component.activeDragWrapper = wrapper;
+      component.videoWrappers = [wrapper];
 
       (component as any).captureNormalized();
 
       expect(component.videoWrappers[0].nx).toBeCloseTo(0.1);
-      expect(component.videoWrappers[0].ny).toBeCloseTo(0.1);
+      expect(component.videoWrappers[0].ny).toBeCloseTo(0.5);
       expect(component.videoWrappers[0].nw).toBeCloseTo(0.5);
       expect(component.videoWrappers[0].nh).toBeCloseTo(0.5);
     });
