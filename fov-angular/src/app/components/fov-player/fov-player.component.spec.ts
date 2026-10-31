@@ -1712,6 +1712,9 @@ describe('FovPlayerComponent', () => {
 
     it('captures normalized coords when a wrapper was active', () => {
       createStage(1000, 500);
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
+      component.isFullscreen = false;
+
       component.activeDragWrapper = { isVideo: true, x: 100, y: 50, width: 500, height: 250, nx: 0, ny: 0, nw: 0, nh: 0 } as any;
       component.videoWrappers = [component.activeDragWrapper as any];
 
