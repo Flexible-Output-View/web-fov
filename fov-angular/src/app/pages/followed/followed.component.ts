@@ -7,7 +7,7 @@ import {
   CategoryCardComponent,
 } from '../../components/category-card/category-card.component';
 import { LiveStreamCardComponent } from '../../components/live-stream-card/live-stream-card.component';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import { LiveStreamInfo } from '../../models/APIModels';
 import { AuthService } from '../../services/auth.service';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { UserService } from '../../services/user.service';
