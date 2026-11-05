@@ -4,7 +4,7 @@ services:
       context: ./backend
     restart: unless-stopped
     volumes:
-      - ./backend/media:/var/media
+      - ./backend/media:/var/media:z
     ports:
       - "4000:4000" # API
       - "9999-10010:9999-10010"
@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
     volumes:
       - fov-db:/var/lib/postgresql
-      - ./fovwebdb.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./fovwebdb.sql:/docker-entrypoint-initdb.d/init.sql:z
     networks:
       - backend
 
