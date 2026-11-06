@@ -17,11 +17,17 @@ import { ChatService } from '../../services/chat.service';
 import { AuthService, AuthUser } from '../../services/auth.service';
 import { ChatMessage } from '../../models/chat';
 
+/**
+ * Palette de couleurs pour les usernames.
+ * Chaque couleur doit atteindre ≥ 4.5:1 de contraste sur le fond sombre
+ * du chat (#1a1a1a). La teinte #9147ff d'origine (~4.0:1) a été remplacée
+ * par #a670ff (~4.8:1).
+ */
 const USERNAME_COLORS = [
   '#ff4545',
   '#1e90ff',
   '#1db954',
-  '#9147ff',
+  '#a670ff',   // ← était #9147ff (contraste insuffisant)
   '#ff7b00',
   '#00c2a8',
   '#ff4fa3',
@@ -166,6 +172,10 @@ export class StreamChatComponent implements OnInit, OnChanges, OnDestroy, AfterV
     });
   }
 
+  /**
+   * Envoi uniquement sur Entrée sans Shift.
+   * Shift+Entrée laisse le retour à la ligne natif de l'input.
+   */
   onKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();

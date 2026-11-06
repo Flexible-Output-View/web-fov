@@ -15,6 +15,10 @@ export interface LiveStreamInfo {
   title: string;
   category: string;
   viewers: number;
+  /** Channel name as stored on the stream row. */
+  streamer: string;
+  /** Exact username of the matching account, when the streamer registered. */
+  streamerUsername?: string | null;
   avatarUrl: string;
   thumbnailUrl: string;
 }

@@ -35,4 +35,50 @@ describe('app routes', () => {
       expect(index).toBeLessThan(usernameIndex);
     }
   });
+
+    it('redirects unknown paths to the home page', () => {
+    const wildcard = routes.find((r) => r.path === '**');
+    expect(wildcard).toBeTruthy();
+    expect(wildcard!.redirectTo).toBe('');
+  });
+
+  it('protects dashboard/stream with authGuard', () => {
+    const dashboardRoute = routes.find((r) => r.path === 'dashboard/stream');
+    expect(dashboardRoute).toBeTruthy();
+    expect(dashboardRoute!.canActivate).toBeDefined();
+    expect(dashboardRoute!.canActivate!.length).toBeGreaterThan(0);
+  });
+
+  it('sets a title on the how-does-it-work route', () => {
+    const route = routes.find((r) => r.path === 'how-does-it-work');
+    expect(route).toBeTruthy();
+    expect(route!.title).toBe('Comment ça marche ?');
+  });
+
+  it('sets a title on the dashboard/stream route', () => {
+    const route = routes.find((r) => r.path === 'dashboard/stream');
+    expect(route).toBeTruthy();
+    expect(route!.title).toBe('Configuration du stream');
+  });
+
+  it('contains all expected page routes', () => {
+    const expectedPaths = [
+      '',
+      'discover',
+      'discover/:name',
+      'followed',
+      'profile',
+      'profile/personal_settings',
+      'login',
+      'register',
+      'stream/:streamId',
+      'how-does-it-work',
+      'dashboard/stream',
+      ':username',
+      '**',
+    ];
+    for (const p of expectedPaths) {
+      expect(paths).toContain(p);
+    }
+  });
 });

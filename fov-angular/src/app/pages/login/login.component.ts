@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 
@@ -21,10 +21,19 @@ export class LoginComponent {
   constructor(
     private authService: AuthService,
     private router: Router,
+    private route: ActivatedRoute,
   ) {
     if (this.authService.isAuthenticated()) {
-      this.router.navigate(['/profile']);
+      this.router.navigateByUrl(this.returnUrl());
     }
+  }
+
+  /** Only allow internal absolute paths so the param cannot redirect off-site. */
+  private returnUrl(): string {
+    const url = this.route.snapshot.queryParamMap.get('returnUrl');
+    return url && url.startsWith('/') && !url.startsWith('//')
+      ? url
+      : '/profile';
   }
 
   async onSubmit(): Promise<void> {
@@ -41,7 +50,7 @@ export class LoginComponent {
       await firstValueFrom(
         this.authService.login(this.login.trim(), this.password),
       );
-      this.router.navigate(['/profile']);
+      this.router.navigateByUrl(this.returnUrl());
     } catch (err: any) {
       this.errorMessage = err?.message || 'Email ou mot de passe incorrect.';
     } finally {

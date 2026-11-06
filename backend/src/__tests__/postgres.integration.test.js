@@ -99,15 +99,25 @@ app.use((err, req, res, _next) => {
         // alice follows bob
         const follow = await request(app).post(`/api/users/${bobName}/follow`).set(auth(aliceToken));
         expect(follow.status).toBe(200);
-        expect(follow.body).toEqual({ following: true });
+        expect(follow.body).toEqual({ following: true, followersCount: 1 });
 
         const bobAsSeenByAlice = await request(app).get(`/api/users/${bobName}`).set(auth(aliceToken));
         expect(bobAsSeenByAlice.body.followersCount).toBe(1);
         expect(bobAsSeenByAlice.body.isFollowing).toBe(true);
 
+        const following = await request(app).get('/api/users/me/following').set(auth(aliceToken));
+        expect(following.status).toBe(200);
+        expect(following.body).toHaveLength(1);
+        expect(following.body[0]).toMatchObject({
+            username: bobName,
+            isFollowing: true,
+            followersCount: 1
+        });
+        expect(following.body[0]).not.toHaveProperty('email');
+
         const unfollow = await request(app).delete(`/api/users/${bobName}/follow`).set(auth(aliceToken));
         expect(unfollow.status).toBe(200);
-        expect(unfollow.body).toEqual({ following: false });
+        expect(unfollow.body).toEqual({ following: false, followersCount: 0 });
 
         // cannot follow yourself
         const selfFollow = await request(app).post(`/api/users/${bobName}/follow`).set(auth(bobToken));
@@ -178,5 +188,69 @@ app.use((err, req, res, _next) => {
             .post('/api/auth/login')
             .send({ login: bobName, password: 'integration-secret' });
         expect(login.status).toBe(401);
+    });
+
+    test('configures stream properties, retrieves the key, and rotates it', async () => {
+        const username = `streamer_${Date.now()}`;
+        const registration = await request(app).post('/api/auth/register').send({
+            username,
+            email: `${username}@example.com`,
+            password: 'integration-secret'
+        });
+        expect(registration.status).toBe(201);
+
+        const token = registration.body.token;
+        const userId = registration.body.user.id;
+        const auth = { Authorization: `Bearer ${token}` };
+
+        const initial = await request(app).get('/api/streams/me').set(auth);
+        expect(initial.status).toBe(200);
+        expect(initial.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
+        expect(initial.body.streamId).toBe(`u${userId}`);
+        expect(initial.body.title).toBe(username);
+        expect(initial.body.visibility).toBe('public');
+        expect(initial.body.isLive).toBe(false);
+
+        const update = await request(app)
+            .put('/api/streams/me')
+            .set(auth)
+            .send({
+                title: 'Ranked grind',
+                description: 'Climbing the ladder',
+                visibility: 'unlisted',
+                thumbnailUrl: 'data:image/png;base64,AAAA',
+                categoryId: 1
+            });
+        expect(update.status).toBe(200);
+        expect(update.body).toMatchObject({
+            title: 'Ranked grind',
+            description: 'Climbing the ladder',
+            visibility: 'unlisted',
+            thumbnailUrl: 'data:image/png;base64,AAAA',
+            categoryId: 1,
+            category: 'League of Legends'
+        });
+
+        const unknownCategory = await request(app)
+            .put('/api/streams/me')
+            .set(auth)
+            .send({ categoryId: 999999 });
+        expect(unknownCategory.status).toBe(400);
+
+        const currentKey = await request(app).get('/api/streams/me/stream-key').set(auth);
+        expect(currentKey.status).toBe(200);
+        expect(currentKey.body.streamKey).toBe(initial.body.streamKey);
+
+        const rotated = await request(app).post('/api/streams/me/stream-key/rotate').set(auth);
+        expect(rotated.status).toBe(200);
+        expect(rotated.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
+        expect(rotated.body.streamKey).not.toBe(initial.body.streamKey);
+        expect(rotated.body.streamId).toBe(`u${userId}`);
+
+        const afterRotation = await request(app).get('/api/streams/me/stream-key').set(auth);
+        expect(afterRotation.body.streamKey).toBe(rotated.body.streamKey);
+
+        const anonymous = await request(app).get('/api/streams/me');
+        expect(anonymous.status).toBe(401);
     });
 });
