@@ -1,3 +1,15 @@
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .how-page {
   max-width: 960px;
   margin: 0 auto;
@@ -23,7 +35,7 @@
     margin: 0 auto;
 
     a {
-      color: var(--color-primary, #9147ff);
+      color: var(--accent-primary, #a670ff);
       text-decoration: none;
       font-weight: 500;
 
@@ -70,7 +82,7 @@
 
   &:hover {
     transform: translateY(-2px);
-    border-color: var(--color-primary, #9147ff);
+    border-color: var(--accent-primary, #a670ff);
     box-shadow: 0 6px 20px rgba(145, 71, 255, 0.15);
   }
 
@@ -98,7 +110,7 @@
   text-align: center;
 
   a {
-    color: var(--color-primary, #9147ff);
+    color: var(--accent-primary, #a670ff);
     text-decoration: none;
 
     &:hover { text-decoration: underline; }
@@ -126,7 +138,7 @@
 
   &:hover {
     transform: translateY(-2px);
-    border-color: var(--color-primary, #9147ff);
+    border-color: var(--accent-primary, #a670ff);
   }
 
   .step-number {
@@ -136,7 +148,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-primary, #9147ff);
+    background: var(--accent-primary, #a670ff);
     color: #fff;
     border-radius: 50%;
     font-weight: 700;
@@ -163,12 +175,12 @@
   .step-arrow {
     font-size: 1.3rem;
     color: var(--text-secondary, #888);
-    transition: transform 0.15s ease;
+    transition: transform 0.15s ease, color 0.15s ease;
   }
 
   &:hover .step-arrow {
     transform: translateX(4px);
-    color: var(--color-primary, #9147ff);
+    color: var(--accent-primary, #a670ff);
   }
 }
 
@@ -206,7 +218,7 @@
     }
 
     a {
-      color: var(--color-primary, #9147ff);
+      color: var(--accent-primary, #a670ff);
       text-decoration: none;
 
       &:hover { text-decoration: underline; }

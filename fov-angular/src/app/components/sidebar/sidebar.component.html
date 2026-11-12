@@ -1,16 +1,18 @@
-<nav class="sidebar" [class.collapsed]="isCollapsed">
+<nav class="sidebar" [class.collapsed]="isCollapsed" aria-label="Chaînes en direct">
   
   <div class="sidebar-header">
-    <h3 class="section-title" *ngIf="!isCollapsed">En direct</h3>
+    <div class="section-title" *ngIf="!isCollapsed">En direct</div>
     
-    <button class="sidebar-toggle" (click)="onToggleCollapse()" [title]="isCollapsed ? 'Déplier' : 'Rabattre'">
-      <span *ngIf="!isCollapsed">‹</span>
-      <span *ngIf="isCollapsed">›</span>
+    <button class="sidebar-toggle"
+            (click)="onToggleCollapse()"
+            [attr.aria-label]="isCollapsed ? 'Déplier la barre latérale' : 'Rabattre la barre latérale'"
+            [attr.aria-expanded]="!isCollapsed">
+      <span aria-hidden="true">{{ isCollapsed ? '›' : '‹' }}</span>
     </button>
   </div>
 
   <div class="sidebar-section">
-    <div *ngIf="liveChannels.length === 0 && !isCollapsed" class="sidebar-empty">
+    <div *ngIf="liveChannels.length === 0 && !isCollapsed" class="sidebar-empty" role="status">
       <span class="empty-text">Aucun live</span>
     </div>
     
@@ -18,10 +20,24 @@
       <li *ngFor="let channel of liveChannels" class="channel-item">
         <a [routerLink]="['/stream', channel.streamId]" 
            class="channel-link is-live"
-           [title]="isCollapsed ? ((channel.streamer || channel.streamId) + ' - En live') : (channel.streamer || channel.streamId)">
+           [attr.aria-label]="isVisuallyCollapsed
+             ? ((channel.streamer || channel.streamId) + ', en direct'
+                + (channel.viewers > 0 ? ', ' + channel.viewers + ' spectateurs' : ''))
+             : null"
+           [title]="isVisuallyCollapsed
+             ? ((channel.streamer || channel.streamId) + ' - En live')
+             : (channel.streamer || channel.streamId)">
           
-          <img *ngIf="channel.avatarUrl" [src]="channel.avatarUrl" [alt]="channel.streamer || channel.streamId" class="avatar">
-          <div class="avatar-circle" *ngIf="!channel.avatarUrl">{{ (channel.streamer || channel.streamId).charAt(0).toUpperCase() }}</div>
+          <img *ngIf="channel.avatarUrl"
+               [src]="channel.avatarUrl"
+               alt=""
+               aria-hidden="true"
+               class="avatar">
+          <div class="avatar-circle"
+               *ngIf="!channel.avatarUrl"
+               aria-hidden="true">
+            {{ (channel.streamer || channel.streamId).charAt(0).toUpperCase() }}
+          </div>
           
           <div class="channel-info" *ngIf="!isCollapsed">
             <span class="channel-name">{{ channel.streamer || channel.streamId }}</span>
@@ -30,8 +46,11 @@
           </div>
 
           <div class="live-info" *ngIf="!isCollapsed">
-            <span class="live-dot"></span>
-            <span class="viewer-count" *ngIf="channel.viewers > 0">{{ channel.viewers }}</span>
+            <span class="live-dot" aria-hidden="true"></span>
+            <span class="sr-only">en direct</span>
+            <span class="viewer-count" *ngIf="channel.viewers > 0">
+              {{ channel.viewers }}<span class="sr-only"> spectateurs</span>
+            </span>
           </div>
         </a>
       </li>

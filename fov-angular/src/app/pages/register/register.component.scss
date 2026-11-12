@@ -62,9 +62,12 @@
       color: var(--text-secondary);
     }
 
-    &:focus {
-      outline: none;
+    &:focus-visible {
       border-color: var(--accent-primary);
+    }
+
+    &[aria-invalid="true"] {
+      border-color: #ef4444;
     }
   }
 }
@@ -102,7 +105,7 @@
 .auth-footer {
   text-align: center;
   margin-top: var(--spacing-lg);
-  
+
   p {
     color: var(--text-secondary);
     font-size: 0.9rem;

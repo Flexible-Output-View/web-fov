@@ -1,11 +1,12 @@
 <div class="stream-page">
-  <div class="loading-state" *ngIf="isLoading">
-    <div class="loading-spinner"></div>
-    <p>Vérification...</p>
+
+  <div class="loading-state" *ngIf="isLoading" role="status" aria-live="polite">
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <p>Vérification…</p>
   </div>
 
-  <div class="error-state" *ngIf="!isLoading && errorMessage">
-    <div class="error-icon">⚠️</div>
+  <div class="error-state" *ngIf="!isLoading && errorMessage" role="alert">
+    <div class="error-icon" aria-hidden="true">⚠️</div>
     <h2>Erreur</h2>
     <p>{{ errorMessage }}</p>
     <div class="error-actions">
@@ -14,8 +15,10 @@
     </div>
   </div>
 
-  <div class="offline-state" *ngIf="!isLoading && !isLive && !errorMessage && !streamEndedMessage">
-    <div class="offline-icon">📴</div>
+  <div class="offline-state"
+       *ngIf="!isLoading && !isLive && !errorMessage && !streamEndedMessage"
+       role="status">
+    <div class="offline-icon" aria-hidden="true">📴</div>
     <h2>{{ streamId }} n'est pas en live</h2>
     <p>Ce streamer ne diffuse pas actuellement.</p>
     <div class="offline-actions">
@@ -24,14 +27,17 @@
     </div>
   </div>
 
-  <div class="ended-state" *ngIf="streamEndedMessage">
-    <div class="ended-icon">👋</div>
+  <div class="ended-state" *ngIf="streamEndedMessage" role="status" aria-live="polite">
+    <div class="ended-icon" aria-hidden="true">👋</div>
     <h2>{{ streamEndedMessage }}</h2>
-    <p>Redirection vers l'accueil dans {{ redirectCountdown }}s...</p>
+    <p>Redirection vers l'accueil dans {{ redirectCountdown }}s…</p>
     <button class="btn-back-home" (click)="goBack()">Retour à l'accueil</button>
   </div>
 
-  <div class="player-wrapper" *ngIf="!isLoading && isLive && !errorMessage && !streamEndedMessage">
+  <div class="player-wrapper"
+       *ngIf="!isLoading && isLive && !errorMessage && !streamEndedMessage"
+       role="region"
+       aria-label="Lecteur du stream">
     <div class="stream-content">
       <div class="player-pane">
         <app-fov-player [streamId]="streamId" (streamEnded)="onStreamEnded()">
@@ -42,26 +48,34 @@
       </div>
     </div>
   </div>
+
   <div class="stream-header">
     <div class="stream-title" *ngIf="isLive && streamInfo">
       <a class="streamer-link"
          *ngIf="streamerName"
          [routerLink]="['/', streamerName]"
-         [attr.aria-label]="'Voir le profil de ' + streamerName"
-         [title]="'Voir le profil de ' + streamerName">
+         [attr.aria-label]="'Voir le profil de ' + streamerName">
         <span class="streamer-avatar">
-          <img *ngIf="streamInfo.avatarUrl" [src]="streamInfo.avatarUrl" [alt]="streamerName">
-          <span *ngIf="!streamInfo.avatarUrl" class="streamer-avatar-initial">
+          <img *ngIf="streamInfo.avatarUrl"
+               [src]="streamInfo.avatarUrl"
+               [alt]="'Photo de profil de ' + streamerName">
+          <span *ngIf="!streamInfo.avatarUrl"
+                class="streamer-avatar-initial"
+                aria-hidden="true">
             {{ streamerName.charAt(0).toUpperCase() }}
           </span>
         </span>
         <span class="streamer-name">{{ streamerName }}</span>
       </a>
       <h1>{{ streamInfo.title || streamId }}</h1>
-      <span class="stream-category-badge" *ngIf="streamInfo.category">{{ streamInfo.category }}</span>
-      <span class="track-info">{{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}</span>
+      <span class="stream-category-badge" *ngIf="streamInfo.category">
+        {{ streamInfo.category }}
+      </span>
+      <span class="track-info">
+        {{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}
+      </span>
       <span class="viewer-info" *ngIf="viewerCount$ | async as viewerCount">
-        <span class="viewer-dot"></span>
+        <span class="viewer-dot" aria-hidden="true"></span>
         {{ viewerCount.total }} spectateur{{ viewerCount.total > 1 ? 's' : '' }}
       </span>
     </div>

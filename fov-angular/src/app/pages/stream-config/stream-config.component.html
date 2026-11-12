@@ -9,34 +9,56 @@
   <!-- ═══ Stream Key ═══ -->
   <div class="settings-section">
     <div class="section-header">
-      <h2>🔑 Clé de stream</h2>
-      <span class="status-badge" [class.live]="streamSettings?.isLive">
-        {{ streamSettings?.isLive ? '🔴 En direct' : '⚫ Hors ligne' }}
+      <h2><span aria-hidden="true">🔑 </span>Clé de stream</h2>
+      <span class="status-badge"
+            [class.live]="streamSettings?.isLive"
+            role="status"
+            aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        {{ streamSettings?.isLive ? 'En direct' : 'Hors ligne' }}
       </span>
     </div>
 
     <div class="form-group">
-      <label>Clé secrète</label>
+      <span class="form-label" id="stream-key-label">Clé secrète</span>
       <div class="key-row">
         <input
           type="text"
           [value]="maskedKey"
           readonly
           class="input-readonly key-input"
+          aria-labelledby="stream-key-label"
+          aria-readonly="true"
         />
-        <button class="btn-icon" (click)="toggleKeyVisibility()" title="Afficher / masquer">
-          {{ streamKeyVisible ? '🙈' : '👁️' }}
+        <button class="btn-icon"
+                (click)="toggleKeyVisibility()"
+                [attr.aria-label]="streamKeyVisible ? 'Masquer la clé' : 'Afficher la clé'"
+                [attr.aria-expanded]="streamKeyVisible">
+          <span aria-hidden="true">{{ streamKeyVisible ? '🙈' : '👁️' }}</span>
         </button>
-        <button class="btn-icon" (click)="copyStreamKey()" title="Copier">📋</button>
+        <button class="btn-icon"
+                (click)="copyStreamKey()"
+                aria-label="Copier la clé de stream">
+          <span aria-hidden="true">📋</span>
+        </button>
       </div>
-      <span class="help">Ne partagez jamais cette clé. Elle est unique à votre compte.</span>
+      <span class="help" id="stream-key-help">Ne partagez jamais cette clé. Elle est unique à votre compte.</span>
     </div>
 
     <div class="form-group">
-      <label>Lien du stream</label>
+      <span class="form-label" id="stream-link-label">Lien du stream</span>
       <div class="key-row">
-        <input type="text" [value]="streamLink" readonly class="input-readonly" />
-        <button class="btn-icon" (click)="copyStreamLink()" title="Copier">🔗</button>
+        <input type="text"
+               [value]="streamLink"
+               readonly
+               class="input-readonly"
+               aria-labelledby="stream-link-label"
+               aria-readonly="true" />
+        <button class="btn-icon"
+                (click)="copyStreamLink()"
+                aria-label="Copier le lien du stream">
+          <span aria-hidden="true">🔗</span>
+        </button>
       </div>
       <span class="help">Partagez ce lien avec vos spectateurs.</span>
     </div>
@@ -46,18 +68,21 @@
         class="btn-danger"
         (click)="rotateStreamKey()"
         [disabled]="isRotatingKey"
+        [attr.aria-busy]="isRotatingKey"
       >
-        🔄 {{ isRotatingKey ? 'Régénération…' : 'Régénérer la clé' }}
+        <span aria-hidden="true">🔄 </span>{{ isRotatingKey ? 'Régénération…' : 'Régénérer la clé' }}
       </button>
-      <span class="help warning">⚠️ La régénération révoque immédiatement l'ancienne clé.</span>
+      <span class="help warning">
+        <span aria-hidden="true">⚠️ </span>La régénération révoque immédiatement l'ancienne clé.
+      </span>
     </div>
   </div>
 
   <!-- ═══ Stream Info ═══ -->
   <div class="settings-section">
-    <h2>⚙️ Informations du stream</h2>
+    <h2><span aria-hidden="true">⚙️ </span>Informations du stream</h2>
 
-    <form [formGroup]="streamForm" (ngSubmit)="save()">
+    <form [formGroup]="streamForm" (ngSubmit)="save()" [attr.aria-busy]="isSaving">
 
       <!-- Title -->
       <div class="form-group">
@@ -67,11 +92,15 @@
           type="text"
           formControlName="title"
           placeholder="Mon super stream"
+          aria-describedby="title-count"
+          [attr.aria-invalid]="fieldErrors['title'] ? true : null"
         />
-        <div class="char-count">
+        <div class="char-count" id="title-count" aria-live="polite">
           {{ streamForm.get('title')?.value?.length || 0 }}/255
         </div>
-        <span class="field-error" *ngIf="fieldErrors['title']">
+        <span class="field-error"
+              *ngIf="fieldErrors['title']"
+              role="alert">
           {{ fieldErrors['title'] }}
         </span>
       </div>
@@ -82,27 +111,33 @@
         <textarea
           id="description"
           formControlName="description"
-          placeholder="Décrivez votre stream..."
+          placeholder="Décrivez votre stream…"
           rows="4"
+          aria-describedby="desc-count"
+          [attr.aria-invalid]="fieldErrors['description'] ? true : null"
         ></textarea>
-        <div class="char-count">
+        <div class="char-count" id="desc-count" aria-live="polite">
           {{ streamForm.get('description')?.value?.length || 0 }}/2000
         </div>
-        <span class="field-error" *ngIf="fieldErrors['description']">
+        <span class="field-error"
+              *ngIf="fieldErrors['description']"
+              role="alert">
           {{ fieldErrors['description'] }}
         </span>
       </div>
 
       <!-- Visibility -->
       <div class="form-group">
-        <label>Visibilité</label>
-        <div class="visibility-cards">
+        <span class="form-label" id="visibility-label">Visibilité</span>
+        <div class="visibility-cards"
+             role="radiogroup"
+             aria-labelledby="visibility-label">
           <label
             class="visibility-card"
             [class.active]="streamForm.get('visibility')?.value === 'public'"
           >
             <input type="radio" formControlName="visibility" value="public" />
-            <strong>🌍 Public</strong>
+            <strong><span aria-hidden="true">🌍 </span>Public</strong>
             <span>Visible dans le feed et les recherches</span>
           </label>
           <label
@@ -110,7 +145,7 @@
             [class.active]="streamForm.get('visibility')?.value === 'unlisted'"
           >
             <input type="radio" formControlName="visibility" value="unlisted" />
-            <strong>🔗 Non listé</strong>
+            <strong><span aria-hidden="true">🔗 </span>Non listé</strong>
             <span>Accessible uniquement via le lien direct</span>
           </label>
           <label
@@ -118,7 +153,7 @@
             [class.active]="streamForm.get('visibility')?.value === 'private'"
           >
             <input type="radio" formControlName="visibility" value="private" />
-            <strong>🔒 Privé</strong>
+            <strong><span aria-hidden="true">🔒 </span>Privé</strong>
             <span>Visible uniquement par vous</span>
           </label>
         </div>
@@ -128,35 +163,42 @@
       <div class="form-group">
         <label for="categoryId">Catégorie</label>
         <select id="categoryId" formControlName="categoryId">
-            <option [ngValue]="null">Aucune catégorie</option>
-            <option *ngFor="let cat of backendCategories" [ngValue]="cat.id">
+          <option [ngValue]="null">Aucune catégorie</option>
+          <option *ngFor="let cat of backendCategories" [ngValue]="cat.id">
             {{ cat.name }}
-            </option>
+          </option>
         </select>
       </div>
 
       <!-- Thumbnail -->
       <div class="form-group">
-        <label>Miniature du stream</label>
+        <span class="form-label" id="thumbnail-label">Miniature du stream</span>
         <div class="thumbnail-section">
-          <div class="thumbnail-preview">
+          <div class="thumbnail-preview"
+               role="img"
+               [attr.aria-label]="thumbnailPreview ? 'Aperçu de la miniature' : null">
             <img
               *ngIf="thumbnailPreview"
               [src]="thumbnailPreview"
-              alt="Miniature"
+              alt="Aperçu de la miniature du stream"
             />
-            <span *ngIf="!thumbnailPreview">🖼️ Aucune miniature</span>
+            <span *ngIf="!thumbnailPreview" aria-hidden="true">
+              🖼️ Aucune miniature
+            </span>
           </div>
           <div class="thumbnail-actions">
-            <label class="btn-file">
+            <label class="btn-file" for="thumbnail-input">
               Choisir une image
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                (change)="onThumbnailSelected($event)"
-                hidden
-              />
             </label>
+            <input
+              type="file"
+              id="thumbnail-input"
+              accept="image/jpeg,image/png,image/webp"
+              (change)="onThumbnailSelected($event)"
+              hidden
+              aria-labelledby="thumbnail-label"
+              aria-describedby="thumbnail-help"
+            />
             <button
               type="button"
               class="btn-remove"
@@ -167,7 +209,7 @@
             </button>
           </div>
         </div>
-        <span class="help">Max 5 Mo. Formats recommandés : JPG, PNG.</span>
+        <span class="help" id="thumbnail-help">Max 5 Mo. Formats recommandés : JPG, PNG.</span>
       </div>
 
       <!-- Submit -->
@@ -176,8 +218,11 @@
         class="btn-primary"
         [disabled]="isSaving || streamForm.invalid"
       >
-        {{ isSaving ? 'Sauvegarde…' : '💾 Sauvegarder' }}
-        <span *ngIf="streamForm.dirty && !isSaving" class="dirty-dot"></span>
+        {{ isSaving ? 'Sauvegarde…' : 'Sauvegarder' }}
+        <span *ngIf="streamForm.dirty && !isSaving"
+              class="dirty-dot"
+              aria-hidden="true"
+              title="Modifications non sauvegardées"></span>
       </button>
     </form>
   </div>
@@ -185,7 +230,7 @@
 
 <!-- Loading -->
 <ng-template #loadingTpl>
-  <div class="stream-config-page">
+  <div class="stream-config-page" role="status" aria-live="polite">
     <p class="hint">Chargement…</p>
   </div>
 </ng-template>
@@ -196,6 +241,8 @@
   *ngIf="toastMessage"
   [class.success]="toastType === 'success'"
   [class.error]="toastType === 'error'"
+  [attr.role]="toastType === 'error' ? 'alert' : 'status'"
+  [attr.aria-live]="toastType === 'error' ? 'assertive' : 'polite'"
 >
   {{ toastMessage }}
 </div>

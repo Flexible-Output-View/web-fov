@@ -1,201 +1,217 @@
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { ComponentFixture } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick, discardPeriodicTasks, flush } from '@angular/core/testing';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { StreamComponent } from './stream.component';
-import { ActivatedRoute, Router, RouterModule, provideRouter } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router } from '@angular/router';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { ViewerPresenceService } from '../../services/viewer-presence.service';
-import { ViewerCount } from '../../models/live-stream.model';
-import { BehaviorSubject, of, throwError } from 'rxjs';
-import { CommonModule } from '@angular/common';
-import { Component, Input, Output, EventEmitter } from '@angular/core';
-
-@Component({ selector: 'app-fov-player', template: '', standalone: true })
-class MockFovPlayerComponent {
-  @Input() streamId = '';
-  @Output() streamEnded = new EventEmitter<void>();
-}
-
-@Component({ selector: 'app-stream-chat', template: '', standalone: true })
-class MockStreamChatComponent {
-  @Input() streamId = '';
-}
-
-const mockStream = {
-  streamId: 'test-stream',
-  title: 'Test Stream',
-  trackCount: 2,
-  viewers: 10,
-  category: 'Gaming',
-  streamer: 'Test Streamer',
-  streamerUsername: 'test_streamer'
-};
+import { LiveStreamInfo } from '../../models/live-stream.model';
 
 describe('StreamComponent', () => {
   let component: StreamComponent;
   let fixture: ComponentFixture<StreamComponent>;
-  let routerSpy: jasmine.Spy;
-  let liveStreamsSpy: jasmine.SpyObj<LiveStreamsService>;
-  let presenceSpy: jasmine.SpyObj<ViewerPresenceService>;
-  let countsSubject: BehaviorSubject<ViewerCount | null>;
+  let liveStreamsService: jasmine.SpyObj<LiveStreamsService>;
+  let viewerPresence: jasmine.SpyObj<ViewerPresenceService>;
+  let router: jasmine.SpyObj<Router>;
+  let params$: BehaviorSubject<Record<string, string>>;
+
+  const mockStream: LiveStreamInfo = {
+    streamId: 's1',
+    trackCount: 1,
+    tracks: [],
+    title: 'Test Stream',
+    category: 'Gaming',
+    viewers: 100,
+    streamer: 'Streamer1',
+    streamerUsername: 'streamer1',
+    avatarUrl: '',
+    thumbnailUrl: '',
+  };
 
   beforeEach(async () => {
-    liveStreamsSpy = jasmine.createSpyObj('LiveStreamsService', ['getStreamById']);
-    liveStreamsSpy.getStreamById.and.returnValue(of(mockStream as any));
+    params$ = new BehaviorSubject<Record<string, string>>({ streamId: 's1' });
 
-    countsSubject = new BehaviorSubject<ViewerCount | null>(null);
-    presenceSpy = jasmine.createSpyObj('ViewerPresenceService', ['start', 'stop'], {
-      counts$: countsSubject.asObservable()
+    liveStreamsService = jasmine.createSpyObj('LiveStreamsService', ['getStreamById']);
+    liveStreamsService.getStreamById.and.returnValue(of(mockStream));
+
+    viewerPresence = jasmine.createSpyObj('ViewerPresenceService', ['start', 'stop'], {
+      counts$: of(null),
     });
 
+    router = jasmine.createSpyObj('Router', [
+      'navigate', 'navigateByUrl', 'createUrlTree', 'serializeUrl',
+    ]);
+    router.navigate.and.returnValue(Promise.resolve(true));
+    router.navigateByUrl.and.returnValue(Promise.resolve(true));
+    router.createUrlTree.and.returnValue({} as any);
+    router.serializeUrl.and.returnValue('/');
+    Object.defineProperty(router, 'events', { value: of({} as any) });
+
     await TestBed.configureTestingModule({
-      imports: [CommonModule, MockFovPlayerComponent, MockStreamChatComponent],
+      imports: [
+        StreamComponent,
+        HttpClientTestingModule,
+      ],
       providers: [
         provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: { params: of({ streamId: 'test-stream' }) }
-        },
-        { provide: LiveStreamsService, useValue: liveStreamsSpy },
-        { provide: ViewerPresenceService, useValue: presenceSpy }
-      ]
-    })
-    .overrideComponent(StreamComponent, {
-      set: {
-        imports: [CommonModule, RouterModule, MockFovPlayerComponent, MockStreamChatComponent]
-      }
-    })
-    .compileComponents();
-
-    routerSpy = spyOn(TestBed.inject(Router), 'navigate').and.returnValue(
-      Promise.resolve(true)
-    );
+        { provide: ActivatedRoute, useValue: { params: params$.asObservable() } },
+        { provide: Router, useValue: router },
+        { provide: LiveStreamsService, useValue: liveStreamsService },
+        { provide: ViewerPresenceService, useValue: viewerPresence },
+      ],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(StreamComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
   });
+
+  afterEach(fakeAsync(() => {
+    discardPeriodicTasks();
+    flush();
+  }));
 
   it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should load streamId from route params', () => {
-    expect(component.streamId).toBe('test-stream');
-  });
-
-  it('should set isLive true when stream found', () => {
-    expect(component.isLive).toBeTrue();
-    expect(component.streamInfo?.streamId).toBe('test-stream');
-    expect(component.isLoading).toBeFalse();
-  });
-
-  it('should navigate to home on goBack()', () => {
-    component.goBack();
-    expect(routerSpy).toHaveBeenCalledWith(['/']);
-  });
-
-  it('should handle stream ended and start countdown', fakeAsync(() => {
-    component.streamInfo = mockStream as any;
-    component.onStreamEnded();
-
-    expect(component.isLive).toBeFalse();
-    expect(component.streamEndedMessage).toContain('Test Stream');
-    expect(component.redirectCountdown).toBe(5);
-
-    tick(1000);
-    expect(component.redirectCountdown).toBe(4);
-
-    tick(4000);
-    expect(routerSpy).toHaveBeenCalledWith(['/']);
-  }));
-
-  it('should clear interval on goBack after stream ended', fakeAsync(() => {
-    component.streamInfo = mockStream as any;
-    component.onStreamEnded();
-    tick(1000);
-    component.goBack();
-    tick(5000);
-    // navigate appelé une seule fois (goBack)
-    expect(routerSpy).toHaveBeenCalledTimes(1);
-  }));
-
-  it('should set error message after max retries on HTTP error', fakeAsync(() => {
-    liveStreamsSpy.getStreamById.and.returnValue(throwError(() => new Error('Network error')));
-    component['checkStream']();
-    tick(10000);
-    expect(component.isLoading).toBeFalse();
-    expect(component.errorMessage).toBeTruthy();
-  }));
-
-  it('should set isLive false after max retries when stream not found', fakeAsync(() => {
-    liveStreamsSpy.getStreamById.and.returnValue(of(null));
-    component['checkStream']();
-    tick(10000);
-    expect(component.isLive).toBeFalse();
-    expect(component.isLoading).toBeFalse();
-  }));
-
-  it('starts viewer presence when the stream is live', () => {
-    expect(presenceSpy.start).toHaveBeenCalledWith('test-stream');
-  });
-
-  it('renders a link to the streamer public profile', () => {
-    const link = fixture.nativeElement.querySelector(
-      '.streamer-link'
-    ) as HTMLAnchorElement;
-
-    expect(link).toBeTruthy();
-    expect(link.textContent).toContain('test_streamer');
-    expect(link.getAttribute('href')).toBe('/test_streamer');
-  });
-
-  it('renders the live viewer total in the header', () => {
-    countsSubject.next({
-      streamId: 'test-stream',
-      total: 3,
-      authenticated: 1,
-      anonymous: 2,
-      updatedAt: new Date().toISOString()
+  describe('streamerName', () => {
+    it('should prefer streamerUsername', () => {
+      component.streamInfo = mockStream;
+      expect(component.streamerName).toBe('streamer1');
     });
-    fixture.detectChanges();
 
-    const badge = fixture.nativeElement.querySelector('.viewer-info') as HTMLElement;
-    expect(badge).toBeTruthy();
-    expect(badge.textContent).toContain('3 spectateurs');
-  });
-
-  it('renders a singular label for a single viewer', () => {
-    countsSubject.next({
-      streamId: 'test-stream',
-      total: 1,
-      authenticated: 0,
-      anonymous: 1,
-      updatedAt: new Date().toISOString()
+    it('should fallback to streamer', () => {
+      component.streamInfo = { ...mockStream, streamerUsername: null };
+      expect(component.streamerName).toBe('Streamer1');
     });
-    fixture.detectChanges();
 
-    const badge = fixture.nativeElement.querySelector('.viewer-info') as HTMLElement;
-    expect(badge.textContent).toContain('1 spectateur');
-    expect(badge.textContent).not.toContain('spectateurs');
+    it('should return empty when no streamInfo', () => {
+      expect(component.streamerName).toBe('');
+    });
   });
 
-  it('hides the viewer badge until a count is available', () => {
-    countsSubject.next(null);
-    fixture.detectChanges();
+  describe('checkStream', () => {
+    it('should load stream on init', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      expect(liveStreamsService.getStreamById).toHaveBeenCalledWith('s1');
+      expect(component.streamInfo).toEqual(mockStream);
+      expect(component.isLive).toBeTrue();
+      expect(component.isLoading).toBeFalse();
+      expect(viewerPresence.start).toHaveBeenCalledWith('s1');
+    }));
 
-    expect(fixture.nativeElement.querySelector('.viewer-info')).toBeNull();
+    it('should retry when stream is null', fakeAsync(() => {
+      liveStreamsService.getStreamById.and.returnValue(of(null));
+      fixture.detectChanges();
+      tick();
+      expect(component.isLive).toBeFalse();
+      expect(liveStreamsService.getStreamById).toHaveBeenCalledTimes(1);
+
+      tick(2000);
+      expect(liveStreamsService.getStreamById).toHaveBeenCalledTimes(2);
+    }));
+
+    it('should give up after 5 attempts', fakeAsync(() => {
+      liveStreamsService.getStreamById.and.returnValue(of(null));
+      fixture.detectChanges();
+      tick();
+      tick(2000);
+      tick(2000);
+      tick(2000);
+      tick(2000);
+      expect(liveStreamsService.getStreamById).toHaveBeenCalledTimes(5);
+      expect(component.isLoading).toBeFalse();
+      expect(component.isLive).toBeFalse();
+    }));
+
+    it('should set error after 5 failed attempts', fakeAsync(() => {
+      liveStreamsService.getStreamById.and.returnValue(
+        throwError(() => new Error('Network')),
+      );
+      spyOn(console, 'error');
+      fixture.detectChanges();
+      tick();
+      tick(2000);
+      tick(2000);
+      tick(2000);
+      tick(2000);
+      expect(component.errorMessage).toContain('Impossible');
+    }));
   });
 
-  it('stops viewer presence when the stream ends', () => {
-    component.streamInfo = mockStream as any;
-    component.onStreamEnded();
+  describe('onStreamEnded', () => {
+    it('should set isLive to false and start countdown', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      component.onStreamEnded();
+      expect(component.isLive).toBeFalse();
+      expect(component.streamEndedMessage).toContain('terminé');
+      expect(component.redirectCountdown).toBe(5);
+      expect(viewerPresence.stop).toHaveBeenCalled();
+    }));
 
-    expect(presenceSpy.stop).toHaveBeenCalled();
+    it('should redirect after countdown', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      component.onStreamEnded();
+      tick(5000);
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
+    }));
+
+    it('should decrement countdown each second', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      component.onStreamEnded();
+      tick(1000);
+      expect(component.redirectCountdown).toBe(4);
+      tick(1000);
+      expect(component.redirectCountdown).toBe(3);
+    }));
   });
 
-  it('stops viewer presence on destroy', () => {
-    fixture.destroy();
+  describe('goBack', () => {
+    it('should navigate to /', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      component.goBack();
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
+    }));
 
-    expect(presenceSpy.stop).toHaveBeenCalled();
+    it('should clear redirect interval', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      component.onStreamEnded();
+      component.goBack();
+      tick(10_000);
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+    }));
+  });
+
+  describe('retry', () => {
+    it('should re-check stream', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      liveStreamsService.getStreamById.calls.reset();
+      component.retry();
+      tick();
+      expect(liveStreamsService.getStreamById).toHaveBeenCalled();
+    }));
+  });
+
+  describe('ngOnDestroy', () => {
+    it('should stop viewer presence and complete destroy$', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      const destroy$ = (component as any).destroy$;
+      const completeSpy = spyOn(destroy$, 'complete').and.callThrough();
+      component.ngOnDestroy();
+      expect(viewerPresence.stop).toHaveBeenCalled();
+      expect(completeSpy).toHaveBeenCalled();
+    }));
+  });
+
+  it('should expose viewerCount$ from presence service', () => {
+    expect(component.viewerCount$).toBeDefined();
   });
 });

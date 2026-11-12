@@ -1,23 +1,30 @@
-<div class="live-stream-card">
-  <a class="card-thumbnail" [routerLink]="['/stream', stream.streamId]">
+<article class="live-stream-card">
+  <a class="card-thumbnail"
+     [routerLink]="['/stream', stream.streamId]"
+     [attr.aria-label]="(stream.title ? stream.title : 'Stream de ' + streamerName)
+       + ', par ' + streamerName
+       + ', en direct, ' + stream.trackCount + ' flux'
+       + (stream.viewers > 0 ? ', ' + stream.viewers + ' spectateur' + (stream.viewers > 1 ? 's' : '') : '')">
     <img *ngIf="stream.thumbnailUrl"
          [src]="stream.thumbnailUrl"
-         [alt]="streamerName"
+         alt=""
+         aria-hidden="true"
          class="thumbnail-img">
 
-    <div class="placeholder-thumbnail" *ngIf="!stream.thumbnailUrl">
+    <div class="placeholder-thumbnail" *ngIf="!stream.thumbnailUrl" aria-hidden="true">
       <span class="streamer-initial">{{ streamerInitial }}</span>
     </div>
 
-    <div class="live-badge">
+    <div class="live-badge" aria-hidden="true">
       <span class="live-dot"></span>
       EN DIRECT
     </div>
-    <div class="track-count">
+    <div class="track-count" aria-hidden="true">
       <span class="icon">📹</span>
       {{ stream.trackCount }} flux
     </div>
   </a>
+
   <div class="card-info">
     <div class="card-info-row">
       <a class="avatar-wrapper"
@@ -25,7 +32,7 @@
          [routerLink]="['/', streamerRoute]"
          [attr.aria-label]="'Voir le profil de ' + streamerName"
          [title]="'Voir le profil de ' + streamerName">
-        <img [src]="stream.avatarUrl" [alt]="streamerName" class="avatar-img">
+        <img [src]="stream.avatarUrl" alt="" aria-hidden="true" class="avatar-img">
       </a>
       <a class="avatar-placeholder"
          *ngIf="!stream.avatarUrl"
@@ -38,6 +45,7 @@
       <div class="card-text">
         <a class="streamer-name"
            [routerLink]="['/', streamerRoute]"
+           [attr.aria-label]="'Voir le profil de ' + streamerName"
            [title]="'Voir le profil de ' + streamerName">
           {{ streamerName }}
         </a>
@@ -55,4 +63,4 @@
       {{ stream.viewers }} spectateur{{ stream.viewers > 1 ? 's' : '' }}
     </div>
   </div>
-</div>
+</article>
