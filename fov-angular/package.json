@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@angular/build": "20.3.16",
-    "@angular/cli": "^20.3.16",
+    "@angular/cli": "^22.2.5",
     "@types/jasmine": "~5.1.0",
     "jasmine-core": "~5.6.0",
     "karma": "~6.4.0",
