@@ -4,7 +4,7 @@ import { BehaviorSubject, Subject } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { ChatService } from './chat.service';
-import { ViewerCount } from '../models/live-stream.model';
+import { ViewerCount } from '../models/APIModels';
 import {
   HEARTBEAT_INTERVAL_MS,
   VISITOR_ID_KEY,
