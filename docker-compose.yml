@@ -68,11 +68,21 @@ services:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
+  demo:
+    build: ./demo-publisher
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - backend
+    environment:
+      API_URL: http://backend:4000
+      SRT_URL: srt://backend:9999?mode=caller&latency=4000000&rcvbuf=134217728&sndbuf=134217728&peerlatency=4000000&tlpktdrop=0&nakreport=1
+
 networks:
   frontend:
-    #driver: bridge
   backend:
-    #driver: bridge
     internal: true
 
 volumes:
