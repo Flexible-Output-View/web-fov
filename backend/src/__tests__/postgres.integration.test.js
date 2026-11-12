@@ -15,7 +15,7 @@ app.use((err, req, res, _next) => {
 
 (runIntegration ? describe : describe.skip)('Postgres integration', () => {
     beforeEach(async () => {
-        await db.query('TRUNCATE users RESTART IDENTITY CASCADE');
+        await db.query('TRUNCATE users, streams RESTART IDENTITY CASCADE');
     });
 
     afterAll(async () => {
@@ -28,9 +28,19 @@ app.use((err, req, res, _next) => {
         expect(Array.isArray(categories.body)).toBe(true);
         expect(categories.body.length).toBeGreaterThan(0);
 
+        // The schema ships without sample streams, so seed one for the lookup.
+        const categoryId = categories.body[0].id;
+        await db.query(
+            `INSERT INTO streams (streamer, title, category_id, viewers, thumbnail_url, avatar_url)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            ['integration_streamer', 'Integration stream', categoryId, 42, 'thumb.png', 'avatar.png']
+        );
+
         const stream = await request(app).get('/api/streams/1');
         expect(stream.status).toBe(200);
         expect(stream.body.id).toBe(1);
+        expect(stream.body.title).toBe('Integration stream');
+        expect(stream.body.category_id).toBe(categoryId);
 
         const missingStream = await request(app).get('/api/streams/999999');
         expect(missingStream.status).toBe(404);
