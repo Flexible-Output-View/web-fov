@@ -90,6 +90,23 @@
   }
 }
 
+.stream-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 8px);
+  min-width: 0;
+}
+
+.stream-description {
+  margin: 0;
+  max-width: 80ch;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
 .stream-title {
   display: flex;
   align-items: center;

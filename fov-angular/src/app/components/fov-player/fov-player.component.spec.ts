@@ -106,6 +106,17 @@ describe('FovPlayerComponent', () => {
   // ---------------------------------------------------------------
 
   describe('ngOnDestroy', () => {
+    it('removes the document audio-unlock listeners', () => {
+      (component as any).registerDocumentUnlock();
+      const unlockSpy = spyOn(component, 'unlockAudio');
+
+      component.ngOnDestroy();
+      document.dispatchEvent(new MouseEvent('click'));
+      document.dispatchEvent(new KeyboardEvent('keydown'));
+
+      expect(unlockSpy).not.toHaveBeenCalled();
+    });
+
     it('destroys every video hls.js instance', () => {
       const destroyA = jasmine.createSpy('destroyA');
       const destroyB = jasmine.createSpy('destroyB');
@@ -176,9 +187,9 @@ describe('FovPlayerComponent', () => {
 
       component.ngOnDestroy();
 
-      expect(removeSpy).toHaveBeenCalledWith('click', jasmine.any(Function));
-      expect(removeSpy).toHaveBeenCalledWith('keydown', jasmine.any(Function));
-      expect(removeSpy).toHaveBeenCalledWith('touchstart', jasmine.any(Function));
+      expect(removeSpy).toHaveBeenCalledWith('click', jasmine.any(Function), { capture: true });
+      expect(removeSpy).toHaveBeenCalledWith('keydown', jasmine.any(Function), { capture: true });
+      expect(removeSpy).toHaveBeenCalledWith('touchstart', jasmine.any(Function), { capture: true });
     });
 
     it('clears savedLayoutTimeout if set', () => {
@@ -717,6 +728,29 @@ describe('FovPlayerComponent', () => {
       await component.toggleFullscreen();
 
       expect(requestSpy).toHaveBeenCalled();
+    });
+
+    it('exits fullscreen when only the webkit-prefixed API is available', async () => {
+      const webkitExitSpy = jasmine.createSpy('webkitExitFullscreen').and.returnValue(Promise.resolve());
+      const originalExit = (document as any).exitFullscreen;
+      (document as any).exitFullscreen = undefined;
+      (document as any).webkitExitFullscreen = webkitExitSpy;
+      Object.defineProperty(document, 'webkitFullscreenElement', { value: {}, configurable: true });
+      const requestSpy = jasmine.createSpy('requestFullscreen');
+      component.playerRoot = { nativeElement: { requestFullscreen: requestSpy } } as any;
+      Object.defineProperty(document, 'fullscreenElement', { value: undefined, configurable: true });
+
+      try {
+        await component.toggleFullscreen();
+      } finally {
+        (document as any).exitFullscreen = originalExit;
+        delete (document as any).webkitExitFullscreen;
+        delete (document as any).webkitFullscreenElement;
+        Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
+      }
+
+      expect(webkitExitSpy).toHaveBeenCalled();
+      expect(requestSpy).not.toHaveBeenCalled();
     });
 
     it('uses webkitRequestFullscreen as fallback', async () => {
@@ -1741,14 +1775,45 @@ describe('FovPlayerComponent', () => {
   // ---------------------------------------------------------------
 
   describe('onFullscreenChange', () => {
+    afterEach(() => {
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
+      delete (document as any).webkitFullscreenElement;
+    });
+
     it('updates isFullscreen based on document.fullscreenElement', () => {
-      Object.defineProperty(document, 'fullscreenElement', { value: {}, configurable: true });
+      const root = document.createElement('div');
+      component.playerRoot = { nativeElement: root } as any;
+
+      Object.defineProperty(document, 'fullscreenElement', { value: root, configurable: true });
       component.onFullscreenChange();
       expect(component.isFullscreen).toBe(true);
 
       Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
       component.onFullscreenChange();
       expect(component.isFullscreen).toBe(false);
+    });
+
+    it('ignores fullscreen on an element other than the player', () => {
+      component.playerRoot = { nativeElement: document.createElement('div') } as any;
+      Object.defineProperty(document, 'fullscreenElement', {
+        value: document.createElement('div'),
+        configurable: true,
+      });
+
+      component.onFullscreenChange();
+
+      expect(component.isFullscreen).toBe(false);
+    });
+
+    it('supports the webkit-prefixed fullscreen element', () => {
+      const root = document.createElement('div');
+      component.playerRoot = { nativeElement: root } as any;
+      Object.defineProperty(document, 'fullscreenElement', { value: undefined, configurable: true });
+      Object.defineProperty(document, 'webkitFullscreenElement', { value: root, configurable: true });
+
+      component.onFullscreenChange();
+
+      expect(component.isFullscreen).toBe(true);
     });
 
     it('closes fullscreen audio panel when exiting fullscreen', () => {
@@ -1758,6 +1823,72 @@ describe('FovPlayerComponent', () => {
       component.onFullscreenChange();
 
       expect(component.fullscreenAudioPanelOpen).toBe(false);
+    });
+  });
+
+  describe('fullscreen rendering', () => {
+    let fixture: ReturnType<typeof TestBed.createComponent<FovPlayerComponent>>;
+    let player: FovPlayerComponent;
+    let root: HTMLElement;
+
+    function setFullscreen(element: Element | null) {
+      Object.defineProperty(document, 'fullscreenElement', { value: element, configurable: true });
+      player.onFullscreenChange();
+      fixture.detectChanges();
+    }
+
+    beforeEach(() => {
+      fixture = TestBed.createComponent(FovPlayerComponent);
+      player = fixture.componentInstance;
+      player.streamId = 'test-stream';
+      fixture.detectChanges();
+      player.isLoading = false;
+      player.errorMessage = '';
+      player.audioWrappers = [
+        { playerId: 'a1', hls: null, volume: 1, track: { name: 'Mic' } } as any,
+      ];
+      fixture.detectChanges();
+      root = fixture.nativeElement.querySelector('.fov-player');
+    });
+
+    afterEach(() => {
+      Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
+      player.onFullscreenChange();
+      fixture.destroy();
+    });
+
+    it('hides the fullscreen audio toggle and panel outside fullscreen', () => {
+      player.fullscreenAudioPanelOpen = true;
+      setFullscreen(null);
+
+      expect(root.classList).not.toContain('is-fullscreen');
+      expect(root.querySelector('.btn-fs-audio-toggle')).toBeNull();
+      expect(root.querySelector('.fs-audio-panel')).toBeNull();
+      expect(getComputedStyle(root.querySelector('.fov-sidebar')!).display).not.toBe('none');
+    });
+
+    it('shows only the fullscreen audio controls in fullscreen', () => {
+      setFullscreen(root);
+      expect(root.querySelector('.btn-fs-audio-toggle')).not.toBeNull();
+      player.toggleFullscreenAudioPanel();
+      fixture.detectChanges();
+
+      expect(root.classList).toContain('is-fullscreen');
+      expect(root.querySelector('.fs-audio-panel')).not.toBeNull();
+      expect(getComputedStyle(root.querySelector('.fov-sidebar')!).display).toBe('none');
+      expect(getComputedStyle(root.querySelector('.fov-toolbar')!).display).toBe('none');
+    });
+
+    it('removes the fullscreen audio controls when leaving fullscreen', () => {
+      setFullscreen(root);
+      player.toggleFullscreenAudioPanel();
+      fixture.detectChanges();
+
+      setFullscreen(null);
+
+      expect(root.classList).not.toContain('is-fullscreen');
+      expect(root.querySelector('.btn-fs-audio-toggle')).toBeNull();
+      expect(root.querySelector('.fs-audio-panel')).toBeNull();
     });
   });
 

@@ -90,6 +90,39 @@ describe('StreamComponent', () => {
     });
   });
 
+  describe('stream description', () => {
+    function render(stream: LiveStreamInfo): HTMLElement {
+      liveStreamsService.getStreamById.and.returnValue(of(stream));
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('should display the description below the stream title', fakeAsync(() => {
+      const el = render({ ...mockStream, description: 'Une super description' });
+
+      const description = el.querySelector('.stream-details > .stream-description');
+      expect(description?.textContent?.trim()).toBe('Une super description');
+
+      const title = el.querySelector('.stream-details > .stream-title h1');
+      expect(title?.textContent?.trim()).toBe('Test Stream');
+      expect(
+        title!.compareDocumentPosition(description!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }));
+
+    it('should not render the description when it is empty', fakeAsync(() => {
+      const el = render({ ...mockStream, description: '   ' });
+      expect(el.querySelector('.stream-description')).toBeNull();
+    }));
+
+    it('should not render the description when it is missing', fakeAsync(() => {
+      const el = render(mockStream);
+      expect(el.querySelector('.stream-description')).toBeNull();
+    }));
+  });
+
   describe('checkStream', () => {
     it('should load stream on init', fakeAsync(() => {
       fixture.detectChanges();

@@ -255,7 +255,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
     this.audioWrappers.forEach((w) => { w.hls?.destroy(); });
     if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
-    if (this.isFullscreen) document.exitFullscreen?.().catch(() => {});
+    if (this.isFullscreen) this.exitDocumentFullscreen().catch(() => {});
 
     if (this.clickToUnlockHandler) {
       const stage = document.getElementById(`stageArea_${this.playerId}`);
@@ -263,9 +263,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       this.clickToUnlockHandler = null;
     }
     if (this.documentUnlockHandler) {
-      document.removeEventListener('click', this.documentUnlockHandler);
-      document.removeEventListener('keydown', this.documentUnlockHandler);
-      document.removeEventListener('touchstart', this.documentUnlockHandler);
+      document.removeEventListener('click', this.documentUnlockHandler, { capture: true });
+      document.removeEventListener('keydown', this.documentUnlockHandler, { capture: true });
+      document.removeEventListener('touchstart', this.documentUnlockHandler, { capture: true });
       this.documentUnlockHandler = null;
     }
   }
@@ -315,7 +315,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const stageW = stage.offsetWidth;
     const stageH = stage.offsetHeight;
     if (!stageW || !stageH) return;
-    if (this.isFullscreen !== !!document.fullscreenElement) return;
+    if (this.isFullscreen !== this.isPlayerFullscreen()) return;
 
     for (const w of this.videoWrappers) {
       if (!w.isVideo) continue;
@@ -396,9 +396,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   @HostListener('document:fullscreenchange')
   @HostListener('document:webkitfullscreenchange')
   onFullscreenChange() {
-    this.isFullscreen = !!(
-      document.fullscreenElement || (document as any).webkitFullscreenElement
-    );
+    this.isFullscreen = this.isPlayerFullscreen();
     if (!this.isFullscreen) this.fullscreenAudioPanelOpen = false;
     setTimeout(() => this.adaptWrappersToViewport(), 100);
   }
@@ -1747,18 +1745,31 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const el = this.playerRoot?.nativeElement;
     if (!el) return;
     try {
-      if (!document.fullscreenElement) {
+      if (!this.getFullscreenElement()) {
         if (el.requestFullscreen) await el.requestFullscreen();
         else if ((el as any).webkitRequestFullscreen)
           await (el as any).webkitRequestFullscreen();
       } else {
-        if (document.exitFullscreen) await document.exitFullscreen();
-        else if ((document as any).webkitExitFullscreen)
-          await (document as any).webkitExitFullscreen();
+        await this.exitDocumentFullscreen();
       }
     } catch (err) {
       console.error('[FOV] Fullscreen error:', err);
     }
+  }
+
+  private getFullscreenElement(): Element | null {
+    return document.fullscreenElement ?? (document as any).webkitFullscreenElement ?? null;
+  }
+
+  private isPlayerFullscreen(): boolean {
+    const root = this.playerRoot?.nativeElement;
+    return !!root && this.getFullscreenElement() === root;
+  }
+
+  private async exitDocumentFullscreen(): Promise<void> {
+    if (document.exitFullscreen) await document.exitFullscreen();
+    else if ((document as any).webkitExitFullscreen)
+      await (document as any).webkitExitFullscreen();
   }
 
   toggleFullscreenAudioPanel() {
