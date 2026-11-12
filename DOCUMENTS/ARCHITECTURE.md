@@ -69,6 +69,7 @@ The FOV Backend is a **modular Express.js REST API** with media streaming capabi
 **Schema Highlights:**
 - Users: `id`, `username`, `email`, `password_hash`, `display_name`, `bio`, `avatar_url`, `banner_url`, `created_at`, `updated_at`
 - Follows: `follower_id`, `following_id`, `created_at` (composite PK, no self-follow)
+- Stream settings: `user_id` (PK), `stream_key` (unique), `title`, `description`, `visibility`, `thumbnail_url`, `category_id`, `created_at`, `updated_at` (one config and one backend-generated key per user)
 - Streams: `id`, `streamer`, `title`, `category_id`, `viewers`, `thumbnail_url`, `avatar_url`, `is_live`
 - Categories: `id`, `name`, `viewers`, `image_url`
 

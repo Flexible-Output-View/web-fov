@@ -4,7 +4,7 @@ services:
       context: ./backend
     restart: unless-stopped
     volumes:
-      - ./backend/media:/var/media
+      - ./backend/media:/var/media:z
     ports:
       - "4000:4000" # API
       - "9999-10010:9999-10010"
@@ -53,7 +53,7 @@ services:
     restart: unless-stopped
     volumes:
       - fov-db:/var/lib/postgresql
-      - ./fovwebdb.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./fovwebdb.sql:/docker-entrypoint-initdb.d/init.sql:z
     networks:
       - backend
 
@@ -68,11 +68,21 @@ services:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: ${DB_PASSWORD}
 
+  demo:
+    build: ./demo-publisher
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - backend
+    environment:
+      API_URL: http://backend:4000
+      SRT_URL: srt://backend:9999?mode=caller&latency=4000000&rcvbuf=134217728&sndbuf=134217728&peerlatency=4000000&tlpktdrop=0&nakreport=1
+
 networks:
   frontend:
-    #driver: bridge
   backend:
-    #driver: bridge
     internal: true
 
 volumes:

@@ -34,9 +34,9 @@ function createProcess({ exitsOnSigint = false } = {}) {
     return process;
 }
 
-function createApp() {
+function createApp(options) {
     const app = express();
-    app.use(createMediaRoutes());
+    app.use(createMediaRoutes(options));
     return app;
 }
 
@@ -115,6 +115,79 @@ describe('Media server lifecycle', () => {
             audioTracks: 1
         });
         expect(duplicate.status).toBe(409);
+    });
+
+    test('links an arriving stream key to the owner public stream id', async () => {
+        const process = createProcess();
+        spawnMock.mockReturnValue(process);
+        const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
+        const app = createApp({ resolveStreamKey });
+        const streamKey = `fov_${'a'.repeat(43)}`;
+
+        const response = await request(app).post('/ffmpeg/register').send({
+            streamId: streamKey,
+            tracks: 1,
+            audioTracks: 1
+        });
+
+        expect(response.status).toBe(200);
+        expect(response.body.streamId).toBe('u12');
+        expect(response.body.hlsUrl).toBe('/api/hls/u12/0/playlist.m3u8');
+        expect(resolveStreamKey).toHaveBeenCalledWith(streamKey);
+        expect(ffmpegProcesses.has('u12')).toBe(true);
+        expect(fs.existsSync(path.join(mediaRoot, 'hls', 'u12'))).toBe(true);
+    });
+
+    test('rejects an unknown arriving stream key without registering anything', async () => {
+        const resolveStreamKey = jest.fn(async () => null);
+        const app = createApp({ resolveStreamKey });
+
+        const response = await request(app).post('/ffmpeg/register').send({
+            streamId: `fov_${'c'.repeat(43)}`,
+            tracks: 1,
+            audioTracks: 1
+        });
+
+        expect(response.status).toBe(401);
+        expect(response.body).toEqual({ error: 'Invalid stream key' });
+        expect(ffmpegProcesses.size).toBe(0);
+        expect(registeredStreams.size).toBe(0);
+    });
+
+    test('refuses to register into a u<id> folder without a key', async () => {
+        const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
+        const app = createApp({ resolveStreamKey });
+
+        const response = await request(app).post('/ffmpeg/register').send({
+            streamId: 'u12',
+            tracks: 1,
+            audioTracks: 1
+        });
+
+        expect(response.status).toBe(401);
+        expect(response.body).toEqual({ error: 'Invalid stream key' });
+        expect(resolveStreamKey).not.toHaveBeenCalled();
+        expect(ffmpegProcesses.size).toBe(0);
+    });
+
+    test('resolves the arriving key when stopping an owned stream', async () => {
+        const process = createProcess({ exitsOnSigint: true });
+        spawnMock.mockReturnValue(process);
+        const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
+        const app = createApp({ resolveStreamKey });
+        const streamKey = `fov_${'d'.repeat(43)}`;
+
+        await request(app).post('/ffmpeg/register').send({
+            streamId: streamKey,
+            tracks: 1,
+            audioTracks: 1
+        });
+        expect(registeredStreams.has('u12')).toBe(true);
+
+        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: streamKey });
+        expect(stopped.status).toBe(200);
+        expect(stopped.body.streamId).toBe('u12');
+        expect(registeredStreams.has('u12')).toBe(false);
     });
 
     test('reports active, missing, and all stream status', async () => {
