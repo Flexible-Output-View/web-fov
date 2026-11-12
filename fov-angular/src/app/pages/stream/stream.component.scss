@@ -226,7 +226,7 @@
   background: var(--accent-primary, #a670ff);
   border: none;
   border-radius: var(--radius-md, 8px);
-  color: white;
+  color: var(--on-accent);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -322,7 +322,7 @@
   background: var(--accent-primary, #a670ff);
   border-radius: var(--radius-sm, 4px);
   font-size: 0.8rem;
-  color: white;
+  color: var(--on-accent);
   font-weight: 500;
 }
 
