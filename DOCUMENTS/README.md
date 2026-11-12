@@ -82,7 +82,7 @@ Create a `.env` file in the `backend/` directory. See `.env.example` for templat
 | `JWT_SECRET` | string | (required) | Secret used to sign JWTs |
 | `JWT_EXPIRES_IN` | string | 7d | JWT expiry |
 | `MEDIA_ROOT` | string | ./media | Path to HLS and media files |
-| `FFMPEG_PATH` | string | auto-detected | Path to FFmpeg binary |
+| `FFMPEG_PATH` | string | `ffmpeg` | Path to an SRT-enabled FFmpeg binary (macOS: `/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`) |
 | `CORS_ORIGIN` | string | * | CORS allowed origin |
 
 ### Production Configuration

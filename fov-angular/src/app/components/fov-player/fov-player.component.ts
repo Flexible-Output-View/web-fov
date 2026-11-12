@@ -196,7 +196,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy() {
     this.engine.disconnect();
     if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
-    if (this.isFullscreen) document.exitFullscreen?.().catch(() => {});
+    if (this.isFullscreen) this.exitDocumentFullscreen().catch(() => {});
   }
 
   toggleStatsModal() {
@@ -402,14 +402,36 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const el = this.playerRoot?.nativeElement;
     if (!el) return;
     try {
-      if (!document.fullscreenElement) {
-        await el.requestFullscreen?.();
+      if (!this.getFullscreenElement()) {
+        if (el.requestFullscreen) await el.requestFullscreen();
       } else {
-        await document.exitFullscreen?.();
+        await this.exitDocumentFullscreen();
       }
     } catch (err) {
       console.error('[FOV] Fullscreen error:', err);
     }
+  }
+
+  @HostListener('document:fullscreenchange')
+  @HostListener('document:webkitfullscreenchange')
+  onFullscreenChange() {
+    this.isFullscreen = this.isPlayerFullscreen();
+    if (!this.isFullscreen) this.fullscreenAudioPanelOpen = false;
+  }
+
+  private getFullscreenElement(): Element | null {
+    return document.fullscreenElement ?? (document as any).webkitFullscreenElement ?? null;
+  }
+
+  private isPlayerFullscreen(): boolean {
+    const root = this.playerRoot?.nativeElement;
+    return !!root && this.getFullscreenElement() === root;
+  }
+
+  private async exitDocumentFullscreen(): Promise<void> {
+    if (document.exitFullscreen) await document.exitFullscreen();
+    else if ((document as any).webkitExitFullscreen)
+      await (document as any).webkitExitFullscreen();
   }
 
   toggleFullscreenAudioPanel() {
@@ -454,6 +476,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+
   private applyStoredLayoutIfAvailable() {
     try {
       const raw = localStorage.getItem(this.layoutStorageKey);
@@ -465,6 +488,8 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       if (!stage) return;
       const stageW = stage.offsetWidth;
       const stageH = stage.offsetHeight;
+
+      if (this.isFullscreen !== this.isPlayerFullscreen()) return;
 
       layout.tracks.forEach((saved) => {
         const track = this.tracks.find((t) => t.name === saved.trackName);

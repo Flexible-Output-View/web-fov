@@ -631,8 +631,7 @@
 /* ─────────────────────────────────────────────
    PLEIN ÉCRAN NATIF
 ───────────────────────────────────────────── */
-.fov-player:fullscreen,
-.fov-player:-webkit-full-screen {
+.fov-player.is-fullscreen {
   border-radius: 0;
 
   .fov-toolbar,

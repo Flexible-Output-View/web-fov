@@ -8,11 +8,16 @@ import { jest } from '@jest/globals';
 const mediaRoot = path.join(process.cwd(), 'src', '__tests__', 'media-server-test-media');
 const spawnMock = jest.fn();
 const execFileMock = jest.fn();
+const execFileSyncMock = jest.fn();
 
 process.env.MEDIA_ROOT = mediaRoot;
 process.env.SRT_PORT = '9999';
 
-jest.unstable_mockModule('child_process', () => ({ spawn: spawnMock, execFile: execFileMock }));
+jest.unstable_mockModule('child_process', () => ({
+    spawn: spawnMock,
+    execFile: execFileMock,
+    execFileSync: execFileSyncMock
+}));
 
 const {
     createMediaRoutes,

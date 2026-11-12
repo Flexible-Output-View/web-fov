@@ -5,10 +5,10 @@
   --text-secondary: #a0a0a0;
   --accent-primary: #1FB8FF;
   --accent-secondary: #0090FF;
+  --on-accent: #151515;
   --border-color: #333333;
   --card-bg: #1f1f1f;
   --focus-ring: #1FB8FF;
-
   --spacing-xs: 0.5rem;
   --spacing-sm: 1rem;
   --spacing-md: 1.5rem;
@@ -22,7 +22,8 @@
   --text-primary: #14140A;
   --text-secondary: #555555;
   --accent-primary: #004BBD;
-  --accent-secondary: #0085FA;
+  --accent-secondary: #0066D6;
+  --on-accent: #FFFFFF;
   --border-color: #e5e5e5;
   --card-bg: #FFFFFF;
   --focus-ring: #004BBD;
@@ -34,8 +35,6 @@
   box-sizing: border-box;
 }
 
-/* ── Focus visible global ─────────────────────── */
-
 *:focus {
   outline: none;
 }
@@ -45,8 +44,6 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
-
-/* ── Respect des préférences de mouvement ─────── */
 
 @media (prefers-reduced-motion: reduce) {
   *,

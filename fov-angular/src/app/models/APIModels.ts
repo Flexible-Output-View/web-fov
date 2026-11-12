@@ -34,6 +34,7 @@ export interface LiveStreamInfo {
   trackCount: number;
   tracks: LiveStreamTrack[];
   title: string;
+  description?: string;
   category: string;
   viewers: number;
   avatarUrl: string;
