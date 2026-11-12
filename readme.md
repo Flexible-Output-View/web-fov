@@ -351,7 +351,8 @@ See [DOCUMENTS/SECURITY.md](DOCUMENTS/SECURITY.md) for full security policy.
 | **Can't connect to database** | Check DB_HOST/DB_USER/DB_PASSWORD in `.env`. Run `node test-db.js` |
 | **SRT port already in use** | Change `SRT_PORT` in `.env` or kill process on port 9999 |
 | **Frontend can't reach backend** | Verify backend is running on port 4000. Check CORS_ORIGIN in `.env` |
-| **No HLS segments being generated** | Check FFmpeg is installed: `which ffmpeg` |
+| **OBS fails to start SRT / FFmpeg says `Protocol not found`** | FFmpeg must be built with SRT. macOS: `brew install ffmpeg-full` and set `FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`. Verify with `ffmpeg -protocols \| grep -w srt`. |
+| **No HLS segments being generated** | Check FFmpeg is installed and has SRT support: `ffmpeg -protocols \| grep -w srt` |
 
 ---
 

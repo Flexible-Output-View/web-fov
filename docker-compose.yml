@@ -24,7 +24,7 @@ services:
       - SRT_PORT=9999
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=fovwebdb
-      - FFMPEG_PATH=/usr/local/bin/ffmpeg
+      - FFMPEG_PATH=/usr/bin/ffmpeg
       - MEDIA_ROOT=/var/media
       - SRT_URL=${SRT_URL}
       - API_HOSTNAME=${API_URL}

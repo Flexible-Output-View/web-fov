@@ -67,7 +67,7 @@ async function start() {
             process.exit(1);
         });
     } catch (err) {
-        console.error('Unable to connect to DB', err);
+        console.error('Unable to start backend:', err);
         process.exit(1);
     }
 }
