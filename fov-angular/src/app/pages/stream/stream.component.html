@@ -50,34 +50,37 @@
   </div>
 
   <div class="stream-header">
-    <div class="stream-title" *ngIf="isLive && streamInfo">
-      <a class="streamer-link"
-         *ngIf="streamerName"
-         [routerLink]="['/', streamerName]"
-         [attr.aria-label]="'Voir le profil de ' + streamerName">
-        <span class="streamer-avatar">
-          <img *ngIf="streamInfo.avatarUrl"
-               [src]="streamInfo.avatarUrl"
-               [alt]="'Photo de profil de ' + streamerName">
-          <span *ngIf="!streamInfo.avatarUrl"
-                class="streamer-avatar-initial"
-                aria-hidden="true">
-            {{ streamerName.charAt(0).toUpperCase() }}
+    <div class="stream-details" *ngIf="isLive && streamInfo">
+      <div class="stream-title">
+        <a class="streamer-link"
+           *ngIf="streamerName"
+           [routerLink]="['/', streamerName]"
+           [attr.aria-label]="'Voir le profil de ' + streamerName">
+          <span class="streamer-avatar">
+            <img *ngIf="streamInfo.avatarUrl"
+                 [src]="streamInfo.avatarUrl"
+                 [alt]="'Photo de profil de ' + streamerName">
+            <span *ngIf="!streamInfo.avatarUrl"
+                  class="streamer-avatar-initial"
+                  aria-hidden="true">
+              {{ streamerName.charAt(0).toUpperCase() }}
+            </span>
           </span>
+          <span class="streamer-name">{{ streamerName }}</span>
+        </a>
+        <h1>{{ streamInfo.title || streamId }}</h1>
+        <span class="stream-category-badge" *ngIf="streamInfo.category">
+          {{ streamInfo.category }}
         </span>
-        <span class="streamer-name">{{ streamerName }}</span>
-      </a>
-      <h1>{{ streamInfo.title || streamId }}</h1>
-      <span class="stream-category-badge" *ngIf="streamInfo.category">
-        {{ streamInfo.category }}
-      </span>
-      <span class="track-info">
-        {{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}
-      </span>
-      <span class="viewer-info" *ngIf="viewerCount$ | async as viewerCount">
-        <span class="viewer-dot" aria-hidden="true"></span>
-        {{ viewerCount.total }} spectateur{{ viewerCount.total > 1 ? 's' : '' }}
-      </span>
+        <span class="track-info">
+          {{ streamInfo.trackCount }} flux{{ streamInfo.trackCount > 1 ? 's' : '' }}
+        </span>
+        <span class="viewer-info" *ngIf="viewerCount$ | async as viewerCount">
+          <span class="viewer-dot" aria-hidden="true"></span>
+          {{ viewerCount.total }} spectateur{{ viewerCount.total > 1 ? 's' : '' }}
+        </span>
+      </div>
+      <p class="stream-description" *ngIf="streamInfo.description?.trim()">{{ streamInfo.description }}</p>
     </div>
   </div>
 </div>

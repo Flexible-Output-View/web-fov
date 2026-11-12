@@ -39,9 +39,9 @@
                  aria-hidden="true"
                  class="thumbnail-img">
             
-            <div class="thumbnail-placeholder" *ngIf="!stream.thumbnailUrl">
-              <span class="placeholder-icon" aria-hidden="true">🎮</span>
-              <span class="placeholder-text">{{ stream.streamId }}</span>
+            <div class="thumbnail-placeholder" *ngIf="!stream.thumbnailUrl" aria-hidden="true">
+              <span class="placeholder-icon">🎮</span>
+              <span class="placeholder-text">{{ stream.title || stream.streamId }}</span>
             </div>
           </div>
           <div class="stream-info">
