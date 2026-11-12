@@ -19,6 +19,7 @@ describe('FovPlayerComponent', () => {
   });
 
   afterEach(() => {
+    component.ngOnDestroy();
     try { sessionStorage.removeItem('fov_audio_unlocked'); } catch {}
     try { localStorage.removeItem(`fov_layout_test-stream`); } catch {}
     // Clean up stage elements
