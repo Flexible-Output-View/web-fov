@@ -36,15 +36,15 @@ function checkFfmpegSrtSupport() {
         if (!ffmpegSrtSupported) {
             console.error(
                 `⚠️ FFmpeg at "${FFMPEG_BIN}" has no SRT support. ` +
-                `Install an SRT-enabled build (macOS: brew install ffmpeg-full) and set ` +
-                `FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg.`
+                'Install an SRT-enabled build (macOS: brew install ffmpeg-full) and set ' +
+                'FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg.'
             );
         }
     } catch (err) {
         ffmpegSrtSupported = false;
         console.error(
             `⚠️ Cannot run FFmpeg at "${FFMPEG_BIN}": ${err.message}. ` +
-            `Install FFmpeg or set FFMPEG_PATH to its full path.`
+            'Install FFmpeg or set FFMPEG_PATH to its full path.'
         );
     }
     return ffmpegSrtSupported;
@@ -435,9 +435,9 @@ function createMediaRoutes(options = {}) {
             return res.status(503).json({
                 error:
                     `FFmpeg at "${FFMPEG_BIN}" does not support SRT. ` +
-                    `Install an SRT-enabled build and set FFMPEG_PATH to its full path ` +
-                    `(macOS: brew install ffmpeg-full, then ` +
-                    `FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg).`
+                    'Install an SRT-enabled build and set FFMPEG_PATH to its full path ' +
+                    '(macOS: brew install ffmpeg-full, then ' +
+                    'FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg).'
             });
         }
 
