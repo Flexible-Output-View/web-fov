@@ -1,11 +1,14 @@
 <a [routerLink]="['/discover', categorySlug]" 
    class="card-link"
+   [attr.aria-label]="'Catégorie ' + category.name + (category.viewers ? ', ' + category.viewers + ' spectateurs' : '')"
    (mouseenter)="onMouseEnter($event)"
    (mousemove)="onMouseMove($event)"
-   (mouseleave)="onMouseLeave()">
+   (mouseleave)="onMouseLeave()"
+   (focus)="onFocus($event)"
+   (blur)="onBlur()">
   <div class="category-card">
     <div class="category-image">
-      <img [src]="category.image" [alt]="category.name">
+      <img [src]="category.image" alt="" aria-hidden="true">
     </div>
     <div class="category-name">
       {{ category.name }}
@@ -16,8 +19,9 @@
   </div>
 </a>
 
-<!-- Tooltip custom -->
+<!-- Tooltip -->
 <div class="tooltip" 
+     role="tooltip"
      *ngIf="showTooltip"
      [style.left.px]="tooltipX"
      [style.top.px]="tooltipY">
