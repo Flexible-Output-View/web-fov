@@ -33,7 +33,7 @@ jobs:
       - name: Prepare test environment dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb pulseaudio netcat-openbsd ffmpeg jq curl
+          sudo apt-get install -y xvfb pulseaudio netcat-openbsd ffmpeg jq curl python3-pip
 
           pulseaudio -D --exit-idle-time=-1
           pacmd load-module module-null-sink sink_name=DummySink
@@ -50,18 +50,29 @@ jobs:
         working-directory: obs-studio-fov
         run: sudo ./requirements.sh
 
+      - name: Create User & Configure Stream Settings
+        working-directory: web-fov
+        run: |
+          set -o pipefail
+          python3 .github/scripts/FOV/integration_setup_stream.py 2>&1 | tee setup-stream.log
+
       - name: Build FOV Software
         working-directory: obs-studio-fov
+        env:
+          FOV_INTEGRATION_TEST_KEY: ${{ env.FOV_INTEGRATION_TEST_KEY }}
         run: ./.github/scripts/FOV/build_integration_test.sh
 
-      - name: Start FOV Headlessly & Auto-Stream
+      - name: Start FOV Headlessly & Auto-Stream with Stream Key
         working-directory: obs-studio-fov
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
             build/rundir/Release/bin/obs --portable > ../obs-stdout.log 2>&1 &
 
       - name: Verify Stream via API
-        run: python3 web-fov/.github/scripts/FOV/integration_test.py
+        working-directory: web-fov
+        run:  |
+          set -o pipefail
+          python3 .github/scripts/FOV/integration_test.py 2>&1 | tee integration-test.log
 
       - name: Collect Docker Logs
         if: always()
@@ -76,3 +87,5 @@ jobs:
           path: |
             docker-web-stack.log
             obs-stdout.log
+            web-fov/setup-stream.log
+            web-fov/integration-test.log
