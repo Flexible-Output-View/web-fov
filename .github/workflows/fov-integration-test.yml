@@ -2,13 +2,14 @@ name: FOV Integration Test
 
 on:
   push:
-      branches:
-        - master
-        - bump-dependencies
+    branches:
+      - master
+      - dev
   pull_request:
     branches:
       - dev
       - master
+      - bump-dependencies
       - 'dependabot/**'
 
 jobs:
@@ -60,49 +61,7 @@ jobs:
             build/rundir/Release/bin/obs --portable > ../obs-stdout.log 2>&1 &
 
       - name: Verify Stream via API
-        run: |
-          echo "Waiting for stream with 2 video and 2 audio tracks in /api/streams/available..."
-
-          MAX_RETRIES=180
-          COUNT=0
-
-          until [ $COUNT -ge $MAX_RETRIES ]; do
-            RESPONSE=$(curl -s http://localhost:4000/api/streams/available || true)
-
-            # Parse counts with fallback to 0
-            STREAM_COUNT=$(echo "$RESPONSE" | jq '. | length' 2>/dev/null || echo "0")
-            VIDEO_COUNT=$(echo "$RESPONSE" | jq '.[0].tracks | map(select(.isVideo == true)) | length' 2>/dev/null || echo "0")
-            AUDIO_COUNT=$(echo "$RESPONSE" | jq '.[0].tracks | map(select(.isAudio == true)) | length' 2>/dev/null || echo "0")
-
-            # Log status every 5 seconds or whenever streams begin appearing
-            if [ $((COUNT % 5)) -eq 0 ] || [ "$STREAM_COUNT" -gt 0 ]; then
-              echo "[$COUNT/${MAX_RETRIES}s] Active Streams: $STREAM_COUNT | Video Tracks: $VIDEO_COUNT | Audio Tracks: $AUDIO_COUNT"
-
-              # Print full payload if a stream is detected but tracks aren't ready yet
-              if [ "$STREAM_COUNT" -gt 0 ] && ([ "$VIDEO_COUNT" -ne 2 ] || [ "$AUDIO_COUNT" -ne 2 ]); then
-                echo "Current API Payload:"
-                echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
-              fi
-            fi
-
-            # Check target conditions
-            if [ "$STREAM_COUNT" -gt 0 ] && [ "$VIDEO_COUNT" -eq 2 ] && [ "$AUDIO_COUNT" -eq 2 ]; then
-              echo "Stream successfully verified with 2 video and 2 audio tracks!"
-              echo "Final API Payload:"
-              echo "$RESPONSE" | jq .
-              exit 0
-            fi
-
-            COUNT=$((COUNT+1))
-            sleep 1
-          done
-
-          echo "ERROR: Stream with required tracks was not detected after $MAX_RETRIES seconds."
-          echo "Last raw API response:"
-          echo "$RESPONSE" | jq . 2>/dev/null || echo "$RESPONSE"
-          echo "=== Last 50 lines of obs-stdout.log ==="
-          tail -n 50 obs-stdout.log || true
-          exit 1
+        run: python3 web-fov/.github/scripts/FOV/integration_test.py
 
       - name: Collect Docker Logs
         if: always()
