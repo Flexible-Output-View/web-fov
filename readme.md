@@ -212,8 +212,9 @@ Encoders should use these settings:
 | `/users/me` | PUT | Update own profile (`bio`, `avatarUrl`, `bannerUrl`) (Bearer token) |
 | `/users/me/password` | PUT | Change own password (`currentPassword`, `newPassword`) (Bearer token) |
 | `/users/{username}` | GET | Get a public profile by username |
-| `/users/{username}/follow` | POST | Follow a user (Bearer token) |
-| `/users/{username}/follow` | DELETE | Unfollow a user (Bearer token) |
+| `/users/me/following` | GET | List the users followed by the authenticated user (Bearer token) |
+| `/users/{username}/follow` | POST | Follow a user → `200 {following: true, followersCount}` (Bearer token) |
+| `/users/{username}/follow` | DELETE | Unfollow a user → `200 {following: false, followersCount}` (Bearer token) |
 | `/streams` | GET | List all streams |
 | `/streams/available` | GET | Get active streams with HLS URLs |
 | `/streams/:id` | GET | Get stream details |
@@ -350,7 +351,8 @@ See [DOCUMENTS/SECURITY.md](DOCUMENTS/SECURITY.md) for full security policy.
 | **Can't connect to database** | Check DB_HOST/DB_USER/DB_PASSWORD in `.env`. Run `node test-db.js` |
 | **SRT port already in use** | Change `SRT_PORT` in `.env` or kill process on port 9999 |
 | **Frontend can't reach backend** | Verify backend is running on port 4000. Check CORS_ORIGIN in `.env` |
-| **No HLS segments being generated** | Check FFmpeg is installed: `which ffmpeg` |
+| **OBS fails to start SRT / FFmpeg says `Protocol not found`** | FFmpeg must be built with SRT. macOS: `brew install ffmpeg-full` and set `FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`. Verify with `ffmpeg -protocols \| grep -w srt`. |
+| **No HLS segments being generated** | Check FFmpeg is installed and has SRT support: `ffmpeg -protocols \| grep -w srt` |
 
 ---
 
@@ -370,19 +372,5 @@ See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Last Updated:** September 2026  
-**Current Version:** 0.1.0 (Beta)
-
-Set up OBS
-The stream key will be used to separate the different stream as you can se on the nginx conf
-```
-# Define stream keys
-hls_variant _stream1 BANDWIDTH=1000000; # Stream 1
-hls_variant _stream2 BANDWIDTH=1000000; # Stream 2
-```
-![Stream settings](https://i.imgur.com/VqlS9Lh.png "OBS")
-
-and then start obs, with the custom settings in obs.sh
-```
-./obs.sh
-```
+**Last Updated:** October 2026
+**Current Version:** 1.2.0

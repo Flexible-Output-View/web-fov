@@ -1,12 +1,12 @@
-<div class="stream-card">
+<article class="stream-card" [attr.aria-label]="stream.title + ', par ' + stream.streamer + ', en direct'">
   <div class="stream-thumbnail">
-    <img [src]="stream.thumbnail" [alt]="stream.title" class="thumbnail-img">
-    <div class="live-indicator">EN DIRECT</div>
-    <div class="viewer-count">{{ stream.viewers }} spectateurs</div>
+    <img [src]="stream.thumbnail" alt="" aria-hidden="true" class="thumbnail-img">
+    <div class="live-indicator" aria-hidden="true">EN DIRECT</div>
+    <div class="viewer-count" aria-hidden="true">{{ stream.viewers }} spectateurs</div>
   </div>
   <div class="stream-info">
     <div class="streamer-avatar">
-      <img [src]="stream.avatar" [alt]="stream.streamer">
+      <img [src]="stream.avatar" alt="" aria-hidden="true">
     </div>
     <div class="stream-details">
       <h4 class="stream-title">{{ stream.title }}</h4>
@@ -14,4 +14,4 @@
       <p class="stream-category">{{ stream.category }}</p>
     </div>
   </div>
-</div>
+</article>

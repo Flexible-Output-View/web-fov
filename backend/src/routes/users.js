@@ -165,6 +165,40 @@ router.delete('/me', requireAuth, async (req, res, next) => {
     }
 });
 
+async function countFollowers(userId) {
+    const rows = await db.query(
+        'SELECT COUNT(*)::int AS followers_count FROM follows WHERE following_id = ?',
+        [userId]
+    );
+    return Number(rows?.[0]?.followers_count) || 0;
+}
+
+// GET /api/users/me/following -> users followed by the authenticated user
+router.get('/me/following', requireAuth, async (req, res, next) => {
+    try {
+        const rows = await db.query(
+            `SELECT
+                u.id,
+                u.username,
+                u.bio,
+                u.avatar_url,
+                u.banner_url,
+                u.created_at,
+                (SELECT COUNT(*)::int FROM follows f WHERE f.following_id = u.id) AS followers_count,
+                (SELECT COUNT(*)::int FROM follows f WHERE f.follower_id = u.id) AS following_count
+            FROM follows f
+            JOIN users u ON u.id = f.following_id
+            WHERE f.follower_id = ?
+            ORDER BY u.username ASC`,
+            [req.userId]
+        );
+
+        res.json(rows.map((row) => toProfile(row, { isFollowing: true })));
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST /api/users/:username/follow -> follow a user
 router.post('/:username/follow', requireAuth, async (req, res, next) => {
     try {
@@ -180,7 +214,7 @@ router.post('/:username/follow', requireAuth, async (req, res, next) => {
             'INSERT INTO follows (follower_id, following_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
             [req.userId, target.id]
         );
-        res.json({ following: true });
+        res.json({ following: true, followersCount: await countFollowers(target.id) });
     } catch (err) {
         next(err);
     }
@@ -198,7 +232,7 @@ router.delete('/:username/follow', requireAuth, async (req, res, next) => {
             'DELETE FROM follows WHERE follower_id = ? AND following_id = ?',
             [req.userId, target.id]
         );
-        res.json({ following: false });
+        res.json({ following: false, followersCount: await countFollowers(target.id) });
     } catch (err) {
         next(err);
     }

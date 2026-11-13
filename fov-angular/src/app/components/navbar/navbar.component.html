@@ -1,20 +1,26 @@
-<nav class="navbar">
+<nav class="navbar" aria-label="Navigation principale">
   <div class="nav-left">
-    <a routerLink="/" class="logo-link">
-      <img src="FOVLogo.png" alt="FOV" class="logo">
+    <a routerLink="/" class="logo-link" aria-label="FOV — Accueil">
+      <img src="FOVLogo.png" alt="" aria-hidden="true" class="logo">
     </a>
-    <div class="nav-links">
-      <a routerLink="/followed" routerLinkActive="active">Suivis</a>
-      <a routerLink="/discover" routerLinkActive="active">Découvrir</a>
-      <a routerLink="/how-does-it-work" routerLinkActive="active">Comment ça marche</a>
+    <div class="nav-links" role="list">
+      <a routerLink="/followed" routerLinkActive="active" role="listitem">Suivis</a>
+      <a routerLink="/discover" routerLinkActive="active" role="listitem">Découvrir</a>
+      <a routerLink="/how-does-it-work" routerLinkActive="active" role="listitem">Comment ça marche</a>
     </div>
   </div>
   
   <div class="nav-center">
-    <div class="search-container">
-      <input type="text" placeholder="Rechercher" class="search-input" autocomplete="off">
-      <button class="search-button">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <div class="search-container" role="search">
+      <label for="nav-search" class="sr-only">Rechercher un stream ou un utilisateur</label>
+      <input id="nav-search"
+             type="search"
+             placeholder="Rechercher"
+             class="search-input"
+             autocomplete="off"
+             aria-label="Rechercher un stream ou un utilisateur">
+      <button class="search-button" type="button" aria-label="Lancer la recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <circle cx="11" cy="11" r="8"></circle>
           <path d="m21 21-4.3-4.3"></path>
         </svg>
@@ -23,19 +29,26 @@
   </div>
 
   <div class="nav-right">
-    <button class="theme-toggle" (click)="toggleTheme()">
-      {{ isDarkTheme ? '☀️' : '🌙' }}
+    <button class="theme-toggle"
+            (click)="toggleTheme()"
+            [attr.aria-label]="isDarkTheme ? 'Passer en mode clair' : 'Passer en mode sombre'"
+            [attr.aria-pressed]="isDarkTheme">
+      <span aria-hidden="true">{{ isDarkTheme ? '☀️' : '🌙' }}</span>
     </button>
 
-    <a *ngIf="isAuthenticated" routerLink="/profile" class="profile-link">
+    <a *ngIf="isAuthenticated"
+       routerLink="/profile"
+       class="profile-link"
+       [attr.aria-label]="'Mon profil — ' + (profile?.username || 'utilisateur')">
       <div class="profile-avatar">
         <img
           *ngIf="avatarUrl"
           [src]="avatarUrl"
-          [alt]="profile?.username || 'Profil'"
+          alt=""
+          aria-hidden="true"
           class="avatar-img"
         >
-        <span *ngIf="!avatarUrl" class="avatar-initial">{{ initial }}</span>
+        <span *ngIf="!avatarUrl" class="avatar-initial" aria-hidden="true">{{ initial }}</span>
       </div>
     </a>
 

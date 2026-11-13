@@ -1,7 +1,9 @@
 <div class="settings-page" *ngIf="profile">
   <div class="settings-header">
     <h1>Paramètres personnels</h1>
-    <button class="btn-back" (click)="cancel()">← Retour au profil</button>
+    <button class="btn-back" (click)="cancel()">
+      <span aria-hidden="true">←</span> Retour au profil
+    </button>
   </div>
 
   <div class="settings-section">
@@ -10,44 +12,64 @@
 
     <!-- Photo de profil -->
     <div class="form-group">
-      <label>Photo de profil</label>
+      <span class="form-label" id="avatar-label">Photo de profil</span>
       <div class="image-uploader">
         <div class="image-preview avatar-preview">
-          <img *ngIf="avatarUrlDraft" [src]="avatarUrlDraft" alt="Aperçu avatar">
-          <span *ngIf="!avatarUrlDraft">Aucun</span>
+          <img *ngIf="avatarUrlDraft" [src]="avatarUrlDraft" alt="Aperçu de votre photo de profil">
+          <span *ngIf="!avatarUrlDraft" aria-hidden="true">Aucun</span>
         </div>
         <div class="image-actions">
-          <label class="btn-file">
+          <label class="btn-file" for="avatar-input">
             Choisir une image
-            <input type="file" accept="image/*" (change)="onAvatarSelected($event)" hidden>
           </label>
-          <button *ngIf="avatarUrlDraft" type="button" class="btn-remove" (click)="removeAvatar()">
+          <input type="file"
+                 id="avatar-input"
+                 accept="image/*"
+                 (change)="onAvatarSelected($event)"
+                 hidden
+                 aria-labelledby="avatar-label"
+                 aria-describedby="avatar-help">
+          <button *ngIf="avatarUrlDraft"
+                  type="button"
+                  class="btn-remove"
+                  (click)="removeAvatar()">
             Retirer
           </button>
         </div>
       </div>
-      <span class="help">JPG ou PNG. L'upload sera disponible prochainement.</span>
+      <span class="help" id="avatar-help">JPG ou PNG. L'upload sera disponible prochainement.</span>
     </div>
 
     <!-- Bannière -->
     <div class="form-group">
-      <label>Bannière</label>
+      <span class="form-label" id="banner-label">Bannière</span>
       <div class="image-uploader">
         <div class="image-preview banner-preview"
-             [style.background-image]="bannerUrlDraft ? 'url(' + bannerUrlDraft + ')' : null">
-          <span *ngIf="!bannerUrlDraft">Aucune</span>
+             [style.background-image]="bannerUrlDraft ? 'url(' + bannerUrlDraft + ')' : null"
+             role="img"
+             [attr.aria-label]="bannerUrlDraft ? 'Aperçu de votre bannière' : null">
+          <span *ngIf="!bannerUrlDraft" aria-hidden="true">Aucune</span>
         </div>
         <div class="image-actions">
-          <label class="btn-file">
+          <label class="btn-file" for="banner-input">
             Choisir une image
-            <input type="file" accept="image/*" (change)="onBannerSelected($event)" hidden>
           </label>
-          <button *ngIf="bannerUrlDraft" type="button" class="btn-remove" (click)="removeBanner()">
+          <input type="file"
+                 id="banner-input"
+                 accept="image/*"
+                 (change)="onBannerSelected($event)"
+                 hidden
+                 aria-labelledby="banner-label"
+                 aria-describedby="banner-help">
+          <button *ngIf="bannerUrlDraft"
+                  type="button"
+                  class="btn-remove"
+                  (click)="removeBanner()">
             Retirer
           </button>
         </div>
       </div>
-      <span class="help">JPG ou PNG. L'upload sera disponible prochainement.</span>
+      <span class="help" id="banner-help">JPG ou PNG. L'upload sera disponible prochainement.</span>
     </div>
 
     <!-- Bio -->
@@ -58,9 +80,12 @@
         [(ngModel)]="bioDraft"
         rows="4"
         maxlength="300"
-        placeholder="Parlez-nous de vous...">
+        placeholder="Parlez-nous de vous…"
+        aria-describedby="bio-count">
       </textarea>
-      <span class="char-count">{{ bioDraft.length }} / 300</span>
+      <span class="char-count" id="bio-count" aria-live="polite">
+        {{ bioDraft.length }} / 300
+      </span>
     </div>
 
     <button class="btn-primary" (click)="saveProfile()">
@@ -73,93 +98,98 @@
     <p class="hint">Ces informations ne sont visibles que par vous.</p>
 
     <div class="form-group">
-        <label for="username">Nom d'utilisateur</label>
-        <input
+      <label for="username">Nom d'utilisateur</label>
+      <input
         id="username"
         type="text"
         [value]="profile.username"
         disabled
         class="input-readonly"
-        />
+        aria-readonly="true"
+      />
     </div>
 
     <div class="form-group">
-        <label for="email">Email</label>
-        <input
+      <label for="email">Email</label>
+      <input
         id="email"
         type="email"
         [value]="profile.email"
         disabled
         class="input-readonly"
-        />
+        aria-readonly="true"
+      />
     </div>
 
     <h3 class="subsection-title">Changer le mot de passe</h3>
 
     <div class="form-group">
-        <label for="currentPassword">Mot de passe actuel</label>
-        <div class="password-input">
+      <label for="currentPassword">Mot de passe actuel</label>
+      <div class="password-input">
         <input
-            id="currentPassword"
-            [type]="showCurrentPassword ? 'text' : 'password'"
-            [(ngModel)]="currentPassword"
-            placeholder="••••••••"
-            autocomplete="current-password"
+          id="currentPassword"
+          [type]="showCurrentPassword ? 'text' : 'password'"
+          [(ngModel)]="currentPassword"
+          placeholder="••••••••"
+          autocomplete="current-password"
         />
         <button
-            type="button"
-            class="btn-toggle-password"
-            (click)="showCurrentPassword = !showCurrentPassword"
-            [title]="showCurrentPassword ? 'Masquer' : 'Afficher'">
-            {{ showCurrentPassword ? '🙈' : '👁' }}
+          type="button"
+          class="btn-toggle-password"
+          (click)="showCurrentPassword = !showCurrentPassword"
+          [attr.aria-label]="showCurrentPassword ? 'Masquer le mot de passe actuel' : 'Afficher le mot de passe actuel'"
+          [attr.aria-expanded]="showCurrentPassword">
+          <span aria-hidden="true">{{ showCurrentPassword ? '🙈' : '👁' }}</span>
         </button>
-        </div>
+      </div>
     </div>
 
     <div class="form-group">
-        <label for="newPassword">Nouveau mot de passe</label>
-        <div class="password-input">
+      <label for="newPassword">Nouveau mot de passe</label>
+      <div class="password-input">
         <input
-            id="newPassword"
-            [type]="showNewPassword ? 'text' : 'password'"
-            [(ngModel)]="newPassword"
-            placeholder="••••••••"
-            autocomplete="new-password"
+          id="newPassword"
+          [type]="showNewPassword ? 'text' : 'password'"
+          [(ngModel)]="newPassword"
+          placeholder="••••••••"
+          autocomplete="new-password"
         />
         <button
-            type="button"
-            class="btn-toggle-password"
-            (click)="showNewPassword = !showNewPassword"
-            [title]="showNewPassword ? 'Masquer' : 'Afficher'">
-            {{ showNewPassword ? '🙈' : '👁' }}
+          type="button"
+          class="btn-toggle-password"
+          (click)="showNewPassword = !showNewPassword"
+          [attr.aria-label]="showNewPassword ? 'Masquer le nouveau mot de passe' : 'Afficher le nouveau mot de passe'"
+          [attr.aria-expanded]="showNewPassword">
+          <span aria-hidden="true">{{ showNewPassword ? '🙈' : '👁' }}</span>
         </button>
-        </div>
+      </div>
     </div>
 
     <div class="form-group">
-        <label for="confirmNewPassword">Confirmer le nouveau mot de passe</label>
-        <div class="password-input">
+      <label for="confirmNewPassword">Confirmer le nouveau mot de passe</label>
+      <div class="password-input">
         <input
-            id="confirmNewPassword"
-            [type]="showConfirmPassword ? 'text' : 'password'"
-            [(ngModel)]="confirmNewPassword"
-            placeholder="••••••••"
-            autocomplete="new-password"
+          id="confirmNewPassword"
+          [type]="showConfirmPassword ? 'text' : 'password'"
+          [(ngModel)]="confirmNewPassword"
+          placeholder="••••••••"
+          autocomplete="new-password"
         />
         <button
-            type="button"
-            class="btn-toggle-password"
-            (click)="showConfirmPassword = !showConfirmPassword"
-            [title]="showConfirmPassword ? 'Masquer' : 'Afficher'">
-            {{ showConfirmPassword ? '🙈' : '👁' }}
+          type="button"
+          class="btn-toggle-password"
+          (click)="showConfirmPassword = !showConfirmPassword"
+          [attr.aria-label]="showConfirmPassword ? 'Masquer la confirmation du mot de passe' : 'Afficher la confirmation du mot de passe'"
+          [attr.aria-expanded]="showConfirmPassword">
+          <span aria-hidden="true">{{ showConfirmPassword ? '🙈' : '👁' }}</span>
         </button>
-        </div>
+      </div>
     </div>
 
     <button class="btn-primary" (click)="savePassword()">
-        Changer le mot de passe
+      Changer le mot de passe
     </button>
-    </div>
+  </div>
 
   <div class="settings-section danger-zone">
     <h2>Zone de danger</h2>
@@ -169,18 +199,31 @@
     </button>
   </div>
 
-  <div class="toast error" *ngIf="errorMessage">{{ errorMessage }}</div>
-  <div class="toast success" *ngIf="successMessage">{{ successMessage }}</div>
+  <div class="toast error"
+       *ngIf="errorMessage"
+       role="alert"
+       aria-live="assertive">
+    {{ errorMessage }}
+  </div>
+  <div class="toast success"
+       *ngIf="successMessage"
+       role="status"
+       aria-live="polite">
+    {{ successMessage }}
+  </div>
 
-  <div class="modal-overlay" *ngIf="isDeleteModalOpen" (click)="closeDeleteModal()">
+  <div class="modal-overlay"
+       *ngIf="isDeleteModalOpen"
+       (click)="closeDeleteModal()">
     <div
       class="modal-dialog"
       role="dialog"
       aria-modal="true"
       aria-labelledby="deleteAccountTitle"
+      aria-describedby="deleteAccountWarning"
       (click)="$event.stopPropagation()">
       <h2 id="deleteAccountTitle">Supprimer mon compte</h2>
-      <p class="modal-warning">
+      <p class="modal-warning" id="deleteAccountWarning">
         Cette action est définitive. Votre profil, vos abonnements et vos abonnés
         seront supprimés et ne pourront pas être récupérés.
       </p>
@@ -196,18 +239,26 @@
             autocomplete="current-password"
             [disabled]="isDeletingAccount"
             (keyup.enter)="deleteAccount()"
+            [attr.aria-invalid]="deleteErrorMessage ? true : null"
+            aria-describedby="delete-pw-error"
           />
           <button
             type="button"
             class="btn-toggle-password"
             (click)="showDeletePassword = !showDeletePassword"
-            [title]="showDeletePassword ? 'Masquer' : 'Afficher'">
-            {{ showDeletePassword ? '🙈' : '👁' }}
+            [attr.aria-label]="showDeletePassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+            [attr.aria-expanded]="showDeletePassword">
+            <span aria-hidden="true">{{ showDeletePassword ? '🙈' : '👁' }}</span>
           </button>
         </div>
       </div>
 
-      <p class="modal-error" *ngIf="deleteErrorMessage">{{ deleteErrorMessage }}</p>
+      <p class="modal-error"
+         id="delete-pw-error"
+         *ngIf="deleteErrorMessage"
+         role="alert">
+        {{ deleteErrorMessage }}
+      </p>
 
       <div class="modal-actions">
         <button
@@ -221,8 +272,9 @@
           type="button"
           class="btn-danger-solid"
           (click)="deleteAccount()"
-          [disabled]="isDeletingAccount || !deletePassword">
-          {{ isDeletingAccount ? 'Suppression…' : 'Supprimer définitivement' }}
+          [disabled]="isDeletingAccount || !deletePassword"
+          [attr.aria-busy]="isDeletingAccount">
+          {{ isDeletingAccount ? 'Suppression en cours…' : 'Supprimer définitivement' }}
         </button>
       </div>
     </div>
