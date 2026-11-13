@@ -31,6 +31,7 @@
     padding-bottom: var(--spacing-sm);
     cursor: pointer;
     border-bottom: 3px solid transparent;
+    transition: color 0.2s ease, border-color 0.2s ease;
 
     &.active {
       color: var(--accent-primary);
@@ -68,8 +69,20 @@
 .loading-state {
   padding: 40px;
   text-align: center;
-  color: #888;
+  color: var(--text-secondary);
   font-size: 1rem;
+}
+
+.live-streams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.empty-state {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 1024px) {

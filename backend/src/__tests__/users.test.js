@@ -288,19 +288,80 @@ describe('Users Routes', () => {
         });
     });
 
+    describe('GET /me/following', () => {
+        test('returns the users followed by the authenticated user', async () => {
+            db.query.mockResolvedValueOnce([
+                profileRow({ id: 2, username: 'bob', email: 'bob@example.com' }),
+                profileRow({ id: 3, username: 'carol', email: 'carol@example.com', followers_count: 0 })
+            ]);
+
+            const response = await request(app).get('/me/following').set(AUTH_HEADER);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual([
+                {
+                    id: 2,
+                    username: 'bob',
+                    bio: 'Hello',
+                    avatarUrl: '',
+                    bannerUrl: '',
+                    followersCount: 2,
+                    followingCount: 3,
+                    isFollowing: true
+                },
+                {
+                    id: 3,
+                    username: 'carol',
+                    bio: 'Hello',
+                    avatarUrl: '',
+                    bannerUrl: '',
+                    followersCount: 0,
+                    followingCount: 3,
+                    isFollowing: true
+                }
+            ]);
+            expect(response.body[0]).not.toHaveProperty('email');
+            expect(db.query).toHaveBeenCalledWith(
+                expect.stringContaining('WHERE f.follower_id = ?'),
+                [1]
+            );
+        });
+
+        test('returns an empty list when nothing is followed', async () => {
+            db.query.mockResolvedValueOnce([]);
+
+            const response = await request(app).get('/me/following').set(AUTH_HEADER);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual([]);
+        });
+
+        test('returns 401 without a token', async () => {
+            const response = await request(app).get('/me/following');
+
+            expect(response.status).toBe(401);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+    });
+
     describe('POST /:username/follow', () => {
-        test('follows another user', async () => {
+        test('follows another user and returns the new follower count', async () => {
             db.query
                 .mockResolvedValueOnce([{ id: 2 }])
-                .mockResolvedValueOnce([]);
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([{ followers_count: 4 }]);
 
             const response = await request(app).post('/bob/follow').set(AUTH_HEADER);
 
             expect(response.status).toBe(200);
-            expect(response.body).toEqual({ following: true });
+            expect(response.body).toEqual({ following: true, followersCount: 4 });
             expect(db.query).toHaveBeenCalledWith(
                 'INSERT INTO follows (follower_id, following_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
                 [1, 2]
+            );
+            expect(db.query).toHaveBeenCalledWith(
+                'SELECT COUNT(*)::int AS followers_count FROM follows WHERE following_id = ?',
+                [2]
             );
         });
 
@@ -330,15 +391,16 @@ describe('Users Routes', () => {
     });
 
     describe('DELETE /:username/follow', () => {
-        test('unfollows a user', async () => {
+        test('unfollows a user and returns the new follower count', async () => {
             db.query
                 .mockResolvedValueOnce([{ id: 2 }])
-                .mockResolvedValueOnce([]);
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([{ followers_count: 1 }]);
 
             const response = await request(app).delete('/bob/follow').set(AUTH_HEADER);
 
             expect(response.status).toBe(200);
-            expect(response.body).toEqual({ following: false });
+            expect(response.body).toEqual({ following: false, followersCount: 1 });
             expect(db.query).toHaveBeenCalledWith(
                 'DELETE FROM follows WHERE follower_id = ? AND following_id = ?',
                 [1, 2]

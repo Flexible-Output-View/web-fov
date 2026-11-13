@@ -17,7 +17,7 @@ export interface Category {
 })
 export class CategoryCardComponent {
   @Input() category!: Category;
-  
+
   showTooltip = false;
   tooltipX = 0;
   tooltipY = 0;
@@ -26,9 +26,8 @@ export class CategoryCardComponent {
     return this.category.name
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, ''); 
   }
 
   onMouseEnter(event: MouseEvent) {
@@ -41,6 +40,20 @@ export class CategoryCardComponent {
   }
 
   onMouseLeave() {
+    this.showTooltip = false;
+  }
+
+  onFocus(event: FocusEvent) {
+    this.showTooltip = true;
+    const el = event.target as HTMLElement;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      this.tooltipX = rect.left + rect.width / 2;
+      this.tooltipY = rect.top - 10;
+    }
+  }
+
+  onBlur() {
     this.showTooltip = false;
   }
 

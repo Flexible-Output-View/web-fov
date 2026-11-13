@@ -5,9 +5,10 @@
   --text-secondary: #a0a0a0;
   --accent-primary: #1FB8FF;
   --accent-secondary: #0090FF;
+  --on-accent: #151515;
   --border-color: #333333;
   --card-bg: #1f1f1f;
-
+  --focus-ring: #1FB8FF;
   --spacing-xs: 0.5rem;
   --spacing-sm: 1rem;
   --spacing-md: 1.5rem;
@@ -19,11 +20,13 @@
   --bg-primary: #F8F6F1;
   --bg-secondary: #FFFFFF;
   --text-primary: #14140A;
-  --text-secondary: #666666;
+  --text-secondary: #555555;
   --accent-primary: #004BBD;
-  --accent-secondary: #0085FA;
+  --accent-secondary: #0066D6;
+  --on-accent: #FFFFFF;
   --border-color: #e5e5e5;
   --card-bg: #FFFFFF;
+  --focus-ring: #004BBD;
 }
 
 * {
@@ -32,10 +35,31 @@
   box-sizing: border-box;
 }
 
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.6;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
