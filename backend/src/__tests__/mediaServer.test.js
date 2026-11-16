@@ -97,7 +97,7 @@ describe('Media server lifecycle', () => {
             audioTracks: 1
         });
 
-        expect(reused.body.srtUrl).toContain(':9999?');
+        expect(reused.body.ingestUrl).toContain(':9999?');
     });
 
     test('validates registration requests and supports debug registration', async () => {
@@ -112,7 +112,7 @@ describe('Media server lifecycle', () => {
             audioTracks: 1
         });
         expect(debug.status).toBe(200);
-        expect(debug.body.srtUrl).toBe('srt://0.0.0.0:5555?mode=listener');
+        expect(debug.body.ingestUrl).toBe('srt://0.0.0.0:5555?mode=listener');
 
         const duplicate = await request(app).post('/ffmpeg/register/debug').send({
             streamId: 'debug-stream',
@@ -209,7 +209,7 @@ describe('Media server lifecycle', () => {
             status: 'active',
             running: true,
             pid: process.pid,
-            srtUrl: expect.stringContaining(':9999?mode=caller')
+            ingestUrl: expect.stringContaining(':9999?mode=caller')
         });
 
         const all = await request(app).get('/ffmpeg/status');
@@ -287,7 +287,7 @@ describe('Media server lifecycle', () => {
                 audioTracks: 1
             });
             expect(response.status).toBe(200);
-            expect(response.body.srtUrl).toContain(`:${9999 + index}?`);
+            expect(response.body.ingestUrl).toContain(`:${9999 + index}?`);
         }
 
         const exhausted = await request(app).post('/ffmpeg/register').send({ streamId: 'exhausted', tracks: 1, audioTracks: 1 });
@@ -306,6 +306,6 @@ describe('Media server lifecycle', () => {
         spawnMock.mockReturnValue(replacement);
         const reused = await request(app).post('/ffmpeg/register').send({ streamId: 'reused', tracks: 1, audioTracks: 1 });
         expect(reused.status).toBe(200);
-        expect(reused.body.srtUrl).toContain(':9999?');
+        expect(reused.body.ingestUrl).toContain(':9999?');
     });
 });

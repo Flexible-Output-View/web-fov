@@ -9,7 +9,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { LiveStreamsService } from '../../services/live-streams.service';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import * as API from '../../models/APIModels'
 import { Subject, takeUntil, interval, startWith, switchMap } from 'rxjs';
 
 @Component({
@@ -23,7 +23,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   @Input() isCollapsed = false;
   @Output() toggleCollapse = new EventEmitter<void>();
 
-  liveChannels: LiveStreamInfo[] = [];
+  liveChannels: API.LiveStreamInfo[] = [];
 
   /**
    * Détecté via matchMedia. Sous 1024px le CSS force le mode collapsed

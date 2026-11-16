@@ -5,8 +5,7 @@ import { BehaviorSubject, Observable, catchError, map, of, tap } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
-import { ChatMessage, SendChatResponse } from '../models/chat';
-import { ViewerCount } from '../models/live-stream.model';
+import * as API from '../models/APIModels'
 
 /**
  * Factory used to create a Socket.IO client.
@@ -29,13 +28,13 @@ export class ChatService implements OnDestroy {
   private socket: Socket | null = null;
   private currentStreamId: string | null = null;
 
-  private messagesSubject = new BehaviorSubject<ChatMessage[]>([]);
+  private messagesSubject = new BehaviorSubject<API.ChatMessage[]>([]);
   public messages$ = this.messagesSubject.asObservable();
 
   private connectedSubject = new BehaviorSubject<boolean>(false);
   public connected$ = this.connectedSubject.asObservable();
 
-  private viewerCountSubject = new BehaviorSubject<ViewerCount | null>(null);
+  private viewerCountSubject = new BehaviorSubject<API.ViewerCount | null>(null);
   public viewerCount$ = this.viewerCountSubject.asObservable();
 
   constructor(
@@ -48,7 +47,7 @@ export class ChatService implements OnDestroy {
     this.disconnect();
   }
 
-  get messages(): ChatMessage[] {
+  get messages(): API.ChatMessage[] {
     return this.messagesSubject.getValue();
   }
 
@@ -86,7 +85,7 @@ export class ChatService implements OnDestroy {
       this.connectedSubject.next(false);
     });
 
-    this.socket.on('chat-message', (message: ChatMessage) => {
+    this.socket.on('chat-message', (message: API.ChatMessage) => {
       if (!message || message.streamId !== this.currentStreamId) {
         // Still accept messages without streamId check when single-room usage.
         if (message && this.currentStreamId && message.streamId && message.streamId !== this.currentStreamId) {
@@ -96,7 +95,7 @@ export class ChatService implements OnDestroy {
       this.appendMessage(message);
     });
 
-    this.socket.on('viewer-count', (counts: ViewerCount) => {
+    this.socket.on('viewer-count', (counts: API.ViewerCount) => {
       if (!counts || String(counts.streamId) !== String(this.currentStreamId)) {
         return;
       }
@@ -124,13 +123,13 @@ export class ChatService implements OnDestroy {
     this.messagesSubject.next([]);
   }
 
-  sendMessage(streamId: string, text: string): Observable<ChatMessage | null> {
+  sendMessage(streamId: string, text: string): Observable<API.ChatMessage | null> {
     const trimmed = (text ?? '').trim();
     if (!trimmed) {
       return of(null);
     }
     return this.http
-      .post<SendChatResponse>(
+      .post<API.SendChatResponse>(
         `${this.API_URL}/chat/${encodeURIComponent(streamId)}`,
         { message: trimmed.slice(0, 500) },
         { headers: this.authHeaders() },
@@ -151,7 +150,7 @@ export class ChatService implements OnDestroy {
       );
   }
 
-  private appendMessage(message: ChatMessage): void {
+  private appendMessage(message: API.ChatMessage): void {
     const current = this.messagesSubject.getValue();
     if (current.some((m) => String(m.id) === String(message.id))) {
       return;

@@ -5,7 +5,7 @@ import { CategoryCardComponent, Category } from '../../components/category-card/
 import { LiveStreamCardComponent } from '../../components/live-stream-card/live-stream-card.component';
 import { TwitchService } from '../../services/twitch.service';
 import { LiveStreamsService } from '../../services/live-streams.service';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import * as API from '../../models/APIModels'
 import { Subject, takeUntil } from 'rxjs';
 
 @Component({
@@ -19,7 +19,7 @@ export class DiscoverComponent implements OnInit, OnDestroy {
   allCategories: Category[] = [];
   activeTab: string = 'categories';
   categoryName: string | null = null;
-  liveStreams: LiveStreamInfo[] = [];
+  liveStreams: API.LiveStreamInfo[] = [];
   isLoadingCategories = true;
   isLoadingStreams = true;
 

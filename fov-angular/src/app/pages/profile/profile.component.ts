@@ -1,8 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { Subject, takeUntil } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { ProfileViewComponent } from './profile-view/profile-view.component';
+import * as API from '../../models/APIModels'
 
 @Component({
   selector: 'app-profile',

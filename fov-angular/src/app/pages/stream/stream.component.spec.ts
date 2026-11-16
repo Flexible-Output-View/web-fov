@@ -5,7 +5,7 @@ import { ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { ViewerPresenceService } from '../../services/viewer-presence.service';
-import { LiveStreamInfo } from '../../models/live-stream.model';
+import { LiveStreamInfo } from '../../models/APIModels';
 
 describe('StreamComponent', () => {
   let component: StreamComponent;

@@ -6,7 +6,7 @@ import { FovPlayerComponent } from '../../components/fov-player/fov-player.compo
 import { StreamChatComponent } from '../../components/stream-chat/stream-chat.component';
 import { LiveStreamsService } from '../../services/live-streams.service';
 import { ViewerPresenceService } from '../../services/viewer-presence.service';
-import { LiveStreamInfo, ViewerCount } from '../../models/live-stream.model';
+import * as API from '../../models/APIModels'
 
 @Component({
   selector: 'app-stream',
@@ -17,7 +17,7 @@ import { LiveStreamInfo, ViewerCount } from '../../models/live-stream.model';
 })
 export class StreamComponent implements OnInit, OnDestroy {
   streamId: string = '';
-  streamInfo: LiveStreamInfo | null = null;
+  streamInfo: API.LiveStreamInfo | null = null;
   isLoading = true;
   isLive = false;
   errorMessage = '';
@@ -26,7 +26,7 @@ export class StreamComponent implements OnInit, OnDestroy {
   redirectCountdown = 5;
   private redirectInterval: any = null;
 
-  readonly viewerCount$: Observable<ViewerCount | null>;
+  readonly viewerCount$: Observable<API.ViewerCount | null>;
 
   private destroy$ = new Subject<void>();
 

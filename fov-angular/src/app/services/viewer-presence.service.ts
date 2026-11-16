@@ -5,7 +5,7 @@ import { catchError, filter, skip, switchMap, takeUntil } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { ChatService } from './chat.service';
-import { ViewerCount } from '../models/live-stream.model';
+import { ViewerCount } from '../models/APIModels';
 
 export const VISITOR_ID_KEY = 'fov_viewer_id';
 export const HEARTBEAT_INTERVAL_MS = 10000;
