@@ -47,4 +47,4 @@ jobs:
           run: mkdir -p /home/deploy/web-deploy/dev/ && cp -r . /home/deploy/web-deploy/dev/
 
         - name: "Run the docker compose stack"
-          run: cd /home/deploy/web-deploy/dev/ && docker-compose up -d --no-deps --build --force-recreate
+          run: cd /home/deploy/web-deploy/dev/ && docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-deps --build --force-recreate --wait

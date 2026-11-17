@@ -1,0 +1,7 @@
+services:
+  backend:
+    volumes: !override
+      - type: tmpfs
+        target: /var/media
+        tmpfs:
+          size: 2048m
