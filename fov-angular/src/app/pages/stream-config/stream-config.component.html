@@ -175,7 +175,7 @@
         <span class="form-label" id="thumbnail-label">Miniature du stream</span>
         <div class="thumbnail-section">
           <div class="thumbnail-preview"
-               role="img"
+               [attr.role]="thumbnailPreview ? 'img' : null"
                [attr.aria-label]="thumbnailPreview ? 'Aperçu de la miniature' : null">
             <img
               *ngIf="thumbnailPreview"

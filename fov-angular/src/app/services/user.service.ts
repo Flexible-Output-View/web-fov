@@ -15,6 +15,11 @@ export interface UserProfile {
   isFollowing?: boolean;
 }
 
+export interface UserSearchResult {
+  username: string;
+  avatarUrl: string;
+}
+
 export interface ProfileUpdates {
   bio: string;
   avatarUrl: string;
@@ -39,6 +44,13 @@ export class UserService {
     return this.http
       .get<UserProfile>(`${this.API_URL}/users/me`)
       .pipe(tap((profile) => this.currentProfileSubject.next(profile)));
+  }
+
+  /** Search users whose username contains the query. */
+  searchUsers(query: string): Observable<UserSearchResult[]> {
+    return this.http.get<UserSearchResult[]>(`${this.API_URL}/users`, {
+      params: { q: query },
+    });
   }
 
   /** Fetch a public profile by username. */

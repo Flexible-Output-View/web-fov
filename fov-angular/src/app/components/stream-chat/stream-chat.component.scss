@@ -96,7 +96,6 @@
 
   .empty-hint {
     font-size: 0.8rem;
-    opacity: 0.8;
   }
 }
 
@@ -144,7 +143,7 @@
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.4);
   border-radius: 6px;
-  color: #f87171;
+  color: var(--danger);
   font-size: 0.8rem;
 }
 

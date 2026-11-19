@@ -46,7 +46,7 @@
       <div class="image-uploader">
         <div class="image-preview banner-preview"
              [style.background-image]="bannerUrlDraft ? 'url(' + bannerUrlDraft + ')' : null"
-             role="img"
+             [attr.role]="bannerUrlDraft ? 'img' : null"
              [attr.aria-label]="bannerUrlDraft ? 'Aperçu de votre bannière' : null">
           <span *ngIf="!bannerUrlDraft" aria-hidden="true">Aucune</span>
         </div>

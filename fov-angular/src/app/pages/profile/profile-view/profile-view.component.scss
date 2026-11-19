@@ -117,7 +117,7 @@
   max-width: 600px;
   margin: 40px auto;
   text-align: center;
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .btn-primary {
@@ -176,8 +176,8 @@
     border: 1px solid var(--border-color);
 
     &:hover {
-      border-color: #ef4444;
-      color: #ef4444;
+      border-color: var(--danger);
+      color: var(--danger);
     }
   }
 
@@ -198,7 +198,7 @@
   }
 
   &.error {
-    color: #ef4444;
+    color: var(--danger);
   }
 }
 
@@ -206,8 +206,8 @@
   width: 100%;
   padding: 14px 20px;
   background-color: transparent;
-  color: #ef4444;
-  border: 1px solid #ef4444;
+  color: var(--danger);
+  border: 1px solid var(--danger);
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
@@ -215,7 +215,7 @@
   transition: background-color 0.2s ease, color 0.2s ease;
 
   &:hover {
-    background-color: #ef4444;
+    background-color: var(--danger-solid);
     color: white;
   }
 }

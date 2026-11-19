@@ -73,6 +73,25 @@ describe('UserService', () => {
     });
   });
 
+  describe('searchUsers', () => {
+    it('should fetch GET /users with the query as q parameter', (done) => {
+      const results = [{ username: 'alice', avatarUrl: '' }];
+      service.searchUsers('a&b').subscribe({
+        next: (users) => {
+          expect(users).toEqual(results);
+          done();
+        },
+        error: (err) => done.fail(err),
+      });
+
+      const req = httpMock.expectOne(
+        (r) => r.url === `${environment.apiUrl}/users` && r.params.get('q') === 'a&b',
+      );
+      expect(req.request.method).toBe('GET');
+      req.flush(results);
+    });
+  });
+
   // ── getProfileByUsername ──────────────────────────────────────
   describe('getProfileByUsername', () => {
     it('should fetch GET /users/:username', (done) => {

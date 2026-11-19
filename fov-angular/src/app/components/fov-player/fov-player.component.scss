@@ -105,16 +105,16 @@
 }
 
 .ctrl-btn--save {
-  background: #22c55e;
+  background: var(--success-solid);
   color: #fff;
   font-weight: 600;
-  &:hover { background: #16a34a; }
+  &:hover { background: var(--success-solid-hover); }
 }
 
 .ctrl-btn--cancel {
-  background: #ef4444;
+  background: var(--danger-solid);
   color: #fff;
-  &:hover { background: #dc2626; }
+  &:hover { background: var(--danger-solid-hover); }
 }
 
 .save-feedback {
@@ -122,9 +122,9 @@
   align-items: center;
   padding: 4px 10px;
   background: rgba(34, 197, 94, 0.15);
-  border: 1px solid #22c55e;
+  border: 1px solid var(--success);
   border-radius: 6px;
-  color: #22c55e;
+  color: var(--success);
   font-size: 0.8rem;
   font-weight: 600;
   animation: fadeInOut 2.5s ease forwards;

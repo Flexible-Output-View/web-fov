@@ -1,0 +1,58 @@
+name: FOV Frontend Accessibility Audit
+
+on:
+  push:
+    paths:
+      - "fov-angular/**"
+      - ".github/workflows/fov-frontend-accessibility-audit.yml"
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  axe_audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.12.0"
+          cache: npm
+          cache-dependency-path: fov-angular/package-lock.json
+
+      - name: Install Chrome
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Install dependencies (reproducible)
+        run: |
+          cd fov-angular
+          npm ci
+
+      - name: Create environment file
+        run: |
+          mkdir -p fov-angular/src/environments
+          cat > fov-angular/src/environments/environment.ts << 'EOF'
+          export const environment = {
+            apiUrl: 'http://localhost:4000/api'
+          };
+          EOF
+
+      - name: Audit every page with axe (WCAG 2.2 AA, light/dark, desktop/mobile)
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          cd fov-angular
+          npm run test:a11y
+
+      - name: Upload accessibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-report
+          path: fov-angular/dist/a11y-report.json
+          if-no-files-found: warn
