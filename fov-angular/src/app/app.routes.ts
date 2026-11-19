@@ -23,10 +23,7 @@ export const routes: Routes = [
   { path: 'register', component: RegisterComponent },
   { path: 'stream/:streamId', component: StreamComponent },
   { path: 'how-does-it-work', component: HowDoesItWorkComponent, title: 'Comment ça marche ?' },
-  // NOTE: keep the dynamic :username route LAST (just before the wildcard).
-  // Angular matches routes in declaration order, so any single-segment static
-  // route placed after it (e.g. 'login') would be shadowed by a profile lookup.
   { path: 'dashboard/stream', component: StreamConfigComponent, canActivate: [authGuard], title: 'Configuration du stream' },
-  { path: '**', redirectTo: '' },
   { path: ':username', component: PublicProfileComponent },
+  { path: '**', redirectTo: '' }
 ];
