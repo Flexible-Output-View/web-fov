@@ -1,20 +1,56 @@
 #!/bin/bash
 
-set -euox
+set -euo pipefail
 
 API_URL="${API_URL:-http://localhost:8080}"
 PUBLISH_URL="${API_URL}/ffmpeg/register"
 SRT_URL="${SRT_URL:-srt://localhost:9999}"
 
-curl --header "Content-Type: application/json" \
+# Ingest is key-only: the demo account is created (or reused) and its real
+# backend-generated stream key is used to register the stream. There is no
+# hardcoded or arbitrary stream id.
+DEMO_USERNAME="${DEMO_USERNAME:-FOVDemo}"
+DEMO_EMAIL="${DEMO_EMAIL:-fovdemo@integration.local}"
+DEMO_PASSWORD="${DEMO_PASSWORD:-FOVDemoPassword123!}"
+
+curl --silent --show-error \
+  --header "Content-Type: application/json" \
   --request POST \
-  --data '{
-    "streamId": "FOVDemo",
-    "tracks": 2,
-    "videoTrackNames": ["BigBuckBunny", "Caminandes 2: Gran Dillama"],
-    "audioTracks": 2,
-    "audioTrackNames": ["BigBuckBunny", "Caminandes 2: Gran Dillama"]
-  }' \
+  --data "{\"username\":\"${DEMO_USERNAME}\",\"email\":\"${DEMO_EMAIL}\",\"password\":\"${DEMO_PASSWORD}\"}" \
+  "${API_URL}/api/auth/register" > /dev/null || true
+
+TOKEN="$(curl --silent --show-error \
+  --header "Content-Type: application/json" \
+  --request POST \
+  --data "{\"login\":\"${DEMO_USERNAME}\",\"password\":\"${DEMO_PASSWORD}\"}" \
+  "${API_URL}/api/auth/login" | jq -r '.token // empty')"
+
+if [ -z "${TOKEN}" ]; then
+  echo "Unable to authenticate the demo account" >&2
+  exit 1
+fi
+
+STREAM_KEY="$(curl --silent --show-error \
+  --header "Authorization: Bearer ${TOKEN}" \
+  "${API_URL}/api/streams/me/stream-key" | jq -r '.streamKey // empty')"
+
+if [ -z "${STREAM_KEY}" ]; then
+  echo "The backend did not return a stream key for the demo account" >&2
+  exit 1
+fi
+
+curl --fail --silent --show-error \
+  --header "Content-Type: application/json" \
+  --request POST \
+  --data "$(jq -n \
+    --arg streamKey "${STREAM_KEY}" \
+    '{
+      streamId: $streamKey,
+      tracks: 2,
+      videoTrackNames: ["BigBuckBunny", "Caminandes 2: Gran Dillama"],
+      audioTracks: 2,
+      audioTrackNames: ["BigBuckBunny", "Caminandes 2: Gran Dillama"]
+    }')" \
   "$PUBLISH_URL"
 
 ffmpeg -re \

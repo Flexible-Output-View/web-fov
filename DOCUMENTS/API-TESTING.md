@@ -750,8 +750,21 @@ curl -X POST http://localhost:4000/ffmpeg/register \
 
 The response contains the internal `streamId: "u12"` (HLS directory) and the SRT
 URL. The stream key never appears in HLS paths or public stream URLs; the public
-stream URL is `/stream/<username>` (here `/stream/alice`). To stop an owned stream, send the
-same key back:
+stream URL is `/stream/<username>` (here `/stream/alice`).
+
+Ingest is key-only. A missing `streamId`, a malformed key, a key that does not
+belong to any account, and a key revoked by rotation are all refused before an
+SRT listener is created:
+
+```json
+{ "error": "Invalid stream key" }
+```
+
+Status: `401`. Legacy arbitrary ids (`streamId: "FOVDemo"`), usernames, and
+internal `u<userId>` ids are not credentials and are refused as well.
+
+To stop an owned stream, send the same key back. An invalid or revoked key is
+refused with `401` and does not stop any running stream:
 
 ```bash
 curl -X POST http://localhost:4000/ffmpeg/stop \

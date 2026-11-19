@@ -412,11 +412,12 @@ const swaggerDocument = {
             post: {
                 tags: ['FFmpeg'],
                 summary: 'Register an arriving stream and create an SRT listener',
-                description: 'The encoder sends the key shown on the configuration page as `streamId`. The backend resolves it to the owner and links the stream at registration time.',
+                description: 'The encoder sends the key shown on the configuration page as `streamId`. The key must exist and be active: missing, malformed, unknown, revoked, or legacy arbitrary ids are refused with `401 { "error": "Invalid stream key" }` and no SRT listener is created.',
                 requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterStreamRequest' } } } },
                 responses: {
                     200: { description: 'Stream registered' },
                     400: { $ref: '#/components/responses/BadRequest' },
+                    401: { $ref: '#/components/responses/Unauthorized' },
                     409: { description: 'Stream ID already registered' }
                 }
             }
@@ -429,6 +430,7 @@ const swaggerDocument = {
                 responses: {
                     200: { description: 'Stop result' },
                     400: { $ref: '#/components/responses/BadRequest' },
+                    401: { $ref: '#/components/responses/Unauthorized' },
                     500: { $ref: '#/components/responses/ServerError' }
                 }
             }
@@ -613,7 +615,7 @@ const swaggerDocument = {
                 properties: {
                     tracks: { type: 'integer', minimum: 1 },
                     audioTracks: { type: 'integer', minimum: 1 },
-                    streamId: { type: 'string', description: 'The stream key shown on the configuration page when an owned stream arrives. When it matches a key, the stream is linked to its owner and stored under the internal `u<userId>` HLS directory; the public URL is `/stream/<username>`. Legacy arbitrary ids keep working.' },
+                    streamId: { type: 'string', description: 'Required. The active stream key shown on the configuration page. It is resolved to its owner and stored under the internal `u<userId>` HLS directory; the public URL is `/stream/<username>`. Missing, malformed, unknown, or revoked keys are refused with 401.' },
                     videoTrackNames: {
                         type: 'array',
                         items: {
@@ -636,7 +638,7 @@ const swaggerDocument = {
                 type: 'object',
                 required: ['streamId'],
                 properties: {
-                    streamId: { type: 'string', description: 'The key the stream arrived with, `u<userId>`, or a legacy arbitrary id' }
+                    streamId: { type: 'string', description: 'The active stream key the stream arrived with. Invalid, unknown, or revoked keys are refused with 401 and the running stream is left untouched.' }
                 }
             }
         },

@@ -1,6 +1,6 @@
 FROM debian:13.7-slim
 
-RUN apt update && apt install ffmpeg curl wget unzip -y
+RUN apt update && apt install ffmpeg curl jq wget unzip -y
 
 WORKDIR /pub
 

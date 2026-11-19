@@ -39,9 +39,29 @@ function createProcess({ exitsOnSigint = false } = {}) {
     return process;
 }
 
-function createApp(options) {
+// Deterministic, correctly-shaped keys so tests exercise the production
+// format without needing a database. `knownKeys` maps each key to the internal
+// stream id the fake resolver will return.
+const knownKeys = new Map();
+
+function keyFor(streamId) {
+    const suffix = Buffer.from(String(streamId))
+        .toString('base64url')
+        .padEnd(43, '0')
+        .slice(0, 43);
+    const key = `fov_${suffix}`;
+    knownKeys.set(key, String(streamId));
+    return key;
+}
+
+function createApp(options = {}) {
     const app = express();
-    app.use(createMediaRoutes(options));
+    const resolveStreamKey = options.resolveStreamKey
+        || (async (key) => {
+            const streamId = knownKeys.get(key);
+            return streamId ? { userId: 1, streamId } : null;
+        });
+    app.use(createMediaRoutes({ ...options, resolveStreamKey }));
     return app;
 }
 
@@ -49,6 +69,7 @@ describe('Media server lifecycle', () => {
     beforeEach(() => {
         jest.useRealTimers();
         spawnMock.mockReset();
+        knownKeys.clear();
         ffmpegProcesses.clear();
         registeredStreams.clear();
         fs.rmSync(mediaRoot, { recursive: true, force: true });
@@ -76,7 +97,7 @@ describe('Media server lifecycle', () => {
         const app = createApp();
 
         const response = await request(app).post('/ffmpeg/register').send({
-            streamId: 'spawn-error',
+            streamId: keyFor('spawn-error'),
             tracks: 1,
             audioTracks: 1
         });
@@ -92,7 +113,7 @@ describe('Media server lifecycle', () => {
         const replacement = createProcess();
         spawnMock.mockReturnValue(replacement);
         const reused = await request(app).post('/ffmpeg/register').send({
-            streamId: 'replacement',
+            streamId: keyFor('replacement'),
             tracks: 1,
             audioTracks: 1
         });
@@ -106,8 +127,9 @@ describe('Media server lifecycle', () => {
         const invalid = await request(app).post('/ffmpeg/register').send({ tracks: 0, audioTracks: 1 });
         expect(invalid.status).toBe(400);
 
+        const debugKey = keyFor('debug-stream');
         const debug = await request(app).post('/ffmpeg/register/debug').send({
-            streamId: 'debug-stream',
+            streamId: debugKey,
             tracks: 1,
             audioTracks: 1
         });
@@ -115,7 +137,7 @@ describe('Media server lifecycle', () => {
         expect(debug.body.srtUrl).toBe('srt://0.0.0.0:5555?mode=listener');
 
         const duplicate = await request(app).post('/ffmpeg/register/debug').send({
-            streamId: 'debug-stream',
+            streamId: debugKey,
             tracks: 1,
             audioTracks: 1
         });
@@ -155,6 +177,7 @@ describe('Media server lifecycle', () => {
 
         expect(response.status).toBe(401);
         expect(response.body).toEqual({ error: 'Invalid stream key' });
+        expect(spawnMock).not.toHaveBeenCalled();
         expect(ffmpegProcesses.size).toBe(0);
         expect(registeredStreams.size).toBe(0);
     });
@@ -173,6 +196,115 @@ describe('Media server lifecycle', () => {
         expect(response.body).toEqual({ error: 'Invalid stream key' });
         expect(resolveStreamKey).not.toHaveBeenCalled();
         expect(ffmpegProcesses.size).toBe(0);
+    });
+
+    test('refuses registration when no stream key is provided', async () => {
+        const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
+        const app = createApp({ resolveStreamKey });
+
+        const response = await request(app).post('/ffmpeg/register').send({
+            tracks: 1,
+            audioTracks: 1
+        });
+
+        expect(response.status).toBe(401);
+        expect(response.body).toEqual({ error: 'Invalid stream key' });
+        expect(resolveStreamKey).not.toHaveBeenCalled();
+        expect(spawnMock).not.toHaveBeenCalled();
+        expect(ffmpegProcesses.size).toBe(0);
+        expect(registeredStreams.size).toBe(0);
+    });
+
+    test('refuses legacy arbitrary stream ids and usernames', async () => {
+        const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
+        const app = createApp({ resolveStreamKey });
+
+        for (const streamId of ['FOVDemo', 'alice', 'stream-0', 'u12']) {
+            const response = await request(app).post('/ffmpeg/register').send({
+                streamId,
+                tracks: 1,
+                audioTracks: 1
+            });
+
+            expect(response.status).toBe(401);
+            expect(response.body).toEqual({ error: 'Invalid stream key' });
+        }
+
+        expect(resolveStreamKey).not.toHaveBeenCalled();
+        expect(spawnMock).not.toHaveBeenCalled();
+        expect(ffmpegProcesses.size).toBe(0);
+        expect(registeredStreams.size).toBe(0);
+    });
+
+    test('refuses malformed stream keys before querying the database', async () => {
+        const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
+        const app = createApp({ resolveStreamKey });
+
+        for (const streamId of [
+            'fov_',
+            'fov_short',
+            `fov_${'a'.repeat(42)}`,
+            `fov_${'a'.repeat(44)}`,
+            `fov_${'a'.repeat(42)}!`,
+            `FOV_${'a'.repeat(43)}`
+        ]) {
+            const response = await request(app).post('/ffmpeg/register').send({
+                streamId,
+                tracks: 1,
+                audioTracks: 1
+            });
+
+            expect(response.status).toBe(401);
+            expect(response.body).toEqual({ error: 'Invalid stream key' });
+        }
+
+        expect(resolveStreamKey).not.toHaveBeenCalled();
+        expect(spawnMock).not.toHaveBeenCalled();
+        expect(ffmpegProcesses.size).toBe(0);
+    });
+
+    test('refuses an invalid key on the debug registration endpoint', async () => {
+        const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
+        const app = createApp({ resolveStreamKey });
+
+        const response = await request(app).post('/ffmpeg/register/debug').send({
+            streamId: 'debug-stream',
+            tracks: 1,
+            audioTracks: 1
+        });
+
+        expect(response.status).toBe(401);
+        expect(response.body).toEqual({ error: 'Invalid stream key' });
+        expect(resolveStreamKey).not.toHaveBeenCalled();
+        expect(spawnMock).not.toHaveBeenCalled();
+        expect(registeredStreams.size).toBe(0);
+    });
+
+    test('refuses stop requests with an invalid key without touching the stream', async () => {
+        const process = createProcess({ exitsOnSigint: true });
+        spawnMock.mockReturnValue(process);
+        const validKey = `fov_${'e'.repeat(43)}`;
+        const resolveStreamKey = jest.fn(async (key) => (
+            key === validKey ? { userId: 12, streamId: 'u12' } : null
+        ));
+        const app = createApp({ resolveStreamKey });
+
+        await request(app).post('/ffmpeg/register').send({
+            streamId: validKey,
+            tracks: 1,
+            audioTracks: 1
+        });
+        expect(registeredStreams.has('u12')).toBe(true);
+
+        for (const streamId of ['u12', 'alice', `fov_${'z'.repeat(43)}`]) {
+            const refused = await request(app).post('/ffmpeg/stop').send({ streamId });
+            expect(refused.status).toBe(401);
+            expect(refused.body).toEqual({ error: 'Invalid stream key' });
+        }
+
+        expect(process.kill).not.toHaveBeenCalled();
+        expect(registeredStreams.has('u12')).toBe(true);
+        expect(ffmpegProcesses.has('u12')).toBe(true);
     });
 
     test('resolves the arriving key when stopping an owned stream', async () => {
@@ -200,7 +332,7 @@ describe('Media server lifecycle', () => {
         spawnMock.mockReturnValue(process);
         const app = createApp();
 
-        await request(app).post('/ffmpeg/register').send({ streamId: 'status-stream', tracks: 1, audioTracks: 1 });
+        await request(app).post('/ffmpeg/register').send({ streamId: keyFor('status-stream'), tracks: 1, audioTracks: 1 });
 
         const active = await request(app).get('/ffmpeg/status').query({ streamId: 'status-stream' });
         expect(active.status).toBe(200);
@@ -227,12 +359,12 @@ describe('Media server lifecycle', () => {
         const missingParameter = await request(app).post('/ffmpeg/stop').send({});
         expect(missingParameter.status).toBe(400);
 
-        const missing = await request(app).post('/ffmpeg/stop').send({ streamId: 'missing' });
+        const missing = await request(app).post('/ffmpeg/stop').send({ streamId: keyFor('missing') });
         expect(missing.status).toBe(200);
         expect(missing.body).toEqual({ status: 'not_found', streamId: 'missing' });
 
-        await request(app).post('/ffmpeg/register/debug').send({ streamId: 'debug-stop', tracks: 1, audioTracks: 1 });
-        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: 'debug-stop' });
+        await request(app).post('/ffmpeg/register/debug').send({ streamId: keyFor('debug-stop'), tracks: 1, audioTracks: 1 });
+        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: keyFor('debug-stop') });
         expect(stopped.status).toBe(200);
         expect(registeredStreams.has('debug-stop')).toBe(false);
     });
@@ -258,12 +390,12 @@ describe('Media server lifecycle', () => {
         spawnMock.mockReturnValue(oldProcess);
         const app = createApp();
 
-        await request(app).post('/ffmpeg/register').send({ streamId: 'same-id', tracks: 1, audioTracks: 1 });
-        await request(app).post('/ffmpeg/stop').send({ streamId: 'same-id' });
+        await request(app).post('/ffmpeg/register').send({ streamId: keyFor('same-id'), tracks: 1, audioTracks: 1 });
+        await request(app).post('/ffmpeg/stop').send({ streamId: keyFor('same-id') });
 
         const newProcess = createProcess();
         spawnMock.mockReturnValue(newProcess);
-        await request(app).post('/ffmpeg/register').send({ streamId: 'same-id', tracks: 1, audioTracks: 1 });
+        await request(app).post('/ffmpeg/register').send({ streamId: keyFor('same-id'), tracks: 1, audioTracks: 1 });
         const hlsFolder = path.join(mediaRoot, 'hls', 'same-id');
 
         oldProcess.emit('exit', 0, 'SIGINT');
@@ -282,7 +414,7 @@ describe('Media server lifecycle', () => {
             processes.push(process);
             spawnMock.mockReturnValueOnce(process);
             const response = await request(app).post('/ffmpeg/register').send({
-                streamId: `stream-${index}`,
+                streamId: keyFor(`stream-${index}`),
                 tracks: 1,
                 audioTracks: 1
             });
@@ -290,7 +422,7 @@ describe('Media server lifecycle', () => {
             expect(response.body.srtUrl).toContain(`:${9999 + index}?`);
         }
 
-        const exhausted = await request(app).post('/ffmpeg/register').send({ streamId: 'exhausted', tracks: 1, audioTracks: 1 });
+        const exhausted = await request(app).post('/ffmpeg/register').send({ streamId: keyFor('exhausted'), tracks: 1, audioTracks: 1 });
         expect(exhausted.status).toBe(503);
 
         processes[0].kill.mockImplementation(signal => {
@@ -299,12 +431,12 @@ describe('Media server lifecycle', () => {
                 processes[0].emit('exit', 0, signal);
             }
         });
-        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: 'stream-0' });
+        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: keyFor('stream-0') });
         expect(stopped.status).toBe(200);
 
         const replacement = createProcess();
         spawnMock.mockReturnValue(replacement);
-        const reused = await request(app).post('/ffmpeg/register').send({ streamId: 'reused', tracks: 1, audioTracks: 1 });
+        const reused = await request(app).post('/ffmpeg/register').send({ streamId: keyFor('reused'), tracks: 1, audioTracks: 1 });
         expect(reused.status).toBe(200);
         expect(reused.body.srtUrl).toContain(':9999?');
     });

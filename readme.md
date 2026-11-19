@@ -189,6 +189,12 @@ npm start  # Runs on http://localhost:4200
 
 ### SRT Configuration
 
+Encoders must first register with the stream key shown on the stream
+configuration page (`POST /ffmpeg/register`, with the key in `streamId`). The
+register request is refused with `401 { "error": "Invalid stream key" }` when
+the key is missing, malformed, unknown, or revoked, and only then is an SRT
+listener created for that stream.
+
 Encoders should use these settings:
 
 | Setting | Value |

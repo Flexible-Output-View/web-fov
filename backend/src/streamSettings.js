@@ -1,10 +1,11 @@
 import { randomBytes } from 'crypto';
 import db from './db.js';
+import { STREAM_KEY_PREFIX, isStreamKeyFormat } from './streamKey.js';
 
-const STREAM_KEY_PREFIX = 'fov_';
 const STREAM_KEY_BYTES = 32;
 const STREAM_KEY_ATTEMPTS = 5;
-const MAX_STREAM_KEY_LENGTH = 64;
+
+export { isStreamKeyFormat };
 
 export const STREAM_VISIBILITIES = ['public', 'unlisted', 'private'];
 
@@ -33,13 +34,6 @@ const SETTINGS_SELECT = `
  */
 export function generateStreamKey() {
     return `${STREAM_KEY_PREFIX}${randomBytes(STREAM_KEY_BYTES).toString('base64url')}`;
-}
-
-export function isStreamKeyFormat(value) {
-    return typeof value === 'string'
-        && value.length >= 8
-        && value.length <= MAX_STREAM_KEY_LENGTH
-        && /^[A-Za-z0-9_-]+$/.test(value);
 }
 
 /**
