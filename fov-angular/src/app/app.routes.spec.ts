@@ -36,10 +36,15 @@ describe('app routes', () => {
     }
   });
 
-    it('redirects unknown paths to the home page', () => {
+  it('redirects unknown paths to the home page', () => {
     const wildcard = routes.find((r) => r.path === '**');
     expect(wildcard).toBeTruthy();
     expect(wildcard!.redirectTo).toBe('');
+  });
+
+  it('declares the ** wildcard route last', () => {
+    expect(paths.indexOf('**')).toBe(paths.length - 1);
+    expect(paths.filter((path) => path === '**').length).toBe(1);
   });
 
   it('protects dashboard/stream with authGuard', () => {
