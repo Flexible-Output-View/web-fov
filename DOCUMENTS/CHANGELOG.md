@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Swagger documentation for auth endpoints (`/api-docs`)
 - Angular `AuthService` with `/login` and `/register` pages (token persisted as `fov_auth_token` / `fov_auth_user`)
 - Postgres 18 as the documented and deployed database (`pg` Pool, `fovwebdb.sql` Postgres schema)
+- Public streams now appear on their owner's profile; unlisted and private streams stay hidden from it while remaining reachable by direct link (unlisted) or by the owner (private)
+
+### Changed
+- Stream URLs are now `/stream/<username>` instead of `/stream/u<userId>`. The internal `u<userId>` id is kept for HLS directories and legacy links, and old `/stream/u<userId>` URLs redirect to the username.
 
 ### Planned Features
 - Input validation & sanitization middleware (beyond auth)

@@ -248,3 +248,6 @@ dist
 
 tmp
 tmp/**
+
+# Generated SBOMs (see DOCUMENTS/DEPENDENCY-TRACK.md)
+/sbom/

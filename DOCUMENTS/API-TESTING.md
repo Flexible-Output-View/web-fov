@@ -670,7 +670,7 @@ curl http://localhost:4000/api/streams/me \
 **Response (200 OK):**
 ```json
 {
-  "streamId": "u12",
+  "streamId": "alice",
   "title": "Ranked grind",
   "description": "Climbing the ladder",
   "visibility": "public",
@@ -704,7 +704,7 @@ curl -X PUT http://localhost:4000/api/streams/me \
 `visibility` is one of `public`, `unlisted`, or `private`:
 
 - `public` — listed in discovery.
-- `unlisted` — hidden from discovery, reachable via `/api/streams/u<userId>/live`.
+- `unlisted` — hidden from discovery, reachable via `/api/streams/<username>/live`.
 - `private` — only readable by the authenticated owner.
 
 A `streamKey` sent in this body is ignored: clients cannot choose their key.
@@ -720,7 +720,7 @@ curl http://localhost:4000/api/streams/me/stream-key \
 ```json
 {
   "streamKey": "fov_...",
-  "streamId": "u12",
+  "streamId": "alice",
   "isLive": false,
   "updatedAt": "2026-10-23T12:00:00.000Z"
 }
@@ -733,7 +733,7 @@ curl -X POST http://localhost:4000/api/streams/me/stream-key/rotate \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-The previous key is revoked immediately. The returned `streamId` (`u<userId>`)
+The previous key is revoked immediately. The returned `streamId` (the username)
 does not change. A stream that is already running keeps running; rotate only
 prevents new ingest registrations with the old key.
 
@@ -748,8 +748,9 @@ curl -X POST http://localhost:4000/ffmpeg/register \
   -d '{"streamId": "fov_...", "tracks": 2, "audioTracks": 2}'
 ```
 
-The response contains `streamId: "u12"` and the SRT URL. The stream key never
-appears in HLS paths or public stream URLs. To stop an owned stream, send the
+The response contains the internal `streamId: "u12"` (HLS directory) and the SRT
+URL. The stream key never appears in HLS paths or public stream URLs; the public
+stream URL is `/stream/<username>` (here `/stream/alice`). To stop an owned stream, send the
 same key back:
 
 ```bash
@@ -761,9 +762,11 @@ curl -X POST http://localhost:4000/ffmpeg/stop \
 ### Direct-link live stream (GET)
 
 ```bash
-curl http://localhost:4000/api/streams/u12/live \
+curl http://localhost:4000/api/streams/alice/live \
   -H "Authorization: Bearer $TOKEN" # required for private streams only
 ```
+
+`/api/streams/u12/live` keeps working for legacy links.
 
 Returns the live stream and its HLS tracks, enforcing the visibility rules.
 

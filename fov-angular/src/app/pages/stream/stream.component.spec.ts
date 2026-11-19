@@ -134,6 +134,18 @@ describe('StreamComponent', () => {
       expect(viewerPresence.start).toHaveBeenCalledWith('s1');
     }));
 
+    it('should rewrite legacy ids to the canonical username URL', fakeAsync(() => {
+      liveStreamsService.getStreamById.and.returnValue(
+        of({ ...mockStream, streamId: 'alice' }),
+      );
+      fixture.detectChanges();
+      tick();
+
+      expect(router.navigate).toHaveBeenCalledWith(['/stream', 'alice'], {
+        replaceUrl: true,
+      });
+    }));
+
     it('should retry when stream is null', fakeAsync(() => {
       liveStreamsService.getStreamById.and.returnValue(of(null));
       fixture.detectChanges();

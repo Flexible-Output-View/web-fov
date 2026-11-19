@@ -7,6 +7,7 @@ import {
   switchMap,
   startWith,
   catchError,
+  throwError,
   of,
   map,
 } from 'rxjs';
@@ -49,13 +50,29 @@ export class LiveStreamsService {
     );
   }
 
+  /**
+   * Fetch one stream by its public handle (the streamer username, or a legacy
+   * `u<id>` / numeric id). Uses the visibility-aware direct endpoint, so
+   * unlisted links and owners opening their private stream keep working while
+   * the discovery listing stays public-only.
+   */
   getStreamById(streamId: string): Observable<LiveStreamInfo | null> {
-    return this.getAvailableStreams().pipe(
-      map((response) => {
-        const stream = response.streams.find((s) => s.streamId === streamId);
-        return stream || null;
-      }),
-    );
+    return this.http
+      .get<LiveStreamInfo>(
+        `${this.API_URL}/streams/${encodeURIComponent(streamId)}/live`,
+      )
+      .pipe(
+        map((stream) =>
+          stream && (stream.trackCount ?? 0) > 0 ? stream : null,
+        ),
+        catchError((err) => {
+          // 404 simply means "not live right now"; the page retries.
+          if (err?.status === 404) {
+            return of(null);
+          }
+          return throwError(() => err);
+        }),
+      );
   }
 
   startPolling(): void {

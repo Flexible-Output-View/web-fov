@@ -145,7 +145,7 @@ describe('Stream settings routes', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
-            streamId: 'u1',
+            streamId: 'alice',
             title: 'alice',
             description: '',
             visibility: 'public',
@@ -241,7 +241,7 @@ describe('Stream settings routes', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
-            streamId: 'u1',
+            streamId: 'alice',
             title: 'Ranked grind',
             description: 'Climbing the ladder',
             visibility: 'unlisted',
@@ -291,7 +291,7 @@ describe('Stream settings routes', () => {
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
             streamKey: 'fov_existing_key_1234567890',
-            streamId: 'u1',
+            streamId: 'alice',
             isLive: true
         });
     });
@@ -304,7 +304,7 @@ describe('Stream settings routes', () => {
         expect(response.status).toBe(200);
         expect(response.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
         expect(response.body.streamKey).not.toBe('fov_old_key');
-        expect(response.body.streamId).toBe('u1');
+        expect(response.body.streamId).toBe('alice');
         expect(db.getState().stream_key).toBe(response.body.streamKey);
     });
 

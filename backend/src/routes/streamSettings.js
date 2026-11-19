@@ -8,6 +8,7 @@ import {
     rotateStreamKey,
     serializeSettings,
     toPublicStreamId,
+    toStreamHandle,
     updateSettings
 } from '../streamSettings.js';
 
@@ -84,16 +85,16 @@ function withLiveStatus(row) {
     const settings = serializeSettings(row);
     return {
         ...settings,
-        isLive: ffmpegProcesses.has(settings.streamId)
+        // FFmpeg keys processes by the internal `u<id>` directory id.
+        isLive: ffmpegProcesses.has(toPublicStreamId(row.user_id))
     };
 }
 
 function streamKeyResponse(row) {
-    const streamId = toPublicStreamId(row.user_id);
     return {
         streamKey: row.stream_key,
-        streamId,
-        isLive: ffmpegProcesses.has(streamId),
+        streamId: toStreamHandle(row),
+        isLive: ffmpegProcesses.has(toPublicStreamId(row.user_id)),
         updatedAt: row.updated_at
     };
 }

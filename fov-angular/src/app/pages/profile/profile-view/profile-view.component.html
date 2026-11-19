@@ -72,6 +72,28 @@
     </div>
   </div>
 
+  <section class="profile-stream" *ngIf="profile.stream as stream" aria-labelledby="profile-stream-title">
+    <a class="stream-card"
+       [routerLink]="['/stream', stream.streamId]"
+       [attr.aria-label]="(stream.isLive ? 'Regarder le direct de ' : 'Voir la chaîne de ') + profile.username">
+      <div class="stream-thumbnail"
+           [style.background-image]="stream.thumbnailUrl ? 'url(' + stream.thumbnailUrl + ')' : null"
+           [class.empty]="!stream.thumbnailUrl">
+        <span class="stream-status" [class.live]="stream.isLive">
+          {{ stream.isLive ? 'EN DIRECT' : 'Hors ligne' }}
+        </span>
+      </div>
+      <div class="stream-meta">
+        <h2 id="profile-stream-title">{{ stream.title || profile.username }}</h2>
+        <p class="stream-category" *ngIf="stream.category">{{ stream.category }}</p>
+        <p class="stream-description" *ngIf="stream.description">{{ stream.description }}</p>
+        <span class="stream-cta">
+          {{ stream.isLive ? 'Regarder le stream' : 'Voir la chaîne' }}
+        </span>
+      </div>
+    </a>
+  </section>
+
   <div class="profile-content" *ngIf="isOwnProfile">
     <button class="btn-logout" (click)="logout()">
       Se déconnecter

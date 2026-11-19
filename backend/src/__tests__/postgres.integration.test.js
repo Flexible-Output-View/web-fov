@@ -210,13 +210,12 @@ app.use((err, req, res, _next) => {
         expect(registration.status).toBe(201);
 
         const token = registration.body.token;
-        const userId = registration.body.user.id;
         const auth = { Authorization: `Bearer ${token}` };
 
         const initial = await request(app).get('/api/streams/me').set(auth);
         expect(initial.status).toBe(200);
         expect(initial.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
-        expect(initial.body.streamId).toBe(`u${userId}`);
+        expect(initial.body.streamId).toBe(username);
         expect(initial.body.title).toBe(username);
         expect(initial.body.visibility).toBe('public');
         expect(initial.body.isLive).toBe(false);
@@ -255,10 +254,29 @@ app.use((err, req, res, _next) => {
         expect(rotated.status).toBe(200);
         expect(rotated.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
         expect(rotated.body.streamKey).not.toBe(initial.body.streamKey);
-        expect(rotated.body.streamId).toBe(`u${userId}`);
+        expect(rotated.body.streamId).toBe(username);
 
         const afterRotation = await request(app).get('/api/streams/me/stream-key').set(auth);
         expect(afterRotation.body.streamKey).toBe(rotated.body.streamKey);
+
+        // Unlisted streams stay off the profile but keep their direct link.
+        const unlistedProfile = await request(app).get(`/api/users/${username}`);
+        expect(unlistedProfile.status).toBe(200);
+        expect(unlistedProfile.body).not.toHaveProperty('stream');
+
+        const makePublic = await request(app)
+            .put('/api/streams/me')
+            .set(auth)
+            .send({ visibility: 'public' });
+        expect(makePublic.status).toBe(200);
+
+        const publicProfile = await request(app).get(`/api/users/${username}`);
+        expect(publicProfile.status).toBe(200);
+        expect(publicProfile.body.stream).toMatchObject({
+            streamId: username,
+            title: 'Ranked grind',
+            isLive: false
+        });
 
         const anonymous = await request(app).get('/api/streams/me');
         expect(anonymous.status).toBe(401);

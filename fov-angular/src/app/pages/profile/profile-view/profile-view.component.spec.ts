@@ -115,6 +115,40 @@ describe('ProfileViewComponent', () => {
       fixture.detectChanges();
       expect(userService.getProfileByUsername).not.toHaveBeenCalled();
     });
+
+    it('should render the public stream with a username URL', () => {
+      userService.getProfileByUsername.and.returnValue(
+        of({
+          ...mockProfile,
+          stream: {
+            streamId: 'alice',
+            title: 'Ranked grind',
+            description: 'Climbing the ladder',
+            thumbnailUrl: '',
+            category: 'Just Chatting',
+            isLive: true,
+          },
+        }),
+      );
+
+      fixture.detectChanges();
+
+      const link = (fixture.nativeElement as HTMLElement).querySelector(
+        '.profile-stream a',
+      ) as HTMLAnchorElement | null;
+      expect(link).toBeTruthy();
+      expect(link?.getAttribute('href')).toBe('/stream/alice');
+      expect(link?.textContent).toContain('EN DIRECT');
+      expect(link?.textContent).toContain('Ranked grind');
+    });
+
+    it('should not render a stream section without a public stream', () => {
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('.profile-stream'),
+      ).toBeNull();
+    });
   });
 
   describe('ngOnChanges', () => {

@@ -11,6 +11,9 @@ A flexible, customizable video streaming platform that allows streamers to broad
 | **Backend Coverage** | [![Backend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/main?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/main) | [![Backend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/dev?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev) |
 | **Frontend Coverage** | [![Frontend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/main?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/main) | [![Frontend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/dev?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev) |
 
+Dependency and vulnerability tracking: see
+[DOCUMENTS/DEPENDENCY-TRACK.md](DOCUMENTS/DEPENDENCY-TRACK.md).
+
 
 ## 📋 Project Overview
 

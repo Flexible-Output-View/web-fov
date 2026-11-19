@@ -1950,127 +1950,75 @@ describe('FovPlayerComponent', () => {
   // ---------------------------------------------------------------
 
   describe('fetchAvailableTracks', () => {
-    it('calls the correct API endpoint', () => {
+    const liveEndpoint = `${environment.apiUrl}/streams/test-stream/live`;
+
+    it('calls the direct live endpoint for its stream', () => {
       (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
+      const req = httpMock.expectOne(liveEndpoint);
       expect(req.request.method).toBe('GET');
-      req.flush({ streams: [] });
+      req.flush({ streamId: 'test-stream', trackCount: 0, tracks: [] });
     });
 
-    it('handles legacy API format with no data by polling', () => {
+    it('polls when the response has no tracks', () => {
       spyOn<any>(component, 'startPolling');
       (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
-      req.flush({});
+      const req = httpMock.expectOne(liveEndpoint);
+      req.flush({ streamId: 'test-stream', trackCount: 0, tracks: [] });
 
       expect((component as any).startPolling).toHaveBeenCalled();
     });
 
-    it('handles errors by polling (with retry budget)', () => {
+    it('polls on 404 without flagging a hard error', () => {
       spyOn<any>(component, 'startPolling');
       (component as any).pollAttempts = 0;
 
       (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
+      const req = httpMock.expectOne(liveEndpoint);
+      req.flush({ error: 'Stream not found' }, { status: 404, statusText: 'Not Found' });
+
+      expect((component as any).startPolling).toHaveBeenCalled();
+      expect(component.errorMessage).toBe('');
+    });
+
+    it('handles errors by polling (with retry budget)', () => {
+      spyOn<any>(component, 'startPolling');
+      spyOn(console, 'error');
+      (component as any).pollAttempts = 0;
+
+      (component as any).fetchAvailableTracks();
+      const req = httpMock.expectOne(liveEndpoint);
       req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
 
       expect((component as any).startPolling).toHaveBeenCalled();
     });
 
     it('shows error message when retry budget is exhausted', () => {
+      spyOn(console, 'error');
       (component as any).pollAttempts = 60;
 
       (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
+      const req = httpMock.expectOne(liveEndpoint);
       req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
 
       expect(component.isLoading).toBe(false);
       expect(component.errorMessage).toContain('Impossible');
     });
 
-    it('handles array API format with matching stream', fakeAsync(() => {
+    it('loads tracks from a matching live stream', fakeAsync(() => {
       spyOn<any>(component, 'waitForPlaylistsReady').and.returnValue(Promise.resolve());
       spyOn<any>(component, 'initializeAllTracks');
 
       (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
-      req.flush([{
+      const req = httpMock.expectOne(liveEndpoint);
+      req.flush({
         streamId: 'test-stream',
         trackCount: 1,
         tracks: [{ trackId: 't1', name: 'Track 1', videoUrl: 'url1', isVideo: true, isAudio: false }],
-      }]);
-      flush();
-
-      expect(component.availableTracks.length).toBe(1);
-    }));
-
-    it('handles new API format with matching stream', fakeAsync(() => {
-      spyOn<any>(component, 'waitForPlaylistsReady').and.returnValue(Promise.resolve());
-      spyOn<any>(component, 'initializeAllTracks');
-
-      (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
-      req.flush({
-        streamCount: 1,
-        streams: [{
-          streamId: 'test-stream',
-          trackCount: 1,
-          tracks: [{ trackId: 't1', name: 'Track 1', videoUrl: 'url1', isVideo: true, isAudio: false }],
-        }],
       });
       flush();
 
       expect(component.availableTracks.length).toBe(1);
     }));
-
-    it('handles legacy API format when ready', () => {
-      spyOn<any>(component, 'initializeAllTracks');
-
-      (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
-      req.flush({
-        tracks: [{ index: 0, name: 'T1', trackId: 't1', videoUrl: 'url1', isVideo: true, isAudio: false }],
-        videoCount: 1,
-        ready: true,
-        totalDirs: 1,
-        pending: 0,
-      });
-
-      expect(component.availableTracks.length).toBe(1);
-      expect(component.isLoading).toBe(false);
-    });
-
-    it('polls when legacy API format is not ready', () => {
-      spyOn<any>(component, 'startPolling');
-
-      (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
-      req.flush({
-        tracks: [],
-        videoCount: 0,
-        ready: false,
-        totalDirs: 2,
-        pending: 2,
-      });
-
-      expect((component as any).startPolling).toHaveBeenCalled();
-    });
-
-    it('shows timeout error for legacy format when attempts exhausted', () => {
-      (component as any).pollAttempts = 60;
-
-      (component as any).fetchAvailableTracks();
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
-      req.flush({
-        tracks: [],
-        videoCount: 0,
-        ready: false,
-        totalDirs: 2,
-        pending: 2,
-      });
-
-      expect(component.errorMessage).toContain('Timeout');
-    });
   });
 
   // ---------------------------------------------------------------
