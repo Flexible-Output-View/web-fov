@@ -309,6 +309,34 @@ const swaggerDocument = {
                 }
             }
         },
+        '/api/users': {
+            get: {
+                tags: ['Users'],
+                summary: 'Search users by username',
+                description: 'Case-insensitive substring match on the username. Usernames starting with the query come first. Returns at most 5 users, and an empty list when the query is empty or longer than 50 characters.',
+                parameters: [{ name: 'q', in: 'query', required: true, schema: { type: 'string', maxLength: 50 } }],
+                responses: {
+                    200: {
+                        description: 'Matching users',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            username: { type: 'string' },
+                                            avatarUrl: { type: 'string' }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    500: { $ref: '#/components/responses/ServerError' }
+                }
+            }
+        },
         '/api/users/{username}': {
             get: {
                 tags: ['Users'],

@@ -124,6 +124,107 @@
           outline-offset: 2px;
         }
       }
+
+      .search-results {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        max-height: 70vh;
+        overflow-y: auto;
+        padding: var(--spacing-xs) 0;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      }
+
+      .search-section-title {
+        margin: 0;
+        padding: 6px 12px 4px;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .search-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .search-result {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 8px 12px;
+        color: var(--text-primary);
+        text-decoration: none;
+
+        &:hover,
+        &:focus-visible {
+          background-color: var(--bg-primary);
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--focus-ring, #1FB8FF);
+          outline-offset: -2px;
+        }
+      }
+
+      .search-result--user {
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .result-main,
+      .result-sub {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      .result-main {
+        font-size: 0.9rem;
+        font-weight: 500;
+      }
+
+      .result-sub {
+        color: var(--text-secondary);
+        font-size: 0.8rem;
+      }
+
+      .result-avatar {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        overflow: hidden;
+        border-radius: 50%;
+        background-color: var(--accent-primary);
+        color: var(--on-accent);
+        font-size: 0.8rem;
+        font-weight: 600;
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+      }
+
+      .search-empty {
+        margin: 0;
+        padding: 8px 12px;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+      }
     }
   }
 
@@ -259,8 +360,8 @@
   transition: border-color 0.2s ease, color 0.2s ease;
 
   &:hover {
-    border-color: #ef4444;
-    color: #ef4444;
+    border-color: var(--danger);
+    color: var(--danger);
   }
 
   &:focus-visible {

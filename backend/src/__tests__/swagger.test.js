@@ -24,6 +24,7 @@ describe('Swagger document', () => {
         expect(swaggerDocument.paths['/api/users/me/password'].put).toBeDefined();
         expect(swaggerDocument.paths['/api/users/{username}/follow'].post).toBeDefined();
         expect(swaggerDocument.paths['/api/users/{username}'].get).toBeDefined();
+        expect(swaggerDocument.paths['/api/users'].get).toBeDefined();
         expect(swaggerDocument.paths['/api/streams/me'].get).toBeDefined();
         expect(swaggerDocument.paths['/api/streams/me'].put).toBeDefined();
         expect(swaggerDocument.paths['/api/streams/me/stream-key'].get).toBeDefined();

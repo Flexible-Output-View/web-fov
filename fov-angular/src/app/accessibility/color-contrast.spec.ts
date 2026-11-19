@@ -5,8 +5,9 @@ import { of } from 'rxjs';
 import { LoginComponent } from '../pages/login/login.component';
 import { FollowedComponent } from '../pages/followed/followed.component';
 import { AuthService } from '../services/auth.service';
-import { UserService } from '../services/user.service';
+import { UserProfile, UserService } from '../services/user.service';
 import { LiveStreamsService } from '../services/live-streams.service';
+import { PersonalSettingsComponent } from '../pages/profile/personal-settings/personal-settings.component';
 
 const WCAG_AA_NORMAL_TEXT = 4.5;
 const THEMES = ['dark', 'light'] as const;
@@ -72,6 +73,84 @@ describe('Accessibilité — contraste des couleurs (WCAG 2.2 AA)', () => {
             .withContext(`--on-accent sur ${token} = ${ratio.toFixed(2)}:1`)
             .toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
         }
+      });
+    }
+  });
+
+  describe('tokens de statut et de fond', () => {
+    const TEXT_TOKENS = ['--text-primary', '--text-secondary', '--danger', '--success', '--warning'];
+    const BACKGROUND_TOKENS = ['--bg-primary', '--bg-secondary', '--bg-tertiary'];
+    const SOLID_TOKENS = [
+      '--danger-solid', '--danger-solid-hover', '--success-solid', '--success-solid-hover', '--live',
+    ];
+
+    for (const theme of THEMES) {
+      it(`les textes sont lisibles sur tous les fonds (thème ${theme})`, () => {
+        applyTheme(theme);
+        const vars = getComputedStyle(document.body);
+        for (const text of TEXT_TOKENS) {
+          for (const background of BACKGROUND_TOKENS) {
+            const ratio = contrastRatio(vars.getPropertyValue(text), vars.getPropertyValue(background));
+            expect(ratio)
+              .withContext(`${text} sur ${background} = ${ratio.toFixed(2)}:1`)
+              .toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
+          }
+        }
+      });
+
+      it(`le texte blanc est lisible sur les fonds de statut (thème ${theme})`, () => {
+        applyTheme(theme);
+        const vars = getComputedStyle(document.body);
+        for (const solid of SOLID_TOKENS) {
+          const ratio = contrastRatio(vars.getPropertyValue('--on-status-solid'), vars.getPropertyValue(solid));
+          expect(ratio)
+            .withContext(`--on-status-solid sur ${solid} = ${ratio.toFixed(2)}:1`)
+            .toBeGreaterThanOrEqual(WCAG_AA_NORMAL_TEXT);
+        }
+      });
+
+      it(`les alias --color-error / --color-success suivent le thème ${theme}`, () => {
+        applyTheme(theme);
+        const vars = getComputedStyle(document.body);
+        expect(vars.getPropertyValue('--color-error').trim()).toBe(vars.getPropertyValue('--danger').trim());
+        expect(vars.getPropertyValue('--color-success').trim()).toBe(vars.getPropertyValue('--success').trim());
+      });
+    }
+  });
+
+  describe('/profile/personal_settings — boutons « Choisir une image » (.btn-file)', () => {
+    beforeEach(async () => {
+      const auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated', 'logout']);
+      auth.isAuthenticated.and.returnValue(true);
+      const profile = {
+        username: 'lucas', bio: '', avatarUrl: '', bannerUrl: '', followersCount: 0, followingCount: 0,
+      } as UserProfile;
+      const users = jasmine.createSpyObj<UserService>(
+        'UserService',
+        ['loadProfile', 'updateProfile', 'changePassword', 'deleteAccount', 'clearProfile'],
+        { currentProfile$: of(profile) },
+      );
+      users.loadProfile.and.returnValue(of(profile));
+
+      await TestBed.configureTestingModule({
+        imports: [PersonalSettingsComponent],
+        providers: [
+          provideRouter([]),
+          { provide: AuthService, useValue: auth },
+          { provide: UserService, useValue: users },
+        ],
+      }).compileComponents();
+    });
+
+    for (const theme of THEMES) {
+      it(`respectent le ratio 4.5:1 (thème ${theme})`, () => {
+        applyTheme(theme);
+        const fixture = TestBed.createComponent(PersonalSettingsComponent);
+        fixture.detectChanges();
+
+        const buttons = Array.from(fixture.nativeElement.querySelectorAll('label.btn-file')) as HTMLElement[];
+        expect(buttons.length).withContext('boutons .btn-file introuvables').toBe(2);
+        buttons.forEach((button, i) => expectReadable(button, `.btn-file #${i + 1} (${theme})`));
       });
     }
   });

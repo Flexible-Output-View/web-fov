@@ -73,6 +73,25 @@ app.use((err, req, res, _next) => {
         expect(badInput.status).toBe(400);
     });
 
+    test('searches users by username with escaped wildcards', async () => {
+        await db.query(
+            `INSERT INTO users (username, email, password_hash, created_at)
+             VALUES (?, ?, 'x', NOW()), (?, ?, 'x', NOW()), (?, ?, 'x', NOW())`,
+            ['ab_cd', 'ab_cd@example.com', 'abxcd', 'abxcd@example.com', 'zab', 'zab@example.com']
+        );
+
+        const prefixFirst = await request(app).get('/api/users').query({ q: 'AB' });
+        expect(prefixFirst.status).toBe(200);
+        expect(prefixFirst.body.map((user) => user.username)).toEqual(['ab_cd', 'abxcd', 'zab']);
+        expect(prefixFirst.body[0]).toEqual({ username: 'ab_cd', avatarUrl: '' });
+
+        const literalUnderscore = await request(app).get('/api/users').query({ q: 'b_c' });
+        expect(literalUnderscore.body.map((user) => user.username)).toEqual(['ab_cd']);
+
+        const noMatch = await request(app).get('/api/users').query({ q: '%' });
+        expect(noMatch.body).toEqual([]);
+    });
+
     test('supports profile update, password change, and follow/unfollow', async () => {
         const register = async (name) => {
             const res = await request(app).post('/api/auth/register').send({

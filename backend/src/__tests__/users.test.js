@@ -464,6 +464,56 @@ describe('Users Routes', () => {
         });
     });
 
+    describe('GET /?q= (search)', () => {
+        test('returns matching users with their avatar', async () => {
+            db.query.mockResolvedValueOnce([
+                { username: 'alice', avatar_url: 'https://example.com/a.png' },
+                { username: 'malice', avatar_url: null }
+            ]);
+
+            const res = await request(app).get('/').query({ q: '  ali ' });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual([
+                { username: 'alice', avatarUrl: 'https://example.com/a.png' },
+                { username: 'malice', avatarUrl: '' }
+            ]);
+            const [sql, params] = db.query.mock.calls[0];
+            expect(sql).toContain('ILIKE');
+            expect(sql).not.toContain('email');
+            expect(params).toEqual(['%ali%', 'ali%', 5]);
+        });
+
+        test('escapes LIKE wildcards in the query', async () => {
+            db.query.mockResolvedValueOnce([]);
+
+            await request(app).get('/').query({ q: '50%_a\\b' });
+
+            const [, params] = db.query.mock.calls[0];
+            expect(params[0]).toBe('%50\\%\\_a\\\\b%');
+        });
+
+        test.each([
+            ['missing', {}],
+            ['blank', { q: '   ' }],
+            ['too long', { q: 'a'.repeat(51) }]
+        ])('returns an empty list without querying when the query is %s', async (_label, query) => {
+            const res = await request(app).get('/').query(query);
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual([]);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        test('forwards database errors', async () => {
+            db.query.mockRejectedValueOnce(new Error('db down'));
+
+            const res = await request(app).get('/').query({ q: 'ali' });
+
+            expect(res.status).toBe(500);
+        });
+    });
+
     describe('GET /:username', () => {
         test('returns a public profile without the email', async () => {
             db.query

@@ -290,6 +290,40 @@ router.delete('/:username/follow', requireAuth, async (req, res, next) => {
     }
 });
 
+const SEARCH_LIMIT = 5;
+const MAX_SEARCH_LENGTH = 50;
+
+function escapeLikePattern(value) {
+    return value.replace(/[\\%_]/g, '\\$&');
+}
+
+// GET /api/users?q=... -> users whose username contains the query
+router.get('/', async (req, res, next) => {
+    try {
+        const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+        if (!query || query.length > MAX_SEARCH_LENGTH) {
+            return res.json([]);
+        }
+
+        const escaped = escapeLikePattern(query);
+        const rows = await db.query(
+            `SELECT username, avatar_url
+             FROM users
+             WHERE username ILIKE ?
+             ORDER BY (username ILIKE ?) DESC, LENGTH(username), username
+             LIMIT ?`,
+            [`%${escaped}%`, `${escaped}%`, SEARCH_LIMIT]
+        );
+
+        res.json(rows.map((row) => ({
+            username: row.username,
+            avatarUrl: row.avatar_url || ''
+        })));
+    } catch (err) {
+        next(err);
+    }
+});
+
 // GET /api/users/:username -> public profile
 router.get('/:username', optionalAuth, async (req, res, next) => {
     try {
