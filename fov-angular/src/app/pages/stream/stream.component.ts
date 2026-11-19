@@ -79,6 +79,14 @@ export class StreamComponent implements OnInit, OnDestroy {
       ).subscribe({
         next: (stream) => {
           if (stream) {
+            // Legacy links (`/stream/u1`, `/stream/1`) resolve to the account.
+            // Move the address bar to the canonical username URL.
+            if (stream.streamId && stream.streamId !== this.streamId) {
+              this.router.navigate(['/stream', stream.streamId], {
+                replaceUrl: true,
+              });
+              return;
+            }
             this.streamInfo = stream;
             this.isLive = true;
             this.isLoading = false;

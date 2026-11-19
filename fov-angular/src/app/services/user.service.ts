@@ -3,6 +3,16 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+export interface ProfileStream {
+  /** Public stream handle: the username. */
+  streamId: string;
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  category: string;
+  isLive: boolean;
+}
+
 export interface UserProfile {
   id?: number;
   username: string;
@@ -13,6 +23,8 @@ export interface UserProfile {
   followersCount: number;
   followingCount: number;
   isFollowing?: boolean;
+  /** Public stream only; unlisted and private streams are omitted. */
+  stream?: ProfileStream | null;
 }
 
 export interface ProfileUpdates {

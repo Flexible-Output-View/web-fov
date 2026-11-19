@@ -58,7 +58,9 @@ describe('Users Routes', () => {
 
     describe('GET /me', () => {
         test('returns the authenticated user full profile', async () => {
-            db.query.mockResolvedValue([profileRow()]);
+            db.query
+                .mockResolvedValueOnce([profileRow()])
+                .mockResolvedValueOnce([]);
 
             const response = await request(app).get('/me').set(AUTH_HEADER);
 
@@ -75,6 +77,52 @@ describe('Users Routes', () => {
                 email: 'alice@example.com'
             });
             expect(db.query).toHaveBeenCalledWith(expect.stringContaining('WHERE u.id = ?'), [1]);
+        });
+
+        test('includes the public stream block on the profile', async () => {
+            db.query
+                .mockResolvedValueOnce([profileRow()])
+                .mockResolvedValueOnce([{
+                    title: 'Ranked grind',
+                    description: 'Climbing the ladder',
+                    visibility: 'public',
+                    thumbnail_url: 'thumb.png',
+                    category: 'Just Chatting',
+                    username: 'alice'
+                }]);
+
+            const response = await request(app).get('/me').set(AUTH_HEADER);
+
+            expect(response.status).toBe(200);
+            expect(response.body.stream).toEqual({
+                streamId: 'alice',
+                title: 'Ranked grind',
+                description: 'Climbing the ladder',
+                thumbnailUrl: 'thumb.png',
+                category: 'Just Chatting',
+                isLive: false
+            });
+        });
+
+        test('omits unlisted and private streams from the profile', async () => {
+            for (const visibility of ['unlisted', 'private']) {
+                db.query
+                    .mockReset()
+                    .mockResolvedValueOnce([profileRow()])
+                    .mockResolvedValueOnce([{
+                        title: 'Hidden',
+                        description: '',
+                        visibility,
+                        thumbnail_url: '',
+                        category: null,
+                        username: 'alice'
+                    }]);
+
+                const response = await request(app).get('/me').set(AUTH_HEADER);
+
+                expect(response.status).toBe(200);
+                expect(response.body).not.toHaveProperty('stream');
+            }
         });
 
         test('returns 401 without a token', async () => {
@@ -418,7 +466,9 @@ describe('Users Routes', () => {
 
     describe('GET /:username', () => {
         test('returns a public profile without the email', async () => {
-            db.query.mockResolvedValue([profileRow({ id: 2, username: 'bob' })]);
+            db.query
+                .mockResolvedValueOnce([profileRow({ id: 2, username: 'bob' })])
+                .mockResolvedValueOnce([]);
 
             const response = await request(app).get('/bob');
 
@@ -427,8 +477,51 @@ describe('Users Routes', () => {
             expect(response.body).not.toHaveProperty('email');
             expect(response.body.isFollowing).toBe(false);
             expect(response.body.followersCount).toBe(2);
-            // only the profile query, no follow lookup without auth
-            expect(db.query).toHaveBeenCalledTimes(1);
+            // Profile query plus the public stream lookup; no follow lookup without auth.
+            expect(db.query).toHaveBeenCalledTimes(2);
+        });
+
+        test('shows a public stream on the profile with the username as id', async () => {
+            db.query
+                .mockResolvedValueOnce([profileRow({ id: 2, username: 'bob' })])
+                .mockResolvedValueOnce([{
+                    title: 'Chill stream',
+                    description: '',
+                    visibility: 'public',
+                    thumbnail_url: '',
+                    category: null,
+                    username: 'bob'
+                }]);
+
+            const response = await request(app).get('/bob');
+
+            expect(response.status).toBe(200);
+            expect(response.body.stream).toMatchObject({
+                streamId: 'bob',
+                title: 'Chill stream',
+                isLive: false
+            });
+        });
+
+        test('hides unlisted and private streams from the public profile', async () => {
+            for (const visibility of ['unlisted', 'private']) {
+                db.query
+                    .mockReset()
+                    .mockResolvedValueOnce([profileRow({ id: 2, username: 'bob' })])
+                    .mockResolvedValueOnce([{
+                        title: 'Hidden',
+                        description: '',
+                        visibility,
+                        thumbnail_url: '',
+                        category: null,
+                        username: 'bob'
+                    }]);
+
+                const response = await request(app).get('/bob');
+
+                expect(response.status).toBe(200);
+                expect(response.body).not.toHaveProperty('stream');
+            }
         });
 
         test('reports isFollowing for an authenticated follower', async () => {

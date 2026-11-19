@@ -67,7 +67,7 @@ Creates the configuration and key on first access. Safe to call on page load.
 
 ```json
 {
-  "streamId": "u12",
+  "streamId": "alice",
   "title": "Ranked grind",
   "description": "Climbing the ladder",
   "visibility": "public",
@@ -85,7 +85,7 @@ Creates the configuration and key on first access. Safe to call on page load.
 
 | Field | Notes |
 |---|---|
-| `streamId` | Public stream id — use it for `/stream/${streamId}` links |
+| `streamId` | Public stream handle (the username) — use it for `/stream/<username>` links |
 | `title` | Defaults to the username on first creation |
 | `visibility` | `public`, `unlisted` or `private` |
 | `thumbnailUrl` | URL or data URL; `""` when none |
@@ -98,7 +98,7 @@ Creates the configuration and key on first access. Safe to call on page load.
 1. The configuration page displays the key to the user.
 2. The user configures the encoder with that key.
 3. When the stream arrives, the encoder sends the key as its `streamId`.
-4. The backend resolves the key to the owner and uses the public id `u<userId>`.
+4. The backend resolves the key to the owner, stores HLS under the internal `u<userId>` directory, and exposes the username as the public stream id (`/stream/<username>`).
 
 The key is therefore never a separate JSON field on the registration request.
 
@@ -178,7 +178,7 @@ GET /api/streams/me/stream-key
 ```json
 {
   "streamKey": "fov_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "streamId": "u12",
+  "streamId": "alice",
   "isLive": false,
   "updatedAt": "2026-10-23T12:00:00.000Z"
 }
@@ -199,7 +199,7 @@ No request body.
 ```json
 {
   "streamKey": "fov_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
-  "streamId": "u12",
+  "streamId": "alice",
   "isLive": true,
   "updatedAt": "2026-10-23T12:05:00.000Z"
 }
@@ -258,7 +258,7 @@ Public. A bearer token is optional; when present, a `private` stream is visible 
 ```json
 [
   {
-    "streamId": "u12",
+    "streamId": "alice",
     "trackCount": 4,
     "tracks": [
       {
@@ -307,7 +307,8 @@ GET /api/streams/:id/live
 
 `:id` can be:
 
-- a public user stream id: `u12`
+- the streamer username (preferred): `alice`
+- a legacy public user stream id: `u12`
 - a legacy numeric stream id: `1`
 
 Token is optional, but required for `private` streams.

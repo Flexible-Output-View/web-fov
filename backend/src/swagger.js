@@ -547,7 +547,7 @@ const swaggerDocument = {
             StreamSettings: {
                 type: 'object',
                 properties: {
-                    streamId: { type: 'string', example: 'u12', description: 'Public stream id used in URLs' },
+                    streamId: { type: 'string', example: 'alice', description: 'Public stream handle (the username) used in `/stream/<username>` URLs' },
                     title: { type: 'string', maxLength: 255 },
                     description: { type: 'string', maxLength: 2000 },
                     visibility: { type: 'string', enum: ['public', 'unlisted', 'private'] },
@@ -574,7 +574,7 @@ const swaggerDocument = {
                 type: 'object',
                 properties: {
                     streamKey: { type: 'string', example: 'fov_...' },
-                    streamId: { type: 'string', example: 'u12' },
+                    streamId: { type: 'string', example: 'alice', description: 'Public stream handle (the username)' },
                     isLive: { type: 'boolean' },
                     updatedAt: { type: 'string', format: 'date-time' }
                 }
@@ -585,7 +585,7 @@ const swaggerDocument = {
                 properties: {
                     tracks: { type: 'integer', minimum: 1 },
                     audioTracks: { type: 'integer', minimum: 1 },
-                    streamId: { type: 'string', description: 'The stream key shown on the configuration page when an owned stream arrives. When it matches a key, the stream is linked to its owner and the response streamId is `u<userId>`. Legacy arbitrary ids keep working.' },
+                    streamId: { type: 'string', description: 'The stream key shown on the configuration page when an owned stream arrives. When it matches a key, the stream is linked to its owner and stored under the internal `u<userId>` HLS directory; the public URL is `/stream/<username>`. Legacy arbitrary ids keep working.' },
                     videoTrackNames: {
                         type: 'array',
                         items: {

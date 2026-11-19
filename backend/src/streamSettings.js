@@ -42,13 +42,34 @@ export function isStreamKeyFormat(value) {
         && /^[A-Za-z0-9_-]+$/.test(value);
 }
 
+/**
+ * Internal HLS directory / runtime id for a user stream.
+ *
+ * `u<userId>` is numeric-only, so it is safe to use as a filesystem path and
+ * never collides with a username. It is NOT the public stream URL anymore:
+ * use `toStreamHandle` for anything a viewer sees or shares.
+ */
 export function toPublicStreamId(userId) {
     return `u${Number(userId)}`;
 }
 
 /**
- * Public stream ids for registered users are `u<userId>`, which keeps the
- * secret stream key out of HLS paths and shared stream URLs.
+ * Public stream handle for a user stream: the username.
+ *
+ * Stream URLs are `/stream/<username>`, which is what viewers share and what
+ * the profile links to. Falls back to the internal id when no username is
+ * available (e.g. a settings row without its user join).
+ */
+export function toStreamHandle(row) {
+    const username = typeof row?.username === 'string' ? row.username.trim() : '';
+    if (username) {
+        return username;
+    }
+    return toPublicStreamId(row?.user_id ?? row?.id);
+}
+
+/**
+ * Legacy `u<userId>` ids are still accepted so old shared links keep working.
  */
 export function parseUserStreamId(streamId) {
     if (typeof streamId !== 'string') {
@@ -68,7 +89,8 @@ export function serializeSettings(row, { includeKey = true } = {}) {
     }
 
     const settings = {
-        streamId: toPublicStreamId(row.user_id),
+        streamId: toStreamHandle(row),
+        streamerUsername: row.username || null,
         title: row.title || '',
         description: row.description || '',
         visibility: row.visibility || 'public',

@@ -3,6 +3,8 @@ const router = express.Router();
 import db from '../db.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { comparePassword, hashPassword } from '../utils/auth.js';
+import { ffmpegProcesses } from '../mediaServer.mjs';
+import { toPublicStreamId } from '../streamSettings.js';
 
 const MAX_IMAGE_LENGTH = 5 * 1024 * 1024; // 5 MB data URL (front resizes images client-side)
 
@@ -20,7 +22,7 @@ const PROFILE_SELECT = `
     FROM users u
 `;
 
-function toProfile(row, { includeEmail = false, isFollowing = false } = {}) {
+function toProfile(row, { includeEmail = false, isFollowing = false, stream = null } = {}) {
     const profile = {
         id: row.id,
         username: row.username,
@@ -36,7 +38,55 @@ function toProfile(row, { includeEmail = false, isFollowing = false } = {}) {
         profile.email = row.email;
     }
 
+    // Omitted entirely when the user has no public stream to show.
+    if (stream) {
+        profile.stream = stream;
+    }
+
     return profile;
+}
+
+/**
+ * Stream block shown on a profile.
+ *
+ * Only public streams are listed: unlisted and private streams stay reachable
+ * by their direct link (unlisted) or by their owner (private) but never appear
+ * on the profile page.
+ */
+async function getProfileStream(userId) {
+    const rows = await db.query(
+        `SELECT
+            ss.title,
+            ss.description,
+            ss.visibility,
+            ss.thumbnail_url,
+            c.name AS category,
+            u.username
+        FROM stream_settings ss
+        JOIN users u ON u.id = ss.user_id
+        LEFT JOIN categories c ON c.id = ss.category_id
+        WHERE ss.user_id = ?
+        LIMIT 1`,
+        [userId]
+    );
+
+    if (!rows || rows.length === 0) {
+        return null;
+    }
+
+    const row = rows[0];
+    if ((row.visibility || 'public') !== 'public') {
+        return null;
+    }
+
+    return {
+        streamId: row.username,
+        title: row.title || '',
+        description: row.description || '',
+        thumbnailUrl: row.thumbnail_url || '',
+        category: row.category || '',
+        isLive: ffmpegProcesses.has(toPublicStreamId(userId))
+    };
 }
 
 async function findUserByUsername(username) {
@@ -51,7 +101,8 @@ router.get('/me', requireAuth, async (req, res, next) => {
         if (!rows || rows.length === 0) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-        res.json(toProfile(rows[0], { includeEmail: true }));
+        const stream = await getProfileStream(req.userId);
+        res.json(toProfile(rows[0], { includeEmail: true, stream }));
     } catch (err) {
         next(err);
     }
@@ -86,7 +137,8 @@ router.put('/me', requireAuth, async (req, res, next) => {
         }
 
         const profileRows = await db.query(`${PROFILE_SELECT} WHERE u.id = ?`, [req.userId]);
-        res.json(toProfile(profileRows[0], { includeEmail: true }));
+        const stream = await getProfileStream(req.userId);
+        res.json(toProfile(profileRows[0], { includeEmail: true, stream }));
     } catch (err) {
         next(err);
     }
@@ -257,7 +309,8 @@ router.get('/:username', optionalAuth, async (req, res, next) => {
             isFollowing = followRows.length > 0;
         }
 
-        res.json(toProfile(row, { isFollowing }));
+        const stream = await getProfileStream(row.id);
+        res.json(toProfile(row, { isFollowing, stream }));
     } catch (err) {
         next(err);
     }

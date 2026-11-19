@@ -98,25 +98,63 @@ describe('LiveStreamsService', () => {
 
   // ── getStreamById ─────────────────────────────────────────────
   describe('getStreamById', () => {
-    it('should find stream by id', (done) => {
+    const liveStream = {
+      streamId: 'test-stream',
+      title: 'Test Stream',
+      trackCount: 2,
+      viewers: 10,
+      category: 'Gaming',
+      tracks: [
+        { trackId: 'v:0', name: 'Video', videoUrl: 'v.m3u8', isVideo: true, isAudio: false },
+      ],
+    };
+
+    it('should request the direct live endpoint for the stream', (done) => {
       service.getStreamById('test-stream').subscribe((stream) => {
         expect(stream).toBeTruthy();
         expect(stream?.streamId).toBe('test-stream');
+        expect(stream?.tracks.length).toBe(1);
         done();
       });
 
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
-      req.flush(mockStreams);
+      const req = httpMock.expectOne(
+        `${environment.apiUrl}/streams/test-stream/live`,
+      );
+      expect(req.request.method).toBe('GET');
+      req.flush(liveStream);
     });
 
-    it('should return null if stream not found', (done) => {
+    it('should return null on 404 (stream not live)', (done) => {
       service.getStreamById('unknown').subscribe((stream) => {
         expect(stream).toBeNull();
         done();
       });
 
-      const req = httpMock.expectOne(`${environment.apiUrl}/streams/available`);
-      req.flush(mockStreams);
+      const req = httpMock.expectOne(
+        `${environment.apiUrl}/streams/unknown/live`,
+      );
+      req.flush({ error: 'Stream not found' }, {
+        status: 404,
+        statusText: 'Not Found',
+      });
+    });
+
+    it('should propagate server errors', (done) => {
+      service.getStreamById('test-stream').subscribe({
+        next: () => fail('expected an error'),
+        error: (err) => {
+          expect(err.status).toBe(500);
+          done();
+        },
+      });
+
+      const req = httpMock.expectOne(
+        `${environment.apiUrl}/streams/test-stream/live`,
+      );
+      req.flush('Server error', {
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
     });
   });
 
