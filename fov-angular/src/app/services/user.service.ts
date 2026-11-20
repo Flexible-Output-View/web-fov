@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import type { StreamVisibility } from '../models/stream-config';
 
 export interface ProfileStream {
   /** Public stream handle: the username. */
@@ -10,6 +11,8 @@ export interface ProfileStream {
   description: string;
   thumbnailUrl: string;
   category: string;
+  /** Public, unlisted, or private. Non-public streams are only returned to their owner. */
+  visibility?: StreamVisibility;
   isLive: boolean;
 }
 

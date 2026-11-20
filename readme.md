@@ -137,7 +137,7 @@ web-fov/
 # Clone repository
 git clone <repo> && cd web-fov
 
-# Start all services (backend, frontend, Postgres)
+# Start all services (backend, frontend, Postgres, demo stream)
 docker-compose up --build
 
 # Services will be available at:
@@ -201,11 +201,17 @@ Encoders should use these settings:
 |---------|-------|
 | **Protocol** | SRT |
 | **Host** | backend server IP/domain |
-| **Port** | 9999 |
+| **Port** | returned by `POST /ffmpeg/register` (starts at 9999) |
 | **Mode** | Caller |
 | **Bitrate** | 5000-10000 kbps (adjust for quality) |
 | **FPS** | 30 or 60 |
 | **Resolution** | 1920x1080 or 1280x720 |
+
+The returned URL includes `connect_timeout=15000`. On Docker Desktop the first
+host-to-container UDP flow can take several seconds to establish; the longer
+timeout keeps OBS from aborting during that first connection. Use the exact
+`srtUrl` returned by the register endpoint rather than hardcoding port 9999:
+the always-running demo uses `9999`, so a real encoder receives the next port.
 
 ---
 

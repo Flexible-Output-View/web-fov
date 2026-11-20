@@ -89,6 +89,8 @@ describe('Streams Routes', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        dbQuery.mockReset();
+        dbQuery.mockResolvedValue([]);
         viewerPresence.clear();
         existsSync.mockReturnValue(true);
         buildSeparatedAvailableTracks.mockReturnValue(null);
@@ -406,7 +408,7 @@ describe('Streams Routes', () => {
             );
         });
 
-        test('hides unlisted and private streams from discovery', async () => {
+        test('hides unlisted and private streams from discovery, even for the owner', async () => {
             setDirectoryEntries([
                 { name: 'u12', isDirectory: () => true },
                 { name: 'u13', isDirectory: () => true }
@@ -426,8 +428,9 @@ describe('Streams Routes', () => {
                 .get('/available')
                 .set('Authorization', `Bearer ${signToken(13)}`);
 
-            expect(owner.body).toHaveLength(1);
-            expect(owner.body[0].streamId).toBe('bob');
+            // Private streams belong on the owner's profile, not in the
+            // public home/discover/followed listings.
+            expect(owner.body).toEqual([]);
         });
 
         test('does not expose a user folder without settings', async () => {
@@ -481,6 +484,52 @@ describe('Streams Routes', () => {
             expect(response.body.visibility).toBe('unlisted');
         });
 
+        test('resolves an unlisted direct link regardless of username casing', async () => {
+            dbQuery
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([
+                    userStreamRow({ username: 'Alice', visibility: 'unlisted' })
+                ]);
+
+            const response = await request(createApp()).get('/ALICE/live');
+
+            expect(response.status).toBe(200);
+            expect(response.body).toMatchObject({
+                streamId: 'Alice',
+                visibility: 'unlisted'
+            });
+            expect(dbQuery).toHaveBeenNthCalledWith(
+                1,
+                expect.stringContaining('WHERE u.username = ?'),
+                ['ALICE']
+            );
+            expect(dbQuery).toHaveBeenNthCalledWith(
+                2,
+                expect.stringContaining('LOWER(u.username) = LOWER(?)'),
+                ['ALICE']
+            );
+        });
+
+        test('keeps an unlisted stream out of discovery but playable by direct link', async () => {
+            setDirectoryEntries([{ name: 'u12', isDirectory: () => true }]);
+            dbQuery
+                .mockResolvedValueOnce([
+                    userStreamRow({ username: 'Alice', visibility: 'unlisted' })
+                ])
+                .mockResolvedValueOnce([
+                    userStreamRow({ username: 'Alice', visibility: 'unlisted' })
+                ]);
+
+            const discovery = await request(createApp()).get('/available');
+            expect(discovery.status).toBe(200);
+            expect(discovery.body).toEqual([]);
+
+            const direct = await request(createApp()).get('/Alice/live');
+            expect(direct.status).toBe(200);
+            expect(direct.body.streamId).toBe('Alice');
+            expect(direct.body.visibility).toBe('unlisted');
+        });
+
         test('restricts a private stream to its owner', async () => {
             dbQuery.mockResolvedValue([userStreamRow({ visibility: 'private' })]);
 
@@ -497,6 +546,18 @@ describe('Streams Routes', () => {
                 .set('Authorization', `Bearer ${signToken(12)}`);
             expect(owner.status).toBe(200);
             expect(owner.body.title).toBe('Ranked grind');
+        });
+
+        test('compares owner ids by value, not driver type', async () => {
+            dbQuery.mockResolvedValue([
+                userStreamRow({ user_id: '12', visibility: 'private' })
+            ]);
+
+            const owner = await request(createApp())
+                .get('/alice/live')
+                .set('Authorization', `Bearer ${signToken(12)}`);
+            expect(owner.status).toBe(200);
+            expect(owner.body.visibility).toBe('private');
         });
 
         test('returns 404 for an unknown username', async () => {

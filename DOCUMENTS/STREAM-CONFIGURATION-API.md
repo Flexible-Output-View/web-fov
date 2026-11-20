@@ -251,7 +251,7 @@ Use `id` as `categoryId` in `PUT /api/streams/me`.
 GET /api/streams/available
 ```
 
-Public. A bearer token is optional; when present, a `private` stream is visible to its owner.
+Public. The feed contains **public streams only**, even when a bearer token is supplied; a private stream belongs on its owner's profile, not in the public menus.
 
 ### 200 — Response
 
@@ -291,11 +291,13 @@ Public. A bearer token is optional; when present, a `private` stream is visible 
 
 ### Visibility behavior
 
-| Visibility | Appears in `/available` | Direct link |
-|---|:---:|:---:|
-| `public` | ✅ | ✅ |
-| `unlisted` | ❌ | ✅ |
-| `private` | Only for owner | Only for owner |
+| Visibility | Appears in `/available` | Direct link | Owner's own profile |
+|---|:---:|:---:|:---:|
+| `public` | ✅ | ✅ | ✅ |
+| `unlisted` | ❌ | ✅ | ✅ |
+| `private` | ❌ | Only for owner | ✅ |
+
+Non-public streams are only included in a profile response when the authenticated viewer is that profile's owner. Other visitors and anonymous requests receive the profile without a `stream` block.
 
 ---
 
@@ -323,7 +325,10 @@ Same shape as one entry from `/api/streams/available`.
 { "error": "Stream not found" }
 ```
 
-> The current stream page uses `/api/streams/available`. To support unlisted and private streams, the stream page should call `/api/streams/:id/live` directly and send the bearer token.
+> The public stream page uses `/api/streams/:id/live` (not `/available`) so
+> unlisted streams stay playable through their direct link and owners can open
+> their private stream. Username lookups are case-insensitive, which keeps
+> hand-typed or re-shared links working.
 
 ---
 

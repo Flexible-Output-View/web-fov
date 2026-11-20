@@ -124,6 +124,23 @@ describe('LiveStreamsService', () => {
       req.flush(liveStream);
     });
 
+    it('should keep an unlisted stream playable through its direct link', (done) => {
+      service.getStreamById('unlisted-stream').subscribe((stream) => {
+        expect(stream).toBeTruthy();
+        expect(stream?.visibility).toBe('unlisted');
+        done();
+      });
+
+      // The discovery listing is not used for direct links: an unlisted
+      // stream is intentionally absent from `/streams/available`.
+      httpMock.expectNone(`${environment.apiUrl}/streams/available`);
+
+      const req = httpMock.expectOne(
+        `${environment.apiUrl}/streams/unlisted-stream/live`,
+      );
+      req.flush({ ...liveStream, streamId: 'unlisted-stream', visibility: 'unlisted' });
+    });
+
     it('should return null on 404 (stream not live)', (done) => {
       service.getStreamById('unknown').subscribe((stream) => {
         expect(stream).toBeNull();

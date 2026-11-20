@@ -85,6 +85,10 @@
       </div>
       <div class="stream-meta">
         <h2 id="profile-stream-title">{{ stream.title || profile.username }}</h2>
+        <span class="stream-visibility"
+              *ngIf="isOwnProfile && stream.visibility && stream.visibility !== 'public'">
+          {{ stream.visibility === 'private' ? 'Privé — visible uniquement par vous' : 'Non listé — visible via le lien direct' }}
+        </span>
         <p class="stream-category" *ngIf="stream.category">{{ stream.category }}</p>
         <p class="stream-description" *ngIf="stream.description">{{ stream.description }}</p>
         <span class="stream-cta">

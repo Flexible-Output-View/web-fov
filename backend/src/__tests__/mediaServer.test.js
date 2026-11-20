@@ -1,5 +1,6 @@
 import express from 'express';
 import fs from 'fs';
+import dgram from 'dgram';
 import path from 'path';
 import { EventEmitter } from 'events';
 import request from 'supertest';
@@ -21,9 +22,12 @@ jest.unstable_mockModule('child_process', () => ({
 
 const {
     createMediaRoutes,
+    startFFmpegListener,
     ffmpegProcesses,
     registeredStreams,
-    killFFmpegProcess
+    killFFmpegProcess,
+    isUdpPortBound,
+    waitForSrtListener
 } = await import('../mediaServer.mjs');
 
 function createProcess({ exitsOnSigint = false } = {}) {
@@ -61,7 +65,13 @@ function createApp(options = {}) {
             const streamId = knownKeys.get(key);
             return streamId ? { userId: 1, streamId } : null;
         });
-    app.use(createMediaRoutes({ ...options, resolveStreamKey }));
+    app.use(createMediaRoutes({
+        // ffmpeg is mocked in these tests, so the real UDP readiness probe
+        // would always report "not bound" and wait for the full timeout.
+        isSrtListenerReady: async () => true,
+        ...options,
+        resolveStreamKey
+    }));
     return app;
 }
 
@@ -159,6 +169,7 @@ describe('Media server lifecycle', () => {
 
         expect(response.status).toBe(200);
         expect(response.body.streamId).toBe('u12');
+        expect(response.body.srtUrl).toContain('connect_timeout=15000');
         expect(response.body.hlsUrl).toBe('/api/hls/u12/0/playlist.m3u8');
         expect(resolveStreamKey).toHaveBeenCalledWith(streamKey);
         expect(ffmpegProcesses.has('u12')).toBe(true);
@@ -439,5 +450,158 @@ describe('Media server lifecycle', () => {
         const reused = await request(app).post('/ffmpeg/register').send({ streamId: keyFor('reused'), tracks: 1, audioTracks: 1 });
         expect(reused.status).toBe(200);
         expect(reused.body.srtUrl).toContain(':9999?');
+    });
+
+    test('does not acknowledge registration before the SRT listener is ready', async () => {
+        const process = createProcess();
+        spawnMock.mockReturnValue(process);
+        let releaseListener;
+        const listenerReady = new Promise(resolve => {
+            releaseListener = resolve;
+        });
+        const isSrtListenerReady = jest.fn(() => listenerReady);
+        const app = createApp({ isSrtListenerReady });
+
+        let settled = false;
+        const pending = request(app).post('/ffmpeg/register').send({
+            streamId: keyFor('slow-listener'),
+            tracks: 1,
+            audioTracks: 1
+        }).then(response => {
+            settled = true;
+            return response;
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 40));
+        expect(isSrtListenerReady).toHaveBeenCalledWith(9999, expect.objectContaining({
+            timeoutMs: expect.any(Number),
+            isAlive: expect.any(Function)
+        }));
+        expect(isSrtListenerReady.mock.calls[0][1].isAlive()).toBe(true);
+        expect(settled).toBe(false);
+        expect(registeredStreams.get('slow-listener')).toMatchObject({ port: 9999, pending: true });
+
+        releaseListener(true);
+        const response = await pending;
+        expect(response.status).toBe(200);
+        expect(registeredStreams.get('slow-listener').pending).toBe(false);
+    });
+
+    test('returns 500 and cleans up when readiness probing throws', async () => {
+        const process = createProcess();
+        spawnMock.mockReturnValue(process);
+        const isSrtListenerReady = jest.fn(async () => {
+            throw new Error('probe exploded');
+        });
+        const app = createApp({ isSrtListenerReady });
+
+        const response = await request(app).post('/ffmpeg/register').send({
+            streamId: keyFor('probe-throws'),
+            tracks: 1,
+            audioTracks: 1
+        });
+
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ error: 'Failed to register stream' });
+        expect(process.kill).toHaveBeenCalledWith('SIGKILL');
+        expect(ffmpegProcesses.has('probe-throws')).toBe(false);
+        expect(registeredStreams.has('probe-throws')).toBe(false);
+        expect(fs.existsSync(path.join(mediaRoot, 'hls', 'probe-throws'))).toBe(false);
+    });
+
+    test('returns 503 and cleans up when the SRT listener never binds', async () => {
+        const process = createProcess({ exitsOnSigint: true });
+        spawnMock.mockReturnValue(process);
+        const isSrtListenerReady = jest.fn(async () => false);
+        const app = createApp({ isSrtListenerReady, srtReadyTimeoutMs: 25 });
+
+        const response = await request(app).post('/ffmpeg/register').send({
+            streamId: keyFor('not-ready'),
+            tracks: 1,
+            audioTracks: 1
+        });
+
+        expect(response.status).toBe(503);
+        expect(response.body).toMatchObject({
+            error: 'SRT listener did not become ready',
+            streamId: 'not-ready',
+            port: 9999
+        });
+        expect(isSrtListenerReady).toHaveBeenCalledWith(9999, expect.objectContaining({ timeoutMs: 25 }));
+        expect(process.kill).toHaveBeenCalledWith('SIGINT');
+        expect(ffmpegProcesses.has('not-ready')).toBe(false);
+        expect(registeredStreams.has('not-ready')).toBe(false);
+        expect(fs.existsSync(path.join(mediaRoot, 'hls', 'not-ready'))).toBe(false);
+    });
+
+    test('normalizes unreachable SRT host names and formats IPv6 hosts', async () => {
+        const originalHost = process.env.SRT_URL;
+        const cases = [
+            ['localhost', '127.0.0.1'],
+            ['web-fov-backend-1', '127.0.0.1'],
+            ['::1', '127.0.0.1'],
+            ['api.example.com', 'api.example.com'],
+            ['192.168.1.10', '192.168.1.10'],
+            ['2001:db8::1', '[2001:db8::1]']
+        ];
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
+
+        try {
+            for (let index = 0; index < cases.length; index++) {
+                const [configuredHost, expectedHost] = cases[index];
+                process.env.SRT_URL = configuredHost;
+                spawnMock.mockReturnValue(createProcess());
+
+                const app = createApp();
+                const response = await request(app).post('/ffmpeg/register').send({
+                    streamId: keyFor(`host-${index}`),
+                    tracks: 1,
+                    audioTracks: 1
+                });
+
+                expect(response.status).toBe(200);
+                expect(response.body.srtUrl).toContain(`srt://${expectedHost}:${9999 + index}?`);
+            }
+        } finally {
+            warnSpy.mockRestore();
+            if (originalHost === undefined) {
+                delete process.env.SRT_URL;
+            } else {
+                process.env.SRT_URL = originalHost;
+            }
+        }
+    });
+
+    test('detects an occupied UDP port and waits for it to become ready', async () => {
+        const socket = dgram.createSocket('udp4');
+        await new Promise((resolve, reject) => {
+            socket.once('error', reject);
+            socket.bind({ address: '0.0.0.0', port: 0 }, resolve);
+        });
+        const occupiedPort = socket.address().port;
+
+        expect(await isUdpPortBound(occupiedPort)).toBe(true);
+        expect(await waitForSrtListener(occupiedPort, { timeoutMs: 100 })).toBe(true);
+        await new Promise(resolve => socket.close(resolve));
+
+        const freeSocket = dgram.createSocket('udp4');
+        await new Promise(resolve => freeSocket.bind({ address: '0.0.0.0', port: 0 }, resolve));
+        const freePort = freeSocket.address().port;
+        await new Promise(resolve => freeSocket.close(resolve));
+
+        expect(await isUdpPortBound(freePort)).toBe(false);
+        expect(await waitForSrtListener(freePort, { timeoutMs: 25 })).toBe(false);
+        expect(await waitForSrtListener(freePort, { timeoutMs: 100, isAlive: () => false })).toBe(false);
+    });
+
+    test('startFFmpegListener rejects an empty video track set without spawning', async () => {
+        const socket = { destroy: jest.fn() };
+
+        const result = startFFmpegListener('zero-tracks', 0, 1, socket, 'srt://0.0.0.0:9999', {});
+
+        expect(result).toBeNull();
+        expect(socket.destroy).toHaveBeenCalledTimes(1);
+        expect(spawnMock).not.toHaveBeenCalled();
+        expect(ffmpegProcesses.has('zero-tracks')).toBe(false);
     });
 });

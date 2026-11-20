@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import dgram from 'dgram';
 import cors from 'cors';
 import { spawn, execFileSync } from 'child_process';
 import {
@@ -21,6 +22,15 @@ const registeredStreams = new Map();
 const baseSrtPort = parseInt(process.env.SRT_PORT || '9999', 10);
 const maxSrtPort = baseSrtPort + 11;
 const debugSrtPort = parseInt(process.env.DEBUG_SRT_PORT || String(baseSrtPort), 10);
+
+// Registration only answers 200 once the FFmpeg SRT listener owns its UDP
+// port. Encoders otherwise connect too early - noticeably on macOS, where a
+// packet sent before the listener binds can break Docker's UDP port mapping
+// for the rest of the session.
+const parsedReadyTimeout = parseInt(process.env.SRT_READY_TIMEOUT_MS || '5000', 10);
+const SRT_READY_TIMEOUT_MS = Number.isFinite(parsedReadyTimeout) ? parsedReadyTimeout : 5000;
+const parsedReadyPoll = parseInt(process.env.SRT_READY_POLL_MS || '50', 10);
+const SRT_READY_POLL_MS = Number.isFinite(parsedReadyPoll) && parsedReadyPoll > 0 ? parsedReadyPoll : 50;
 
 // Optimistic until startMediaServer() has actually probed the binary. This
 // keeps createMediaRoutes() usable in tests and in code paths that never spawn
@@ -52,12 +62,88 @@ function checkFfmpegSrtSupport() {
 
 function normalizeSrtHost(host) {
     const value = (host || '').trim();
+
     // FFmpeg binds the listener on IPv4 (0.0.0.0). On macOS `localhost`
     // resolves to ::1 first, so always hand the encoder an IPv4 address.
-    if (!value || value === 'localhost' || value === '::1') {
+    if (!value || value === 'localhost' || value === '::1' || value === '[::1]') {
         return '127.0.0.1';
     }
-    return value;
+
+    const isIpv4 = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value);
+    const isIpv6 = value.includes(':');
+    const hasDot = value.includes('.');
+
+    // Docker Compose service/container names (e.g. `web-fov-backend-1`) only
+    // resolve inside the Docker network. Encoders run on the host, so emit a
+    // reachable loopback address instead of a URL that can never connect.
+    if (!isIpv4 && !isIpv6 && !hasDot) {
+        console.warn(
+            `⚠️ SRT_URL "${value}" looks like a container name; ` +
+            'using 127.0.0.1 instead. Set SRT_URL to the host address encoders should use.'
+        );
+        return '127.0.0.1';
+    }
+
+    return isIpv6 && !value.startsWith('[') ? `[${value}]` : value;
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Check whether a UDP port is already owned by another socket.
+ *
+ * `bind()` succeeding means nobody is listening yet; `EADDRINUSE` means the
+ * FFmpeg SRT listener has bound the port. This works both inside Docker and
+ * when the backend runs natively.
+ */
+function isUdpPortBound(port) {
+    return new Promise((resolve) => {
+        const socket = dgram.createSocket('udp4');
+
+        const finish = (bound) => {
+            try {
+                socket.close();
+            } catch (err) {
+                // Socket already closed - nothing to do.
+            }
+            resolve(bound);
+        };
+
+        socket.once('error', (err) => finish(err?.code === 'EADDRINUSE'));
+        socket.bind({ address: '0.0.0.0', port, exclusive: true }, () => finish(false));
+    });
+}
+
+/**
+ * Wait until the SRT listener spawned for a stream is accepting traffic.
+ *
+ * @param {number} port Allocated SRT port.
+ * @param {object} [options]
+ * @param {number} [options.timeoutMs] Maximum time to wait.
+ * @param {number} [options.pollMs] Delay between probes.
+ * @param {() => boolean} [options.isAlive] Return false to abort (FFmpeg exited).
+ * @returns {Promise<boolean>} true when the listener owns the UDP port.
+ */
+async function waitForSrtListener(port, options = {}) {
+    const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : SRT_READY_TIMEOUT_MS;
+    const pollMs = Number.isFinite(options.pollMs) ? options.pollMs : SRT_READY_POLL_MS;
+    const { isAlive } = options;
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+
+    for (;;) {
+        if (typeof isAlive === 'function' && !isAlive()) {
+            return false;
+        }
+        if (await isUdpPortBound(port)) {
+            return true;
+        }
+        if (Date.now() >= deadline) {
+            return false;
+        }
+        await delay(pollMs);
+    }
 }
 
 function parseRegisterRequest(body) {
@@ -115,6 +201,7 @@ function buildSrtUrl(host, port, mode) {
     return [
         `srt://${normalizeSrtHost(host)}:${port}`,
         `?mode=${mode}`,
+        '&connect_timeout=15000',
         '&latency=4000000',
         '&rcvbuf=134217728',
         '&sndbuf=134217728',
@@ -268,7 +355,7 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, 
         if (socket) {
             socket.destroy();
         }
-        return;
+        return null;
     }
 
     const ffmpegArgs = buildFfmpegArgs(tracksV, tracksA, streamId, srtUrl);
@@ -338,7 +425,7 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, 
         });
     }
 
-    ffmpegProcesses.set(streamId, {
+    const streamEntry = {
         process: ffmpegProc,
         tracksV,
         tracksA,
@@ -347,7 +434,10 @@ function startFFmpegListener(streamId, tracksV, tracksA, socket, srtUrl = null, 
         socket,
         stopped: false,
         createdAt: Date.now()
-    });
+    };
+
+    ffmpegProcesses.set(streamId, streamEntry);
+    return streamEntry;
 }
 
 function createMediaRoutes(options = {}) {
@@ -355,6 +445,13 @@ function createMediaRoutes(options = {}) {
     const resolveStreamKey = typeof options.resolveStreamKey === 'function'
         ? options.resolveStreamKey
         : resolveStreamKeyFromDatabase;
+    const isSrtListenerReady = typeof options.isSrtListenerReady === 'function'
+        ? options.isSrtListenerReady
+        : waitForSrtListener;
+    const requestedReadyTimeout = Number(options.srtReadyTimeoutMs);
+    const srtReadyTimeoutMs = Number.isFinite(requestedReadyTimeout) && requestedReadyTimeout >= 0
+        ? requestedReadyTimeout
+        : SRT_READY_TIMEOUT_MS;
 
     /**
      * Resolve the stream key presented at registration.
@@ -459,19 +556,51 @@ function createMediaRoutes(options = {}) {
             const srtUrl = `srt://0.0.0.0:${srtPort}`;
             const srtUrlExternal = buildSrtUrl(host, srtPort, 'caller');
 
-            writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
-            startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl, nameOptions);
-
-            registeredStreams.set(streamId, {
+            // Reserve the port before the readiness probe so concurrent
+            // registrations cannot be handed the same port while we wait.
+            const registrationState = {
                 tracksV: trackVNum,
                 tracksA: trackANum,
                 videoTrackNames,
                 audioTrackNames,
                 port: srtPort,
-                srtUrl
+                srtUrl,
+                pending: true
+            };
+            registeredStreams.set(streamId, registrationState);
+
+            writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
+            const started = startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl, nameOptions);
+
+            // Do not acknowledge before the listener owns its UDP port: an
+            // encoder that connects too early can lose the handshake (and on
+            // macOS/Docker Desktop break the published UDP mapping entirely).
+            const ready = await isSrtListenerReady(srtPort, {
+                timeoutMs: srtReadyTimeoutMs,
+                isAlive: () => ffmpegProcesses.get(streamId)?.process === started.process
             });
 
+            if (!ready) {
+                console.error(
+                    `⚠️ SRT listener for stream ${streamId} did not bind port ${srtPort} within ` +
+                    `${srtReadyTimeoutMs}ms (Docker Desktop on macOS can drop published UDP ports).`
+                );
+                if (ffmpegProcesses.get(streamId)?.process === started.process) {
+                    await killFFmpegProcess(streamId, started.process);
+                    ffmpegProcesses.delete(streamId);
+                }
+                registeredStreams.delete(streamId);
+                clearStreamHLSFiles(streamId);
+                return res.status(503).json({
+                    error: 'SRT listener did not become ready',
+                    streamId,
+                    port: srtPort
+                });
+            }
+
             console.log(`📝 Stream registered: ${streamId} (tracksV=${trackVNum}, (tracksA=${trackANum}, port=${srtPort})`);
+
+            registrationState.pending = false;
 
             return res.status(200).json({
                 status: 'registered',
@@ -482,6 +611,17 @@ function createMediaRoutes(options = {}) {
                 hlsUrl: `/api/hls/${streamId}/0/playlist.m3u8`
             });
         } catch (err) {
+            registeredStreams.delete(streamId);
+            const running = ffmpegProcesses.get(streamId);
+            if (running?.process) {
+                try {
+                    running.process.kill('SIGKILL');
+                } catch (killErr) {
+                    // Process already gone.
+                }
+                ffmpegProcesses.delete(streamId);
+            }
+            clearStreamHLSFiles(streamId);
             console.error(`⚠️ Failed to register stream ${streamId}:`, err);
             return res.status(500).json({ error: 'Failed to register stream' });
         }
@@ -624,7 +764,7 @@ function createMediaRoutes(options = {}) {
                     tracks: streamData.tracks,
                     hlsUrl: `/api/hls/${streamId}/0/playlist.m3u8`,
                     srtUrl: registered
-                        ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
+                        ? buildSrtUrl(process.env.SRT_URL || '127.0.0.1', registered.port, 'caller')
                         : null
                 });
             }
@@ -643,7 +783,7 @@ function createMediaRoutes(options = {}) {
                 tracks: data.tracks,
                 hlsUrl: `/api/hls/${id}/0/playlist.m3u8`,
                 srtUrl: registered
-                    ? `srt://${process.env.API_HOSTNAME || 'localhost'}:${registered.port}?mode=caller&latency=4000000&tlpktdrop=0`
+                    ? buildSrtUrl(process.env.SRT_URL || '127.0.0.1', registered.port, 'caller')
                     : null,
                 srtPort: registered ? registered.port : null
             };
@@ -723,4 +863,15 @@ async function startMediaServer() {
     });
 }
 
-export { createMediaRoutes, startMediaServer, ffmpegProcesses, registeredStreams, killFFmpegProcess, clearHLSFiles };
+export {
+    createMediaRoutes,
+    startMediaServer,
+    startFFmpegListener,
+    ffmpegProcesses,
+    registeredStreams,
+    killFFmpegProcess,
+    clearHLSFiles,
+    normalizeSrtHost,
+    waitForSrtListener,
+    isUdpPortBound
+};

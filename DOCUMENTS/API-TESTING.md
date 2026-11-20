@@ -815,6 +815,7 @@ Before considering API ready:
 - [ ] **Stream settings update**: title, description, visibility, thumbnail, and category are validated
 - [ ] **Stream key rotation**: `POST /api/streams/me/stream-key/rotate` returns a different key
 - [ ] **Direct link**: unlisted streams work through `/api/streams/:id/live`, private ones only for the owner
+- [ ] **Profile visibility**: the owner sees their private/unlisted stream on their own profile; other visitors and `/available` never list it
 - [ ] **Performance**: Responses < 500ms
 - [ ] **Tests Pass**: `npm test` shows all green
 - [ ] **Linting Passes**: `npm run lint` shows no errors
