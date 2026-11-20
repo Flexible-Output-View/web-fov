@@ -1,41 +1,93 @@
-<nav class="navbar">
+<nav class="navbar" aria-label="Navigation principale">
   <div class="nav-left">
-    <a routerLink="/" class="logo-link">
-      <img src="FOVLogo.png" alt="FOV" class="logo">
+    <a routerLink="/" class="logo-link" aria-label="FOV — Accueil">
+      <img src="FOVLogo.png" alt="" aria-hidden="true" class="logo">
     </a>
-    <div class="nav-links">
-      <a routerLink="/followed" routerLinkActive="active">Suivis</a>
-      <a routerLink="/discover" routerLinkActive="active">Découvrir</a>
-      <a routerLink="/how-does-it-work" routerLinkActive="active">Comment ça marche</a>
+    <div class="nav-links" role="list">
+      <a routerLink="/followed" routerLinkActive="active" role="listitem">Suivis</a>
+      <a routerLink="/discover" routerLinkActive="active" role="listitem">Découvrir</a>
+      <a routerLink="/how-does-it-work" routerLinkActive="active" role="listitem">Comment ça marche</a>
     </div>
   </div>
   
   <div class="nav-center">
-    <div class="search-container">
-      <input type="text" placeholder="Rechercher" class="search-input" autocomplete="off">
-      <button class="search-button">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <form class="search-container" role="search" (submit)="onSearchSubmit($event)">
+      <label for="nav-search" class="sr-only">Rechercher un stream ou un utilisateur</label>
+      <input id="nav-search"
+             type="search"
+             placeholder="Rechercher"
+             class="search-input"
+             autocomplete="off"
+             [value]="searchQuery"
+             (input)="onSearchInput($event)"
+             (focus)="isSearchOpen = true">
+      <button class="search-button" type="submit" aria-label="Lancer la recherche">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <circle cx="11" cy="11" r="8"></circle>
           <path d="m21 21-4.3-4.3"></path>
         </svg>
       </button>
-    </div>
+
+      <p class="sr-only" role="status" aria-live="polite">{{ searchStatus }}</p>
+
+      <div id="nav-search-results"
+           class="search-results"
+           *ngIf="isSearchOpen && searchQuery.trim() && searchResults">
+        <ng-container *ngIf="searchResults.streams.length > 0">
+          <p class="search-section-title" id="search-streams-title">Streams en direct</p>
+          <ul class="search-list" aria-labelledby="search-streams-title">
+            <li *ngFor="let stream of searchResults.streams">
+              <a class="search-result" [routerLink]="['/stream', stream.streamId]">
+                <span class="result-main">{{ stream.title || stream.streamer || stream.streamId }}</span>
+                <span class="result-sub">
+                  {{ stream.streamerUsername || stream.streamer }}<ng-container *ngIf="stream.category"> · {{ stream.category }}</ng-container>
+                </span>
+              </a>
+            </li>
+          </ul>
+        </ng-container>
+
+        <ng-container *ngIf="searchResults.users.length > 0">
+          <p class="search-section-title" id="search-users-title">Utilisateurs</p>
+          <ul class="search-list" aria-labelledby="search-users-title">
+            <li *ngFor="let user of searchResults.users">
+              <a class="search-result search-result--user" [routerLink]="['/', user.username]">
+                <span class="result-avatar" aria-hidden="true">
+                  <img *ngIf="user.avatarUrl" [src]="user.avatarUrl" alt="">
+                  <ng-container *ngIf="!user.avatarUrl">{{ user.username.charAt(0).toUpperCase() }}</ng-container>
+                </span>
+                <span class="result-main">{{ user.username }}</span>
+              </a>
+            </li>
+          </ul>
+        </ng-container>
+
+        <p class="search-empty" *ngIf="!hasSearchResults">Aucun résultat pour « {{ searchQuery.trim() }} »</p>
+      </div>
+    </form>
   </div>
 
   <div class="nav-right">
-    <button class="theme-toggle" (click)="toggleTheme()">
-      {{ isDarkTheme ? '☀️' : '🌙' }}
+    <button class="theme-toggle"
+            (click)="toggleTheme()"
+            [attr.aria-label]="isDarkTheme ? 'Passer en mode clair' : 'Passer en mode sombre'"
+            [attr.aria-pressed]="isDarkTheme">
+      <span aria-hidden="true">{{ isDarkTheme ? '☀️' : '🌙' }}</span>
     </button>
 
-    <a *ngIf="isAuthenticated" routerLink="/profile" class="profile-link">
+    <a *ngIf="isAuthenticated"
+       routerLink="/profile"
+       class="profile-link"
+       [attr.aria-label]="'Mon profil — ' + (profile?.username || 'utilisateur')">
       <div class="profile-avatar">
         <img
           *ngIf="avatarUrl"
           [src]="avatarUrl"
-          [alt]="profile?.username || 'Profil'"
+          alt=""
+          aria-hidden="true"
           class="avatar-img"
         >
-        <span *ngIf="!avatarUrl" class="avatar-initial">{{ initial }}</span>
+        <span *ngIf="!avatarUrl" class="avatar-initial" aria-hidden="true">{{ initial }}</span>
       </div>
     </a>
 

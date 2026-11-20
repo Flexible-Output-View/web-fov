@@ -11,6 +11,9 @@ A flexible, customizable video streaming platform that allows streamers to broad
 | **Backend Coverage** | [![Backend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/main?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/main) | [![Backend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/dev?flag=backend&label=Backend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev) |
 | **Frontend Coverage** | [![Frontend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/main?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/main) | [![Frontend Coverage](https://img.shields.io/codecov/c/github/Flexible-Output-View/web-fov/dev?flag=frontend&label=Frontend%20Coverage)](https://codecov.io/gh/Flexible-Output-View/web-fov/branch/dev) |
 
+Dependency and vulnerability tracking: see
+[DOCUMENTS/DEPENDENCY-TRACK.md](DOCUMENTS/DEPENDENCY-TRACK.md).
+
 
 ## 📋 Project Overview
 
@@ -134,7 +137,7 @@ web-fov/
 # Clone repository
 git clone <repo> && cd web-fov
 
-# Start all services (backend, frontend, Postgres)
+# Start all services (backend, frontend, Postgres, demo stream)
 docker-compose up --build
 
 # Services will be available at:
@@ -186,17 +189,29 @@ npm start  # Runs on http://localhost:4200
 
 ### SRT Configuration
 
+Encoders must first register with the stream key shown on the stream
+configuration page (`POST /ffmpeg/register`, with the key in `streamId`). The
+register request is refused with `401 { "error": "Invalid stream key" }` when
+the key is missing, malformed, unknown, or revoked, and only then is an SRT
+listener created for that stream.
+
 Encoders should use these settings:
 
 | Setting | Value |
 |---------|-------|
 | **Protocol** | SRT |
 | **Host** | backend server IP/domain |
-| **Port** | 9999 |
+| **Port** | returned by `POST /ffmpeg/register` (starts at 9999) |
 | **Mode** | Caller |
 | **Bitrate** | 5000-10000 kbps (adjust for quality) |
 | **FPS** | 30 or 60 |
 | **Resolution** | 1920x1080 or 1280x720 |
+
+The returned URL includes `connect_timeout=15000`. On Docker Desktop the first
+host-to-container UDP flow can take several seconds to establish; the longer
+timeout keeps OBS from aborting during that first connection. Use the exact
+`srtUrl` returned by the register endpoint rather than hardcoding port 9999:
+the always-running demo uses `9999`, so a real encoder receives the next port.
 
 ---
 
@@ -212,8 +227,9 @@ Encoders should use these settings:
 | `/users/me` | PUT | Update own profile (`bio`, `avatarUrl`, `bannerUrl`) (Bearer token) |
 | `/users/me/password` | PUT | Change own password (`currentPassword`, `newPassword`) (Bearer token) |
 | `/users/{username}` | GET | Get a public profile by username |
-| `/users/{username}/follow` | POST | Follow a user (Bearer token) |
-| `/users/{username}/follow` | DELETE | Unfollow a user (Bearer token) |
+| `/users/me/following` | GET | List the users followed by the authenticated user (Bearer token) |
+| `/users/{username}/follow` | POST | Follow a user → `200 {following: true, followersCount}` (Bearer token) |
+| `/users/{username}/follow` | DELETE | Unfollow a user → `200 {following: false, followersCount}` (Bearer token) |
 | `/streams` | GET | List all streams |
 | `/streams/available` | GET | Get active streams with HLS URLs |
 | `/streams/:id` | GET | Get stream details |
@@ -350,7 +366,8 @@ See [DOCUMENTS/SECURITY.md](DOCUMENTS/SECURITY.md) for full security policy.
 | **Can't connect to database** | Check DB_HOST/DB_USER/DB_PASSWORD in `.env`. Run `node test-db.js` |
 | **SRT port already in use** | Change `SRT_PORT` in `.env` or kill process on port 9999 |
 | **Frontend can't reach backend** | Verify backend is running on port 4000. Check CORS_ORIGIN in `.env` |
-| **No HLS segments being generated** | Check FFmpeg is installed: `which ffmpeg` |
+| **OBS fails to start SRT / FFmpeg says `Protocol not found`** | FFmpeg must be built with SRT. macOS: `brew install ffmpeg-full` and set `FFMPEG_PATH=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg`. Verify with `ffmpeg -protocols \| grep -w srt`. |
+| **No HLS segments being generated** | Check FFmpeg is installed and has SRT support: `ffmpeg -protocols \| grep -w srt` |
 
 ---
 
@@ -370,19 +387,5 @@ See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Last Updated:** September 2026  
-**Current Version:** 0.1.0 (Beta)
-
-Set up OBS
-The stream key will be used to separate the different stream as you can se on the nginx conf
-```
-# Define stream keys
-hls_variant _stream1 BANDWIDTH=1000000; # Stream 1
-hls_variant _stream2 BANDWIDTH=1000000; # Stream 2
-```
-![Stream settings](https://i.imgur.com/VqlS9Lh.png "OBS")
-
-and then start obs, with the custom settings in obs.sh
-```
-./obs.sh
-```
+**Last Updated:** October 2026
+**Current Version:** 1.2.0

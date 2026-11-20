@@ -1,21 +1,26 @@
 <div class="home-page">
-  <!-- Carousel en haut — affiche les lives -->
-  <section class="section">
-    <app-featured-carousel [streams]="liveStreams" [isLoading]="isLoadingLiveStreams"></app-featured-carousel>
+  <h1 class="sr-only">Accueil</h1>
+
+  <section class="section" aria-label="Streams en vedette">
+    <app-featured-carousel
+      [streams]="liveStreams"
+      [isLoading]="isLoadingLiveStreams">
+    </app-featured-carousel>
   </section>
 
   <section class="section">
     <div class="section-header">
       <h2>Catégories populaires</h2>
     </div>
-    
-    <div *ngIf="isLoadingCategories" class="loading-state">
-      Chargement des catégories...
+
+    <div *ngIf="isLoadingCategories" class="loading-state" role="status" aria-live="polite">
+      <span class="loading-spinner" aria-hidden="true"></span>
+      Chargement des catégories…
     </div>
-    
+
     <div *ngIf="!isLoadingCategories" class="categories-grid">
-      <app-category-card 
-        *ngFor="let category of popularCategories" 
+      <app-category-card
+        *ngFor="let category of popularCategories"
         [category]="category">
       </app-category-card>
     </div>

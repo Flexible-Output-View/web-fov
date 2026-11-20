@@ -12,9 +12,15 @@ import {
 } from '../streamTrackUtils.js';
 import { optionalAuth } from '../middleware/auth.js';
 import { sanitizeVisitorId, viewerPresence } from '../viewerPresence.js';
+import streamSettingsRouter from './streamSettings.js';
+import { parseUserStreamId, toPublicStreamId, toStreamHandle } from '../streamSettings.js';
 
 const MEDIA_ROOT = process.env.MEDIA_ROOT || path.join(process.cwd(), 'media');
 const HLS_DIR = path.join(MEDIA_ROOT, 'hls');
+
+// Authenticated stream configuration endpoints. Mounted before `/:id` so
+// `/api/streams/me` is never interpreted as a stream id.
+router.use('/me', streamSettingsRouter);
 
 /*function isPlaylistReady(playlistPath, minSegments = 2) {
     try {
@@ -185,17 +191,155 @@ function isNumericStreamId(streamId) {
     return /^\d+$/.test(streamId);
 }
 
-async function fetchStreamInfo(streamId) {
-    if (!isNumericStreamId(streamId)) {
+const USER_STREAM_SELECT = `
+    SELECT
+        ss.user_id,
+        ss.title,
+        ss.description,
+        ss.visibility,
+        ss.thumbnail_url,
+        c.name AS category,
+        u.username,
+        u.avatar_url
+    FROM stream_settings ss
+    JOIN users u ON u.id = ss.user_id
+    LEFT JOIN categories c ON c.id = ss.category_id
+`;
+
+function toUserStreamInfo(row) {
+    return {
+        user_id: row.user_id,
+        username: row.username,
+        streamer: row.username,
+        streamer_username: row.username,
+        title: row.title,
+        description: row.description,
+        visibility: row.visibility,
+        category: row.category,
+        viewers: 0,
+        avatar_url: row.avatar_url,
+        thumbnail_url: row.thumbnail_url
+    };
+}
+
+async function fetchUserStreamInfo(userId) {
+    const rows = await db.query(
+        `${USER_STREAM_SELECT} WHERE ss.user_id = ? LIMIT 1`,
+        [userId]
+    );
+
+    return rows.length > 0 ? toUserStreamInfo(rows[0]) : null;
+}
+
+async function fetchUserStreamInfoByUsername(username) {
+    if (typeof username !== 'string' || username.trim().length === 0) {
         return null;
     }
 
-    const dbRows = await db.query(
-        'SELECT s.id, s.title, s.viewers, s.avatar_url, s.thumbnail_url, c.name as category FROM streams s LEFT JOIN categories c ON s.category_id = c.id WHERE s.id = ?',
-        [streamId]
+    const handle = username.trim();
+
+    // Exact match first: usernames are stored as registered and this keeps
+    // `Alice` and `alice` distinct when both accounts exist.
+    const rows = await db.query(
+        `${USER_STREAM_SELECT} WHERE u.username = ? LIMIT 1`,
+        [handle]
     );
 
-    return dbRows.length > 0 ? dbRows[0] : null;
+    if (rows?.length > 0) {
+        return toUserStreamInfo(rows[0]);
+    }
+
+    // Direct links are shared and typed by hand, so fall back to a
+    // case-insensitive match. Without this, an unlisted stream (which is only
+    // reachable through its direct link) returns 404 when the link casing
+    // differs from the registered username.
+    const insensitiveRows = await db.query(
+        `${USER_STREAM_SELECT}
+         WHERE LOWER(u.username) = LOWER(?)
+         ORDER BY u.id
+         LIMIT 1`,
+        [handle]
+    );
+
+    return insensitiveRows?.length > 0 ? toUserStreamInfo(insensitiveRows[0]) : null;
+}
+
+async function fetchStreamInfo(streamId) {
+    if (isNumericStreamId(streamId)) {
+        const dbRows = await db.query(
+            `SELECT
+                s.id,
+                s.streamer,
+                s.title,
+                s.viewers,
+                s.avatar_url,
+                s.thumbnail_url,
+                c.name as category,
+                (
+                    SELECT u.username
+                    FROM users u
+                    WHERE LOWER(u.username) = LOWER(s.streamer)
+                    ORDER BY u.id
+                    LIMIT 1
+                ) AS streamer_username
+            FROM streams s
+            LEFT JOIN categories c ON s.category_id = c.id
+            WHERE s.id = ?`,
+            [streamId]
+        );
+
+        return dbRows.length > 0 ? dbRows[0] : null;
+    }
+
+    // Legacy `u<userId>` links still resolve to the same account.
+    const userId = parseUserStreamId(streamId);
+    if (userId) {
+        return fetchUserStreamInfo(userId);
+    }
+
+    // Otherwise the id is the public handle: the streamer's username.
+    return fetchUserStreamInfoByUsername(streamId);
+}
+
+/** HLS directory / runtime key backing a stream (always numeric-safe). */
+function streamDirId(streamId, streamInfo) {
+    if (streamInfo?.user_id) {
+        return toPublicStreamId(streamInfo.user_id);
+    }
+    return streamId;
+}
+
+/** Id exposed to viewers: the username for account streams, else the row id. */
+function streamPublicId(streamId, streamInfo) {
+    if (streamInfo?.user_id) {
+        return toStreamHandle(streamInfo);
+    }
+    return streamId;
+}
+
+/** Normalize a user id coming from the DB or a JWT for safe comparisons. */
+function normalizeUserId(value) {
+    const userId = Number(value);
+    return Number.isSafeInteger(userId) && userId > 0 ? userId : null;
+}
+
+/** Whether a stream may appear in discovery listings (`/available`). */
+function canDiscover(streamInfo) {
+    // Only public streams are discoverable. Private streams stay on their
+    // owner's profile, and unlisted streams stay reachable through their
+    // direct link, but neither belongs in the public home/discover/followed
+    // listings — not even for the owner.
+    return (streamInfo?.visibility || 'public') === 'public';
+}
+
+/** Whether the caller may open a stream page / fetch its tracks. */
+function canView(streamInfo, viewerId) {
+    const visibility = streamInfo?.visibility || 'public';
+    if (visibility === 'public' || visibility === 'unlisted') {
+        return true;
+    }
+    const ownerId = normalizeUserId(streamInfo?.user_id);
+    return Boolean(ownerId) && ownerId === normalizeUserId(viewerId);
 }
 
 function buildStreamEntry(streamId, tracks, streamInfo) {
@@ -204,11 +348,25 @@ function buildStreamEntry(streamId, tracks, streamInfo) {
         trackCount: tracks.length,
         tracks,
         title: streamInfo?.title || '',
+        description: streamInfo?.description || '',
+        visibility: streamInfo?.visibility || 'public',
         category: streamInfo?.category || '',
         viewers: streamInfo?.viewers || 0,
+        streamer: streamInfo?.streamer || '',
+        streamerUsername: streamInfo?.streamer_username || null,
         avatarUrl: streamInfo?.avatar_url || '',
         thumbnailUrl: streamInfo?.thumbnail_url || ''
     };
+}
+
+function buildBaseUrl(req) {
+    const port = process.env.PORT || 4000;
+    const rawHost = process.env.API_HOSTNAME || req.get('host') || `localhost:${port}`;
+    const normalizedHost = rawHost.trim().replace(/:\s*/, ':');
+    const hostUrl = new URL(/^https?:\/\//i.test(normalizedHost) ? normalizedHost : `http://${normalizedHost}`);
+    const host = hostUrl.host.replace(/\/api(?:\/.*)?$/i, '');
+    const protocol = process.env.API_PROTOCOL || req.protocol || hostUrl.protocol.replace(':', '') || 'http';
+    return `${protocol}://${host}`;
 }
 
 export function broadcastViewerCount(app, streamId, counts) {
@@ -264,19 +422,13 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-router.get('/available', async (req, res, next) => {
+router.get('/available', optionalAuth, async (req, res, next) => {
     try {
         res.set('Cache-Control', 'no-store'); // Disable caching
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
 
-        const port = process.env.PORT || 4000;
-        const rawHost = process.env.API_HOSTNAME || req.get('host') || `localhost:${port}`;
-        const normalizedHost = rawHost.trim().replace(/:\s*/, ':');
-        const hostUrl = new URL(/^https?:\/\//i.test(normalizedHost) ? normalizedHost : `http://${normalizedHost}`);
-        const host = hostUrl.host.replace(/\/api(?:\/.*)?$/i, '');
-        const protocol = process.env.API_PROTOCOL || req.protocol || hostUrl.protocol.replace(':', '') || 'http';
-        const url = `${protocol}://${host}`;
+        const url = buildBaseUrl(req);
         const streams = [];
 
         // Get all stream directories
@@ -286,8 +438,19 @@ router.get('/available', async (req, res, next) => {
 
         // For each stream, get database info and HLS tracks
         for (const streamId of streamDirs) {
+            const isUserStream = Boolean(parseUserStreamId(streamId));
+
             try {
                 const streamInfo = await fetchStreamInfo(streamId);
+
+                // A user stream without settings cannot be attributed safely.
+                if (isUserStream && !streamInfo) {
+                    continue;
+                }
+
+                if (!canDiscover(streamInfo)) {
+                    continue;
+                }
 
                 const streamPath = path.join(HLS_DIR, streamId);
                 const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
@@ -295,9 +458,15 @@ router.get('/available', async (req, res, next) => {
                     .map(dirent => dirent.name);
 
                 const tracks = await buildTracks(streamId, trackDirs, url);
-                streams.push(buildStreamEntry(streamId, tracks, streamInfo));
+                streams.push(buildStreamEntry(streamPublicId(streamId, streamInfo), tracks, streamInfo));
             } catch (err) {
                 console.error(`Error processing stream ${streamId}: `, err);
+
+                // Never expose an unverified user stream with default metadata.
+                if (isUserStream) {
+                    continue;
+                }
+
                 const streamPath = path.join(HLS_DIR, streamId);
                 const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
                     .filter(dirent => dirent.isDirectory())
@@ -315,12 +484,104 @@ router.get('/available', async (req, res, next) => {
     }
 });
 
+// GET /api/streams/:id/live -> one live stream with tracks, visibility-aware.
+// `:id` is the streamer username (preferred) or a legacy `u<userId>` / numeric
+// stream id. This is the direct-link lookup for unlisted streams and for
+// private streams opened by their owner.
+router.get('/:id/live', optionalAuth, async (req, res, next) => {
+    try {
+        const requestedId = req.params.id;
+        const legacyUserStream = Boolean(parseUserStreamId(requestedId));
+
+        if (!legacyUserStream) {
+            // Public handle: resolve the username to its account stream. This
+            // runs before the numeric lookup so a digits-only username still
+            // owns its `/stream/<username>` URL.
+            const userStreamInfo = await fetchUserStreamInfoByUsername(requestedId);
+            if (userStreamInfo) {
+                return sendLiveStream(req, res, userStreamInfo, streamDirId(requestedId, userStreamInfo));
+            }
+            if (!isNumericStreamId(requestedId)) {
+                return res.status(404).json({ error: 'Stream not found' });
+            }
+        } else {
+            const streamInfo = await fetchStreamInfo(requestedId);
+            if (!streamInfo) {
+                return res.status(404).json({ error: 'Stream not found' });
+            }
+            return sendLiveStream(req, res, streamInfo, streamDirId(requestedId, streamInfo));
+        }
+
+        // Numeric ids belong to the legacy `streams` table.
+        const streamInfo = await fetchStreamInfo(requestedId);
+        const streamPath = path.join(HLS_DIR, requestedId);
+        if (!fs.existsSync(streamPath)) {
+            return res.status(404).json({ error: 'Stream not found' });
+        }
+
+        const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
+            .filter(dirent => dirent.isDirectory())
+            .map(dirent => dirent.name);
+
+        if (trackDirs.length === 0) {
+            return res.status(404).json({ error: 'Stream not found' });
+        }
+
+        const tracks = await buildTracks(requestedId, trackDirs, buildBaseUrl(req));
+        res.json(buildStreamEntry(requestedId, tracks, streamInfo));
+    } catch (err) {
+        next(err);
+    }
+});
+
+async function sendLiveStream(req, res, streamInfo, dirId) {
+    if (!canView(streamInfo, req.userId)) {
+        return res.status(404).json({ error: 'Stream not found' });
+    }
+
+    const streamPath = path.join(HLS_DIR, dirId);
+    if (!fs.existsSync(streamPath)) {
+        return res.status(404).json({ error: 'Stream not found' });
+    }
+
+    const trackDirs = fs.readdirSync(streamPath, { withFileTypes: true })
+        .filter(dirent => dirent.isDirectory())
+        .map(dirent => dirent.name);
+
+    if (trackDirs.length === 0) {
+        return res.status(404).json({ error: 'Stream not found' });
+    }
+
+    const tracks = await buildTracks(dirId, trackDirs, buildBaseUrl(req));
+    return res.json(buildStreamEntry(streamPublicId(dirId, streamInfo), tracks, streamInfo));
+}
+
 router.get('/:id', async (req, res, next) => {
     try {
         if (!isNumericStreamId(req.params.id)) {
             return res.status(404).json({ error: 'Stream not found' });
         }
-        const rows = await db.query('SELECT id, streamer, title, category_id, viewers, thumbnail_url, avatar_url, is_live FROM streams WHERE id = ?', [req.params.id]);
+        const rows = await db.query(
+            `SELECT
+                s.id,
+                s.streamer,
+                s.title,
+                s.category_id,
+                s.viewers,
+                s.thumbnail_url,
+                s.avatar_url,
+                s.is_live,
+                (
+                    SELECT u.username
+                    FROM users u
+                    WHERE LOWER(u.username) = LOWER(s.streamer)
+                    ORDER BY u.id
+                    LIMIT 1
+                ) AS "streamerUsername"
+            FROM streams s
+            WHERE s.id = ?`,
+            [req.params.id]
+        );
         if (!rows || rows.length === 0) {
             return res.status(404).json({ error: 'Stream not found' });
         }
@@ -333,9 +594,11 @@ router.get('/:id', async (req, res, next) => {
 router.get('/:id/hls', async (req, res, next) => {
     try {
         const streamId = req.params.id;
+        const streamInfo = await fetchStreamInfo(streamId);
+        const dirId = streamDirId(streamId, streamInfo);
         const host = req.get('host') || `localhost:${process.env.PORT || 4000}`;
         const protocol = req.protocol || 'http';
-        const hlsUrl = `${protocol}://${host}/api/hls/live/${streamId}/playlist.m3u8`;
+        const hlsUrl = `${protocol}://${host}/api/hls/live/${dirId}/playlist.m3u8`;
         console.log(`DEBUG 111 HLS URL: ${hlsUrl}`);
         res.json({ hls: hlsUrl });
     } catch (err) {

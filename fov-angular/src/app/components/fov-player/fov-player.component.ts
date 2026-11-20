@@ -81,15 +81,6 @@ interface SavedLayout {
   audioWrappers?: SavedAudioLayout[];
 }
 
-interface ApiTracksResponse {
-  tracks: Track[];
-  videoCount: number;
-  ready: boolean;
-  pending?: number;
-  totalDirs?: number;
-  message?: string;
-}
-
 interface ApiStreamTrack {
   trackId: string;
   name?: string;
@@ -102,11 +93,6 @@ interface ApiLiveStream {
   streamId: string;
   trackCount: number;
   tracks: ApiStreamTrack[];
-}
-
-interface ApiAvailableStreamsResponse {
-  streams: ApiLiveStream[];
-  streamCount: number;
 }
 
 interface TrackBufferInfo {
@@ -255,7 +241,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     this.videoWrappers.forEach((w) => { w.hls?.destroy(); });
     this.audioWrappers.forEach((w) => { w.hls?.destroy(); });
     if (this.savedLayoutTimeout) clearTimeout(this.savedLayoutTimeout);
-    if (this.isFullscreen) document.exitFullscreen?.().catch(() => {});
+    if (this.isFullscreen) this.exitDocumentFullscreen().catch(() => {});
 
     if (this.clickToUnlockHandler) {
       const stage = document.getElementById(`stageArea_${this.playerId}`);
@@ -263,9 +249,9 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       this.clickToUnlockHandler = null;
     }
     if (this.documentUnlockHandler) {
-      document.removeEventListener('click', this.documentUnlockHandler);
-      document.removeEventListener('keydown', this.documentUnlockHandler);
-      document.removeEventListener('touchstart', this.documentUnlockHandler);
+      document.removeEventListener('click', this.documentUnlockHandler, { capture: true });
+      document.removeEventListener('keydown', this.documentUnlockHandler, { capture: true });
+      document.removeEventListener('touchstart', this.documentUnlockHandler, { capture: true });
       this.documentUnlockHandler = null;
     }
   }
@@ -315,7 +301,7 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const stageW = stage.offsetWidth;
     const stageH = stage.offsetHeight;
     if (!stageW || !stageH) return;
-    if (this.isFullscreen !== !!document.fullscreenElement) return;
+    if (this.isFullscreen !== this.isPlayerFullscreen()) return;
 
     for (const w of this.videoWrappers) {
       if (!w.isVideo) continue;
@@ -396,37 +382,65 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
   @HostListener('document:fullscreenchange')
   @HostListener('document:webkitfullscreenchange')
   onFullscreenChange() {
-    this.isFullscreen = !!(
-      document.fullscreenElement || (document as any).webkitFullscreenElement
-    );
+    this.isFullscreen = this.isPlayerFullscreen();
     if (!this.isFullscreen) this.fullscreenAudioPanelOpen = false;
     setTimeout(() => this.adaptWrappersToViewport(), 100);
   }
 
   private fetchAvailableTracks() {
-    this.http.get<any>(`${this.API_URL}/streams/available`).subscribe({
-      next: (response) => {
-        if (Array.isArray(response)) {
-          this.handleArrayApiFormat(response);
-        } else if (response.streams) {
-          this.handleNewApiFormat(response as ApiAvailableStreamsResponse);
-        } else if (response.tracks) {
-          this.handleLegacyApiFormat(response as ApiTracksResponse);
-        } else {
-          this.handleNoData();
-        }
-      },
-      error: (err) => {
-        console.error(`[FOV] fetchAvailableTracks error:`, err.status, err.message);
-        this.pollAttempts++;
-        if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
-          this.startPolling(2000);
-        } else {
-          this.isLoading = false;
-          this.isBufferingPhase = false;
-          this.errorMessage = 'Impossible de charger les flux.';
-        }
-      },
+    // Direct, visibility-aware lookup: `/live` accepts the username and keeps
+    // unlisted / private-owner streams playable even though they are absent
+    // from the public discovery listing.
+    this.http
+      .get<ApiLiveStream>(
+        `${this.API_URL}/streams/${encodeURIComponent(this.streamId)}/live`,
+      )
+      .subscribe({
+        next: (stream) => {
+          if (stream && stream.tracks && stream.tracks.length > 0) {
+            this.handleLiveStream(stream);
+          } else {
+            this.handleNoData();
+          }
+        },
+        error: (err) => {
+          if (err?.status === 404) {
+            // Not live yet: keep polling without flagging a hard error.
+            this.handleNoData();
+            return;
+          }
+          console.error(`[FOV] fetchAvailableTracks error:`, err.status, err.message);
+          this.pollAttempts++;
+          if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
+            this.startPolling(2000);
+          } else {
+            this.isLoading = false;
+            this.isBufferingPhase = false;
+            this.errorMessage = 'Impossible de charger les flux.';
+          }
+        },
+      });
+  }
+
+  private handleLiveStream(stream: ApiLiveStream) {
+    if (!stream.tracks || stream.tracks.length === 0) {
+      this.handleNoData();
+      return;
+    }
+
+    this.stopPolling();
+    this.availableTracks = stream.tracks.map((t, i) => ({
+      index: i,
+      name: t.name || t.trackId,
+      trackId: t.trackId,
+      videoUrl: t.videoUrl,
+      isVideo: t.isVideo ?? true,
+      isAudio: t.isAudio ?? false,
+    }));
+
+    this.waitForPlaylistsReady(this.availableTracks).then(() => {
+      this.initializeAllTracks();
+      this.isLoading = false;
     });
   }
 
@@ -459,76 +473,6 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
       };
       check();
     });
-  }
-
-  private handleArrayApiFormat(streams: any[]) {
-    const stream = streams.find(
-      (s) => s.streamId === this.streamId && (s.trackCount ?? 0) > 0,
-    );
-    if (stream && stream.tracks && stream.tracks.length > 0) {
-      this.stopPolling();
-      this.availableTracks = stream.tracks.map((t: any, i: number) => ({
-        index: i,
-        name: t.name || t.trackId,
-        trackId: t.trackId,
-        videoUrl: t.videoUrl,
-        isVideo: t.isVideo ?? true,
-        isAudio: t.isAudio ?? false,
-      }));
-      this.waitForPlaylistsReady(this.availableTracks).then(() => {
-        this.initializeAllTracks();
-        this.isLoading = false;
-      });
-    } else {
-      this.handleNoData();
-    }
-  }
-
-  private handleNewApiFormat(response: ApiAvailableStreamsResponse) {
-    const stream = response.streams.find(
-      (s) => s.streamId === this.streamId && (s.trackCount ?? 0) > 0,
-    );
-    if (stream && stream.tracks.length > 0) {
-      this.stopPolling();
-      this.availableTracks = stream.tracks.map((t: any, i: number) => ({
-        index: i,
-        name: t.name || t.trackId,
-        trackId: t.trackId,
-        videoUrl: t.videoUrl,
-        isVideo: t.isVideo ?? true,
-        isAudio: t.isAudio ?? false,
-      }));
-      this.waitForPlaylistsReady(this.availableTracks).then(() => {
-        this.initializeAllTracks();
-        this.isLoading = false;
-      });
-    } else {
-      this.handleNoData();
-    }
-  }
-
-  private handleLegacyApiFormat(response: ApiTracksResponse) {
-    const totalDirs = response.totalDirs || 0;
-    const readyCount = response.videoCount || 0;
-    const pending = response.pending || 0;
-    const allReady = totalDirs > 0 && pending === 0 && readyCount === totalDirs;
-    if (allReady && response.tracks && response.tracks.length > 0) {
-      this.stopPolling();
-      this.availableTracks = response.tracks;
-      this.initializeAllTracks();
-      this.isLoading = false;
-    } else {
-      this.pollAttempts++;
-      if (this.pollAttempts < this.MAX_POLL_ATTEMPTS) {
-        const pollDelay =
-          pending > 0 && readyCount > 0 ? 500 : totalDirs > 0 ? 1000 : 2000;
-        this.startPolling(pollDelay);
-      } else {
-        this.isLoading = false;
-        this.isBufferingPhase = false;
-        this.errorMessage = 'Timeout.';
-      }
-    }
   }
 
   private handleNoData() {
@@ -1747,18 +1691,31 @@ export class FovPlayerComponent implements AfterViewInit, OnDestroy {
     const el = this.playerRoot?.nativeElement;
     if (!el) return;
     try {
-      if (!document.fullscreenElement) {
+      if (!this.getFullscreenElement()) {
         if (el.requestFullscreen) await el.requestFullscreen();
         else if ((el as any).webkitRequestFullscreen)
           await (el as any).webkitRequestFullscreen();
       } else {
-        if (document.exitFullscreen) await document.exitFullscreen();
-        else if ((document as any).webkitExitFullscreen)
-          await (document as any).webkitExitFullscreen();
+        await this.exitDocumentFullscreen();
       }
     } catch (err) {
       console.error('[FOV] Fullscreen error:', err);
     }
+  }
+
+  private getFullscreenElement(): Element | null {
+    return document.fullscreenElement ?? (document as any).webkitFullscreenElement ?? null;
+  }
+
+  private isPlayerFullscreen(): boolean {
+    const root = this.playerRoot?.nativeElement;
+    return !!root && this.getFullscreenElement() === root;
+  }
+
+  private async exitDocumentFullscreen(): Promise<void> {
+    if (document.exitFullscreen) await document.exitFullscreen();
+    else if ((document as any).webkitExitFullscreen)
+      await (document as any).webkitExitFullscreen();
   }
 
   toggleFullscreenAudioPanel() {

@@ -231,4 +231,73 @@ describe('ViewerPresenceService', () => {
     expect(payload).toEqual(jasmine.any(Blob));
     discardPeriodicTasks();
   }));
+
+  it('ignores start() with empty streamId', fakeAsync(() => {
+    service.start('');
+    tick(0);
+    httpMock.expectNone(heartbeatUrl());
+    expect(service.streamId).toBeNull();
+  }));
+
+  it('calls stop() on ngOnDestroy', fakeAsync(() => {
+    service.start('1');
+    tick(0);
+    httpMock.expectOne(heartbeatUrl()).flush(viewerCount());
+
+    spyOn(service, 'stop').and.callThrough();
+    service.ngOnDestroy();
+    expect(service.stop).toHaveBeenCalled();
+    expect(service.streamId).toBeNull();
+
+    httpMock.expectOne(leaveUrl()).flush(null, { status: 204, statusText: 'No Content' });
+  }));
+
+  it('falls back to fetch keepalive when sendBeacon returns false', fakeAsync(() => {
+    spyOn(navigator, 'sendBeacon').and.returnValue(false);
+    const fetchSpy = spyOn(window, 'fetch').and.returnValue(Promise.resolve(new Response()));
+
+    service.start('1');
+    tick(0);
+    httpMock.expectOne(heartbeatUrl()).flush(viewerCount());
+
+    window.dispatchEvent(new Event('pagehide'));
+
+    expect(navigator.sendBeacon).toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      leaveUrl(),
+      jasmine.objectContaining({ method: 'POST', keepalive: true }),
+    );
+    discardPeriodicTasks();
+  }));
+
+  it('does not send leave beacon when no stream is active', () => {
+    const beaconSpy = spyOn(navigator, 'sendBeacon');
+    window.dispatchEvent(new Event('pagehide'));
+    expect(beaconSpy).not.toHaveBeenCalled();
+  });
+
+  it('generates a fallback visitor id when crypto.randomUUID is unavailable', () => {
+    sessionStorage.removeItem(VISITOR_ID_KEY);
+    const originalCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
+
+    // Re-create service to trigger resolveVisitorId
+    TestBed.resetTestingModule();
+    const authMock = { currentUser$: userSubject.asObservable(), getToken: () => null };
+    const chatMock = { viewerCount$: socketCounts.asObservable() };
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [
+        ViewerPresenceService,
+        { provide: AuthService, useValue: authMock },
+        { provide: ChatService, useValue: chatMock },
+      ],
+    });
+    const freshService = TestBed.inject(ViewerPresenceService);
+
+    expect(freshService.visitor).toMatch(/^viewer-\d+-[a-z0-9]+$/);
+
+    Object.defineProperty(globalThis, 'crypto', { value: originalCrypto, configurable: true });
+  });
 });
+

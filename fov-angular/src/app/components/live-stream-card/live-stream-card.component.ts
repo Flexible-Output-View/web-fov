@@ -12,4 +12,18 @@ import { LiveStreamInfo } from '../../models/live-stream.model';
 })
 export class LiveStreamCardComponent {
   @Input() stream!: LiveStreamInfo;
+
+  /** Channel name, falling back to the stream id for legacy payloads. */
+  get streamerName(): string {
+    return this.stream.streamer || this.stream.streamId;
+  }
+
+  /** Username used by the public profile route. */
+  get streamerRoute(): string {
+    return this.stream.streamerUsername || this.streamerName;
+  }
+
+  get streamerInitial(): string {
+    return this.streamerName.charAt(0).toUpperCase();
+  }
 }

@@ -5,7 +5,10 @@
       <p>Créez votre compte FOV</p>
     </div>
 
-    <form (ngSubmit)="onSubmit()" class="auth-form">
+    <form (ngSubmit)="onSubmit()"
+          class="auth-form"
+          [attr.aria-busy]="isLoading">
+
       <div class="form-group">
         <label for="username">Nom d'utilisateur</label>
         <input
@@ -15,6 +18,7 @@
           name="username"
           placeholder="Nom d'utilisateur"
           autocomplete="username"
+          [attr.aria-invalid]="errorMessage ? true : null"
         />
       </div>
 
@@ -27,6 +31,7 @@
           name="email"
           placeholder="votre@email.com"
           autocomplete="email"
+          [attr.aria-invalid]="errorMessage ? true : null"
         />
       </div>
 
@@ -39,6 +44,7 @@
           name="password"
           placeholder="••••••••"
           autocomplete="new-password"
+          [attr.aria-invalid]="errorMessage ? true : null"
         />
       </div>
 
@@ -51,15 +57,19 @@
           name="confirmPassword"
           placeholder="••••••••"
           autocomplete="new-password"
+          [attr.aria-invalid]="errorMessage ? true : null"
         />
       </div>
 
-      <div class="error-message" *ngIf="errorMessage">
+      <div class="error-message"
+           *ngIf="errorMessage"
+           role="alert"
+           aria-live="assertive">
         {{ errorMessage }}
       </div>
 
       <button type="submit" class="btn-primary" [disabled]="isLoading">
-        {{ isLoading ? 'Inscription...' : 'S\'inscrire' }}
+        {{ isLoading ? 'Inscription en cours…' : 'S\'inscrire' }}
       </button>
     </form>
 

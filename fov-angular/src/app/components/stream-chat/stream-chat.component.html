@@ -4,8 +4,9 @@
     <span
       class="connection-dot"
       [class.online]="isConnected"
-      [title]="isConnected ? 'Connecté au chat' : 'Connexion au chat…'"
-    ></span>
+      role="status"
+      [attr.aria-label]="isConnected ? 'Connecté au chat' : 'Connexion au chat en cours'">
+    </span>
   </header>
 
   <div
@@ -14,9 +15,10 @@
     (scroll)="onScroll()"
     role="log"
     aria-live="polite"
-  >
+    aria-relevant="additions"
+    aria-label="Messages du chat">
     <div class="chat-empty" *ngIf="messages.length === 0">
-      <p class="empty-icon">💬</p>
+      <p class="empty-icon" aria-hidden="true">💬</p>
       <p>Bienvenue dans le chat !</p>
       <p class="empty-hint">Soyez le premier à discuter.</p>
     </div>
@@ -24,22 +26,26 @@
     <div
       class="chat-line"
       *ngFor="let msg of messages; trackBy: trackByMessage"
-    >
-      <span class="chat-time">{{ formatTime(msg.createdAt) }}</span>
+      [attr.aria-label]="msg.username + ' dit : ' + msg.message">
+      <span class="chat-time" aria-hidden="true">{{ formatTime(msg.createdAt) }}</span>
       <span
         class="chat-username"
         [style.color]="usernameColor(msg.username)"
         >{{ msg.username }}</span
-      ><span class="chat-colon">: </span>
+      ><span class="chat-colon" aria-hidden="true">: </span>
       <span class="chat-text">{{ msg.message }}</span>
     </div>
   </div>
 
   <footer class="chat-footer">
-    <div class="send-error" *ngIf="sendError">{{ sendError }}</div>
+    <div class="send-error" *ngIf="sendError" role="alert">
+      {{ sendError }}
+    </div>
 
     <div class="chat-input-row" *ngIf="isLoggedIn; else loginPrompt">
+      <label for="chat-message-input" class="sr-only">Message du chat</label>
       <input
+        id="chat-message-input"
         class="chat-input"
         type="text"
         [(ngModel)]="draft"
@@ -47,18 +53,18 @@
         [maxlength]="maxLength"
         [disabled]="isSending"
         placeholder="Envoyer un message"
-        aria-label="Envoyer un message"
+        aria-label="Écrire un message dans le chat"
+        [attr.aria-describedby]="sendError ? 'chat-error' : null"
       />
       <button
         class="chat-send"
         (click)="send()"
         [disabled]="!canSend"
-        aria-label="Envoyer"
-      >
+        aria-label="Envoyer le message">
         {{ isSending ? '…' : 'Discuter' }}
       </button>
     </div>
-    <div class="chat-count" *ngIf="isLoggedIn">
+    <div class="chat-count" *ngIf="isLoggedIn" aria-hidden="true">
       {{ draft.length }}/{{ maxLength }}
     </div>
 

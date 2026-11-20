@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - "main"
-      - "87-fix-déploiement-master-site-fov"
 
 jobs:
     Deploy-public:

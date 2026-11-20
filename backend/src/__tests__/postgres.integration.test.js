@@ -15,7 +15,7 @@ app.use((err, req, res, _next) => {
 
 (runIntegration ? describe : describe.skip)('Postgres integration', () => {
     beforeEach(async () => {
-        await db.query('TRUNCATE users RESTART IDENTITY CASCADE');
+        await db.query('TRUNCATE users, streams RESTART IDENTITY CASCADE');
     });
 
     afterAll(async () => {
@@ -28,9 +28,19 @@ app.use((err, req, res, _next) => {
         expect(Array.isArray(categories.body)).toBe(true);
         expect(categories.body.length).toBeGreaterThan(0);
 
+        // The schema ships without sample streams, so seed one for the lookup.
+        const categoryId = categories.body[0].id;
+        await db.query(
+            `INSERT INTO streams (streamer, title, category_id, viewers, thumbnail_url, avatar_url)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            ['integration_streamer', 'Integration stream', categoryId, 42, 'thumb.png', 'avatar.png']
+        );
+
         const stream = await request(app).get('/api/streams/1');
         expect(stream.status).toBe(200);
         expect(stream.body.id).toBe(1);
+        expect(stream.body.title).toBe('Integration stream');
+        expect(stream.body.category_id).toBe(categoryId);
 
         const missingStream = await request(app).get('/api/streams/999999');
         expect(missingStream.status).toBe(404);
@@ -61,6 +71,25 @@ app.use((err, req, res, _next) => {
 
         const badInput = await request(app).post('/api/auth/login').send({ login: credentials.username });
         expect(badInput.status).toBe(400);
+    });
+
+    test('searches users by username with escaped wildcards', async () => {
+        await db.query(
+            `INSERT INTO users (username, email, password_hash, created_at)
+             VALUES (?, ?, 'x', NOW()), (?, ?, 'x', NOW()), (?, ?, 'x', NOW())`,
+            ['ab_cd', 'ab_cd@example.com', 'abxcd', 'abxcd@example.com', 'zab', 'zab@example.com']
+        );
+
+        const prefixFirst = await request(app).get('/api/users').query({ q: 'AB' });
+        expect(prefixFirst.status).toBe(200);
+        expect(prefixFirst.body.map((user) => user.username)).toEqual(['ab_cd', 'abxcd', 'zab']);
+        expect(prefixFirst.body[0]).toEqual({ username: 'ab_cd', avatarUrl: '' });
+
+        const literalUnderscore = await request(app).get('/api/users').query({ q: 'b_c' });
+        expect(literalUnderscore.body.map((user) => user.username)).toEqual(['ab_cd']);
+
+        const noMatch = await request(app).get('/api/users').query({ q: '%' });
+        expect(noMatch.body).toEqual([]);
     });
 
     test('supports profile update, password change, and follow/unfollow', async () => {
@@ -99,15 +128,25 @@ app.use((err, req, res, _next) => {
         // alice follows bob
         const follow = await request(app).post(`/api/users/${bobName}/follow`).set(auth(aliceToken));
         expect(follow.status).toBe(200);
-        expect(follow.body).toEqual({ following: true });
+        expect(follow.body).toEqual({ following: true, followersCount: 1 });
 
         const bobAsSeenByAlice = await request(app).get(`/api/users/${bobName}`).set(auth(aliceToken));
         expect(bobAsSeenByAlice.body.followersCount).toBe(1);
         expect(bobAsSeenByAlice.body.isFollowing).toBe(true);
 
+        const following = await request(app).get('/api/users/me/following').set(auth(aliceToken));
+        expect(following.status).toBe(200);
+        expect(following.body).toHaveLength(1);
+        expect(following.body[0]).toMatchObject({
+            username: bobName,
+            isFollowing: true,
+            followersCount: 1
+        });
+        expect(following.body[0]).not.toHaveProperty('email');
+
         const unfollow = await request(app).delete(`/api/users/${bobName}/follow`).set(auth(aliceToken));
         expect(unfollow.status).toBe(200);
-        expect(unfollow.body).toEqual({ following: false });
+        expect(unfollow.body).toEqual({ following: false, followersCount: 0 });
 
         // cannot follow yourself
         const selfFollow = await request(app).post(`/api/users/${bobName}/follow`).set(auth(bobToken));
@@ -178,5 +217,87 @@ app.use((err, req, res, _next) => {
             .post('/api/auth/login')
             .send({ login: bobName, password: 'integration-secret' });
         expect(login.status).toBe(401);
+    });
+
+    test('configures stream properties, retrieves the key, and rotates it', async () => {
+        const username = `streamer_${Date.now()}`;
+        const registration = await request(app).post('/api/auth/register').send({
+            username,
+            email: `${username}@example.com`,
+            password: 'integration-secret'
+        });
+        expect(registration.status).toBe(201);
+
+        const token = registration.body.token;
+        const auth = { Authorization: `Bearer ${token}` };
+
+        const initial = await request(app).get('/api/streams/me').set(auth);
+        expect(initial.status).toBe(200);
+        expect(initial.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
+        expect(initial.body.streamId).toBe(username);
+        expect(initial.body.title).toBe(username);
+        expect(initial.body.visibility).toBe('public');
+        expect(initial.body.isLive).toBe(false);
+
+        const update = await request(app)
+            .put('/api/streams/me')
+            .set(auth)
+            .send({
+                title: 'Ranked grind',
+                description: 'Climbing the ladder',
+                visibility: 'unlisted',
+                thumbnailUrl: 'data:image/png;base64,AAAA',
+                categoryId: 1
+            });
+        expect(update.status).toBe(200);
+        expect(update.body).toMatchObject({
+            title: 'Ranked grind',
+            description: 'Climbing the ladder',
+            visibility: 'unlisted',
+            thumbnailUrl: 'data:image/png;base64,AAAA',
+            categoryId: 1,
+            category: 'League of Legends'
+        });
+
+        const unknownCategory = await request(app)
+            .put('/api/streams/me')
+            .set(auth)
+            .send({ categoryId: 999999 });
+        expect(unknownCategory.status).toBe(400);
+
+        const currentKey = await request(app).get('/api/streams/me/stream-key').set(auth);
+        expect(currentKey.status).toBe(200);
+        expect(currentKey.body.streamKey).toBe(initial.body.streamKey);
+
+        const rotated = await request(app).post('/api/streams/me/stream-key/rotate').set(auth);
+        expect(rotated.status).toBe(200);
+        expect(rotated.body.streamKey).toMatch(/^fov_[A-Za-z0-9_-]{43}$/);
+        expect(rotated.body.streamKey).not.toBe(initial.body.streamKey);
+        expect(rotated.body.streamId).toBe(username);
+
+        const afterRotation = await request(app).get('/api/streams/me/stream-key').set(auth);
+        expect(afterRotation.body.streamKey).toBe(rotated.body.streamKey);
+
+        // Unlisted streams stay off the profile but keep their direct link.
+        const unlistedProfile = await request(app).get(`/api/users/${username}`);
+        expect(unlistedProfile.status).toBe(200);
+        expect(unlistedProfile.body).not.toHaveProperty('stream');
+
+        const makePublic = await request(app)
+            .put('/api/streams/me')
+            .set(auth)
+            .send({ visibility: 'public' });
+        expect(makePublic.status).toBe(200);
+
+        const publicProfile = await request(app).get(`/api/users/${username}`);
+        expect(publicProfile.status).toBe(200);
+        expect(publicProfile.body.stream).toMatchObject({
+            streamId: username,
+            title: 'Ranked grind',
+            isLive: false
+        });
+
+        const anonymous = await request(app).get('/api/streams/me');
+        expect(anonymous.status).toBe(401);
     });
 });

@@ -58,7 +58,9 @@ describe('Users Routes', () => {
 
     describe('GET /me', () => {
         test('returns the authenticated user full profile', async () => {
-            db.query.mockResolvedValue([profileRow()]);
+            db.query
+                .mockResolvedValueOnce([profileRow()])
+                .mockResolvedValueOnce([]);
 
             const response = await request(app).get('/me').set(AUTH_HEADER);
 
@@ -75,6 +77,58 @@ describe('Users Routes', () => {
                 email: 'alice@example.com'
             });
             expect(db.query).toHaveBeenCalledWith(expect.stringContaining('WHERE u.id = ?'), [1]);
+        });
+
+        test('includes the public stream block on the profile', async () => {
+            db.query
+                .mockResolvedValueOnce([profileRow()])
+                .mockResolvedValueOnce([{
+                    title: 'Ranked grind',
+                    description: 'Climbing the ladder',
+                    visibility: 'public',
+                    thumbnail_url: 'thumb.png',
+                    category: 'Just Chatting',
+                    username: 'alice'
+                }]);
+
+            const response = await request(app).get('/me').set(AUTH_HEADER);
+
+            expect(response.status).toBe(200);
+            expect(response.body.stream).toEqual({
+                streamId: 'alice',
+                title: 'Ranked grind',
+                description: 'Climbing the ladder',
+                visibility: 'public',
+                thumbnailUrl: 'thumb.png',
+                category: 'Just Chatting',
+                isLive: false
+            });
+        });
+
+        test('shows the owner their own unlisted and private streams', async () => {
+            for (const visibility of ['unlisted', 'private']) {
+                db.query
+                    .mockReset()
+                    .mockResolvedValueOnce([profileRow()])
+                    .mockResolvedValueOnce([{
+                        title: 'Hidden',
+                        description: '',
+                        visibility,
+                        thumbnail_url: '',
+                        category: null,
+                        username: 'alice'
+                    }]);
+
+                const response = await request(app).get('/me').set(AUTH_HEADER);
+
+                expect(response.status).toBe(200);
+                expect(response.body.stream).toMatchObject({
+                    streamId: 'alice',
+                    title: 'Hidden',
+                    visibility,
+                    isLive: false
+                });
+            }
         });
 
         test('returns 401 without a token', async () => {
@@ -288,19 +342,80 @@ describe('Users Routes', () => {
         });
     });
 
+    describe('GET /me/following', () => {
+        test('returns the users followed by the authenticated user', async () => {
+            db.query.mockResolvedValueOnce([
+                profileRow({ id: 2, username: 'bob', email: 'bob@example.com' }),
+                profileRow({ id: 3, username: 'carol', email: 'carol@example.com', followers_count: 0 })
+            ]);
+
+            const response = await request(app).get('/me/following').set(AUTH_HEADER);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual([
+                {
+                    id: 2,
+                    username: 'bob',
+                    bio: 'Hello',
+                    avatarUrl: '',
+                    bannerUrl: '',
+                    followersCount: 2,
+                    followingCount: 3,
+                    isFollowing: true
+                },
+                {
+                    id: 3,
+                    username: 'carol',
+                    bio: 'Hello',
+                    avatarUrl: '',
+                    bannerUrl: '',
+                    followersCount: 0,
+                    followingCount: 3,
+                    isFollowing: true
+                }
+            ]);
+            expect(response.body[0]).not.toHaveProperty('email');
+            expect(db.query).toHaveBeenCalledWith(
+                expect.stringContaining('WHERE f.follower_id = ?'),
+                [1]
+            );
+        });
+
+        test('returns an empty list when nothing is followed', async () => {
+            db.query.mockResolvedValueOnce([]);
+
+            const response = await request(app).get('/me/following').set(AUTH_HEADER);
+
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual([]);
+        });
+
+        test('returns 401 without a token', async () => {
+            const response = await request(app).get('/me/following');
+
+            expect(response.status).toBe(401);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+    });
+
     describe('POST /:username/follow', () => {
-        test('follows another user', async () => {
+        test('follows another user and returns the new follower count', async () => {
             db.query
                 .mockResolvedValueOnce([{ id: 2 }])
-                .mockResolvedValueOnce([]);
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([{ followers_count: 4 }]);
 
             const response = await request(app).post('/bob/follow').set(AUTH_HEADER);
 
             expect(response.status).toBe(200);
-            expect(response.body).toEqual({ following: true });
+            expect(response.body).toEqual({ following: true, followersCount: 4 });
             expect(db.query).toHaveBeenCalledWith(
                 'INSERT INTO follows (follower_id, following_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
                 [1, 2]
+            );
+            expect(db.query).toHaveBeenCalledWith(
+                'SELECT COUNT(*)::int AS followers_count FROM follows WHERE following_id = ?',
+                [2]
             );
         });
 
@@ -330,15 +445,16 @@ describe('Users Routes', () => {
     });
 
     describe('DELETE /:username/follow', () => {
-        test('unfollows a user', async () => {
+        test('unfollows a user and returns the new follower count', async () => {
             db.query
                 .mockResolvedValueOnce([{ id: 2 }])
-                .mockResolvedValueOnce([]);
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([{ followers_count: 1 }]);
 
             const response = await request(app).delete('/bob/follow').set(AUTH_HEADER);
 
             expect(response.status).toBe(200);
-            expect(response.body).toEqual({ following: false });
+            expect(response.body).toEqual({ following: false, followersCount: 1 });
             expect(db.query).toHaveBeenCalledWith(
                 'DELETE FROM follows WHERE follower_id = ? AND following_id = ?',
                 [1, 2]
@@ -354,9 +470,61 @@ describe('Users Routes', () => {
         });
     });
 
+    describe('GET /?q= (search)', () => {
+        test('returns matching users with their avatar', async () => {
+            db.query.mockResolvedValueOnce([
+                { username: 'alice', avatar_url: 'https://example.com/a.png' },
+                { username: 'malice', avatar_url: null }
+            ]);
+
+            const res = await request(app).get('/').query({ q: '  ali ' });
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual([
+                { username: 'alice', avatarUrl: 'https://example.com/a.png' },
+                { username: 'malice', avatarUrl: '' }
+            ]);
+            const [sql, params] = db.query.mock.calls[0];
+            expect(sql).toContain('ILIKE');
+            expect(sql).not.toContain('email');
+            expect(params).toEqual(['%ali%', 'ali%', 5]);
+        });
+
+        test('escapes LIKE wildcards in the query', async () => {
+            db.query.mockResolvedValueOnce([]);
+
+            await request(app).get('/').query({ q: '50%_a\\b' });
+
+            const [, params] = db.query.mock.calls[0];
+            expect(params[0]).toBe('%50\\%\\_a\\\\b%');
+        });
+
+        test.each([
+            ['missing', {}],
+            ['blank', { q: '   ' }],
+            ['too long', { q: 'a'.repeat(51) }]
+        ])('returns an empty list without querying when the query is %s', async (_label, query) => {
+            const res = await request(app).get('/').query(query);
+
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual([]);
+            expect(db.query).not.toHaveBeenCalled();
+        });
+
+        test('forwards database errors', async () => {
+            db.query.mockRejectedValueOnce(new Error('db down'));
+
+            const res = await request(app).get('/').query({ q: 'ali' });
+
+            expect(res.status).toBe(500);
+        });
+    });
+
     describe('GET /:username', () => {
         test('returns a public profile without the email', async () => {
-            db.query.mockResolvedValue([profileRow({ id: 2, username: 'bob' })]);
+            db.query
+                .mockResolvedValueOnce([profileRow({ id: 2, username: 'bob' })])
+                .mockResolvedValueOnce([]);
 
             const response = await request(app).get('/bob');
 
@@ -365,8 +533,81 @@ describe('Users Routes', () => {
             expect(response.body).not.toHaveProperty('email');
             expect(response.body.isFollowing).toBe(false);
             expect(response.body.followersCount).toBe(2);
-            // only the profile query, no follow lookup without auth
-            expect(db.query).toHaveBeenCalledTimes(1);
+            // Profile query plus the public stream lookup; no follow lookup without auth.
+            expect(db.query).toHaveBeenCalledTimes(2);
+        });
+
+        test('shows a public stream on the profile with the username as id', async () => {
+            db.query
+                .mockResolvedValueOnce([profileRow({ id: 2, username: 'bob' })])
+                .mockResolvedValueOnce([{
+                    title: 'Chill stream',
+                    description: '',
+                    visibility: 'public',
+                    thumbnail_url: '',
+                    category: null,
+                    username: 'bob'
+                }]);
+
+            const response = await request(app).get('/bob');
+
+            expect(response.status).toBe(200);
+            expect(response.body.stream).toMatchObject({
+                streamId: 'bob',
+                title: 'Chill stream',
+                visibility: 'public',
+                isLive: false
+            });
+        });
+
+        test('shows the owner their own unlisted and private streams on the public profile route', async () => {
+            for (const visibility of ['unlisted', 'private']) {
+                db.query
+                    .mockReset()
+                    .mockResolvedValueOnce([profileRow({ id: 1, username: 'alice' })])
+                    .mockResolvedValueOnce([{
+                        title: 'My hidden stream',
+                        description: '',
+                        visibility,
+                        thumbnail_url: '',
+                        category: null,
+                        username: 'alice'
+                    }]);
+
+                const response = await request(app).get('/alice').set(AUTH_HEADER);
+
+                expect(response.status).toBe(200);
+                expect(response.body.stream).toMatchObject({
+                    streamId: 'alice',
+                    title: 'My hidden stream',
+                    visibility,
+                    isLive: false
+                });
+            }
+        });
+
+        test('hides unlisted and private streams from other visitors', async () => {
+            authUtils.verifyToken.mockReturnValue({ userId: 3 });
+
+            for (const visibility of ['unlisted', 'private']) {
+                db.query
+                    .mockReset()
+                    .mockResolvedValueOnce([profileRow({ id: 2, username: 'bob' })])
+                    .mockResolvedValueOnce([])
+                    .mockResolvedValueOnce([{
+                        title: 'Hidden',
+                        description: '',
+                        visibility,
+                        thumbnail_url: '',
+                        category: null,
+                        username: 'bob'
+                    }]);
+
+                const response = await request(app).get('/bob').set(AUTH_HEADER);
+
+                expect(response.status).toBe(200);
+                expect(response.body).not.toHaveProperty('stream');
+            }
         });
 
         test('reports isFollowing for an authenticated follower', async () => {

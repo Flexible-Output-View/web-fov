@@ -1,10 +1,12 @@
+<a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
 <app-navbar></app-navbar>
 <div class="app-layout">
   <app-sidebar 
     [isCollapsed]="isSidebarCollapsed" 
     (toggleCollapse)="onSidebarToggle()">
   </app-sidebar>
-  <main class="main-content">
+  <main id="main-content" class="main-content" aria-label="Contenu principal">
     <router-outlet></router-outlet>
   </main>
 </div>

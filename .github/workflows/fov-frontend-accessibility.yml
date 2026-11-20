@@ -1,0 +1,43 @@
+name: FOV Frontend Accessibility
+
+
+on:
+   push:
+     branches:
+       - main
+
+jobs:
+  accessibility_scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Docker
+        uses: docker/setup-docker-action@v5.5.0
+
+      - name: Checkout FOV Web repository
+        uses: actions/checkout@v7
+        with:
+          path: web-fov
+          submodules: recursive
+
+      - name: Run FOV Web Stack
+        working-directory: web-fov
+        run: |
+          cp .env.example .env
+          mkdir -p media var/media hls
+          sudo chmod -R 777 .
+          docker compose up -d --build --wait
+
+      - name: Run Github Accessibility Scanner
+        uses: github/accessibility-scanner@v3
+        with:
+          repository: Flexible-Output-View/web-fov
+          token: ${{ secrets.GH_TOKEN }}
+          cache_key: cached_results-fovapp.json
+          skip_copilot_assignment: true
+          include_screenshots: true
+          file_best_practice_issues: false
+          file_experimental_issues: false
+          dry_run: false
+          open_grouped_issues: true
+          group_by: rule
+          url_configs: '[{"url":"http://localhost:4200","waitForSelectors":["app-root .app-layout"]},{"url":"http://localhost:4200/login","waitForSelectors":["app-root"]},{"url":"http://localhost:4200/followed","waitForSelectors":["app-root .app-layout"]},{"url":"http://localhost:4200/discover","waitForSelectors":["app-root .app-layout"]},{"url":"http://localhost:4200/how-does-it-work","waitForSelectors":["app-root .app-layout"]}]'

@@ -245,3 +245,9 @@ dist
 .vscode/*
 # NOTE: ne jamais ignorer package-lock.json — dépendances figées via lockfiles
 # backend/package-lock.json et fov-angular/package-lock.json doivent rester versionnés
+
+tmp
+tmp/**
+
+# Generated SBOMs (see DOCUMENTS/DEPENDENCY-TRACK.md)
+/sbom/

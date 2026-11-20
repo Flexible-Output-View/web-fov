@@ -3,6 +3,8 @@ const router = express.Router();
 import db from '../db.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { comparePassword, hashPassword } from '../utils/auth.js';
+import { ffmpegProcesses } from '../mediaServer.mjs';
+import { toPublicStreamId } from '../streamSettings.js';
 
 const MAX_IMAGE_LENGTH = 5 * 1024 * 1024; // 5 MB data URL (front resizes images client-side)
 
@@ -20,7 +22,7 @@ const PROFILE_SELECT = `
     FROM users u
 `;
 
-function toProfile(row, { includeEmail = false, isFollowing = false } = {}) {
+function toProfile(row, { includeEmail = false, isFollowing = false, stream = null } = {}) {
     const profile = {
         id: row.id,
         username: row.username,
@@ -36,7 +38,57 @@ function toProfile(row, { includeEmail = false, isFollowing = false } = {}) {
         profile.email = row.email;
     }
 
+    // Omitted entirely when the user has no public stream to show.
+    if (stream) {
+        profile.stream = stream;
+    }
+
     return profile;
+}
+
+/**
+ * Stream block shown on a profile.
+ *
+ * Public streams are visible to everyone. Unlisted and private streams are
+ * only returned when the viewer is the owner, so the owner sees their own
+ * stream on their profile while other visitors do not.
+ */
+async function getProfileStream(userId, { includeHidden = false } = {}) {
+    const rows = await db.query(
+        `SELECT
+            ss.title,
+            ss.description,
+            ss.visibility,
+            ss.thumbnail_url,
+            c.name AS category,
+            u.username
+        FROM stream_settings ss
+        JOIN users u ON u.id = ss.user_id
+        LEFT JOIN categories c ON c.id = ss.category_id
+        WHERE ss.user_id = ?
+        LIMIT 1`,
+        [userId]
+    );
+
+    if (!rows || rows.length === 0) {
+        return null;
+    }
+
+    const row = rows[0];
+    const visibility = row.visibility || 'public';
+    if (visibility !== 'public' && !includeHidden) {
+        return null;
+    }
+
+    return {
+        streamId: row.username,
+        title: row.title || '',
+        description: row.description || '',
+        visibility,
+        thumbnailUrl: row.thumbnail_url || '',
+        category: row.category || '',
+        isLive: ffmpegProcesses.has(toPublicStreamId(userId))
+    };
 }
 
 async function findUserByUsername(username) {
@@ -51,7 +103,8 @@ router.get('/me', requireAuth, async (req, res, next) => {
         if (!rows || rows.length === 0) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-        res.json(toProfile(rows[0], { includeEmail: true }));
+        const stream = await getProfileStream(req.userId, { includeHidden: true });
+        res.json(toProfile(rows[0], { includeEmail: true, stream }));
     } catch (err) {
         next(err);
     }
@@ -86,7 +139,8 @@ router.put('/me', requireAuth, async (req, res, next) => {
         }
 
         const profileRows = await db.query(`${PROFILE_SELECT} WHERE u.id = ?`, [req.userId]);
-        res.json(toProfile(profileRows[0], { includeEmail: true }));
+        const stream = await getProfileStream(req.userId, { includeHidden: true });
+        res.json(toProfile(profileRows[0], { includeEmail: true, stream }));
     } catch (err) {
         next(err);
     }
@@ -165,6 +219,40 @@ router.delete('/me', requireAuth, async (req, res, next) => {
     }
 });
 
+async function countFollowers(userId) {
+    const rows = await db.query(
+        'SELECT COUNT(*)::int AS followers_count FROM follows WHERE following_id = ?',
+        [userId]
+    );
+    return Number(rows?.[0]?.followers_count) || 0;
+}
+
+// GET /api/users/me/following -> users followed by the authenticated user
+router.get('/me/following', requireAuth, async (req, res, next) => {
+    try {
+        const rows = await db.query(
+            `SELECT
+                u.id,
+                u.username,
+                u.bio,
+                u.avatar_url,
+                u.banner_url,
+                u.created_at,
+                (SELECT COUNT(*)::int FROM follows f WHERE f.following_id = u.id) AS followers_count,
+                (SELECT COUNT(*)::int FROM follows f WHERE f.follower_id = u.id) AS following_count
+            FROM follows f
+            JOIN users u ON u.id = f.following_id
+            WHERE f.follower_id = ?
+            ORDER BY u.username ASC`,
+            [req.userId]
+        );
+
+        res.json(rows.map((row) => toProfile(row, { isFollowing: true })));
+    } catch (err) {
+        next(err);
+    }
+});
+
 // POST /api/users/:username/follow -> follow a user
 router.post('/:username/follow', requireAuth, async (req, res, next) => {
     try {
@@ -180,7 +268,7 @@ router.post('/:username/follow', requireAuth, async (req, res, next) => {
             'INSERT INTO follows (follower_id, following_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
             [req.userId, target.id]
         );
-        res.json({ following: true });
+        res.json({ following: true, followersCount: await countFollowers(target.id) });
     } catch (err) {
         next(err);
     }
@@ -198,7 +286,41 @@ router.delete('/:username/follow', requireAuth, async (req, res, next) => {
             'DELETE FROM follows WHERE follower_id = ? AND following_id = ?',
             [req.userId, target.id]
         );
-        res.json({ following: false });
+        res.json({ following: false, followersCount: await countFollowers(target.id) });
+    } catch (err) {
+        next(err);
+    }
+});
+
+const SEARCH_LIMIT = 5;
+const MAX_SEARCH_LENGTH = 50;
+
+function escapeLikePattern(value) {
+    return value.replace(/[\\%_]/g, '\\$&');
+}
+
+// GET /api/users?q=... -> users whose username contains the query
+router.get('/', async (req, res, next) => {
+    try {
+        const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+        if (!query || query.length > MAX_SEARCH_LENGTH) {
+            return res.json([]);
+        }
+
+        const escaped = escapeLikePattern(query);
+        const rows = await db.query(
+            `SELECT username, avatar_url
+             FROM users
+             WHERE username ILIKE ?
+             ORDER BY (username ILIKE ?) DESC, LENGTH(username), username
+             LIMIT ?`,
+            [`%${escaped}%`, `${escaped}%`, SEARCH_LIMIT]
+        );
+
+        res.json(rows.map((row) => ({
+            username: row.username,
+            avatarUrl: row.avatar_url || ''
+        })));
     } catch (err) {
         next(err);
     }
@@ -223,7 +345,9 @@ router.get('/:username', optionalAuth, async (req, res, next) => {
             isFollowing = followRows.length > 0;
         }
 
-        res.json(toProfile(row, { isFollowing }));
+        const isOwner = Boolean(req.userId) && req.userId === Number(row.id);
+        const stream = await getProfileStream(row.id, { includeHidden: isOwner });
+        res.json(toProfile(row, { isFollowing, stream }));
     } catch (err) {
         next(err);
     }

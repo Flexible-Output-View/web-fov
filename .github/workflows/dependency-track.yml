@@ -1,0 +1,79 @@
+name: Dependency-Track SBOM
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - "fov-angular/package.json"
+      - "fov-angular/package-lock.json"
+      - "scripts/generate-sbom.sh"
+      - "scripts/upload-sbom.sh"
+      - ".github/workflows/dependency-track.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "backend/package.json"
+      - "backend/package-lock.json"
+      - "fov-angular/package.json"
+      - "fov-angular/package-lock.json"
+      - ".github/workflows/dependency-track.yml"
+  schedule:
+    # Re-submit the inventory weekly so Dependency-Track also notices
+    # components that were updated on a branch without a dependency change.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: dependency-track-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sbom:
+    name: Generate and upload SBOMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DEPENDENCY_TRACK_URL: ${{ vars.DEPENDENCY_TRACK_URL }}
+      DEPENDENCY_TRACK_API_KEY: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
+      DEPENDENCY_TRACK_PROJECT_VERSION: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.12.0"
+
+      - name: Generate CycloneDX SBOMs
+        run: ./scripts/generate-sbom.sh
+
+      - name: Upload SBOMs as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom/*.cdx.json
+          if-no-files-found: error
+
+      - name: Upload SBOMs to Dependency-Track
+        if: env.DEPENDENCY_TRACK_URL != '' && env.DEPENDENCY_TRACK_API_KEY != ''
+        run: |
+          ./scripts/upload-sbom.sh \
+            --project web-fov-backend \
+            --version "$DEPENDENCY_TRACK_PROJECT_VERSION" \
+            sbom/web-fov-backend.cdx.json
+          ./scripts/upload-sbom.sh \
+            --project web-fov-frontend \
+            --version "$DEPENDENCY_TRACK_PROJECT_VERSION" \
+            sbom/web-fov-frontend.cdx.json
+
+      - name: Explain skipped upload
+        if: env.DEPENDENCY_TRACK_URL == '' || env.DEPENDENCY_TRACK_API_KEY == ''
+        run: |
+          echo "DEPENDENCY_TRACK_URL / DEPENDENCY_TRACK_API_KEY are not configured;"
+          echo "SBOMs were generated and archived but not uploaded."

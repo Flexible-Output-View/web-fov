@@ -2,6 +2,19 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import type { StreamVisibility } from '../models/stream-config';
+
+export interface ProfileStream {
+  /** Public stream handle: the username. */
+  streamId: string;
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  category: string;
+  /** Public, unlisted, or private. Non-public streams are only returned to their owner. */
+  visibility?: StreamVisibility;
+  isLive: boolean;
+}
 
 export interface UserProfile {
   id?: number;
@@ -13,12 +26,24 @@ export interface UserProfile {
   followersCount: number;
   followingCount: number;
   isFollowing?: boolean;
+  /** Public stream only; unlisted and private streams are omitted. */
+  stream?: ProfileStream | null;
+}
+
+export interface UserSearchResult {
+  username: string;
+  avatarUrl: string;
 }
 
 export interface ProfileUpdates {
   bio: string;
   avatarUrl: string;
   bannerUrl: string;
+}
+
+export interface FollowResponse {
+  following: boolean;
+  followersCount: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -34,6 +59,13 @@ export class UserService {
     return this.http
       .get<UserProfile>(`${this.API_URL}/users/me`)
       .pipe(tap((profile) => this.currentProfileSubject.next(profile)));
+  }
+
+  /** Search users whose username contains the query. */
+  searchUsers(query: string): Observable<UserSearchResult[]> {
+    return this.http.get<UserSearchResult[]>(`${this.API_URL}/users`, {
+      params: { q: query },
+    });
   }
 
   /** Fetch a public profile by username. */
@@ -65,17 +97,22 @@ export class UserService {
     });
   }
 
+  /** Fetch the users followed by the authenticated user. */
+  getFollowing(): Observable<UserProfile[]> {
+    return this.http.get<UserProfile[]>(`${this.API_URL}/users/me/following`);
+  }
+
   /** Follow a user. */
-  follow(username: string): Observable<{ following: boolean }> {
-    return this.http.post<{ following: boolean }>(
+  follow(username: string): Observable<FollowResponse> {
+    return this.http.post<FollowResponse>(
       `${this.API_URL}/users/${encodeURIComponent(username)}/follow`,
       {},
     );
   }
 
   /** Unfollow a user. */
-  unfollow(username: string): Observable<{ following: boolean }> {
-    return this.http.delete<{ following: boolean }>(
+  unfollow(username: string): Observable<FollowResponse> {
+    return this.http.delete<FollowResponse>(
       `${this.API_URL}/users/${encodeURIComponent(username)}/follow`,
     );
   }
