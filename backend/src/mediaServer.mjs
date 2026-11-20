@@ -115,6 +115,7 @@ function buildSrtUrl(host, port, mode) {
     return [
         `srt://${normalizeSrtHost(host)}:${port}`,
         `?mode=${mode}`,
+        '&connect_timeout=15000',
         '&latency=4000000',
         '&rcvbuf=134217728',
         '&sndbuf=134217728',

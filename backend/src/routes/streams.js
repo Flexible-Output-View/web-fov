@@ -324,16 +324,12 @@ function normalizeUserId(value) {
 }
 
 /** Whether a stream may appear in discovery listings (`/available`). */
-function canDiscover(streamInfo, viewerId) {
-    const visibility = streamInfo?.visibility || 'public';
-    if (visibility === 'public') {
-        return true;
-    }
-    if (visibility === 'private') {
-        const ownerId = normalizeUserId(streamInfo?.user_id);
-        return Boolean(ownerId) && ownerId === normalizeUserId(viewerId);
-    }
-    return false; // unlisted streams are only reachable via a direct link
+function canDiscover(streamInfo) {
+    // Only public streams are discoverable. Private streams stay on their
+    // owner's profile, and unlisted streams stay reachable through their
+    // direct link, but neither belongs in the public home/discover/followed
+    // listings — not even for the owner.
+    return (streamInfo?.visibility || 'public') === 'public';
 }
 
 /** Whether the caller may open a stream page / fetch its tracks. */
@@ -452,7 +448,7 @@ router.get('/available', optionalAuth, async (req, res, next) => {
                     continue;
                 }
 
-                if (!canDiscover(streamInfo, req.userId)) {
+                if (!canDiscover(streamInfo)) {
                     continue;
                 }
 

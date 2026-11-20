@@ -408,7 +408,7 @@ describe('Streams Routes', () => {
             );
         });
 
-        test('hides unlisted and private streams from discovery', async () => {
+        test('hides unlisted and private streams from discovery, even for the owner', async () => {
             setDirectoryEntries([
                 { name: 'u12', isDirectory: () => true },
                 { name: 'u13', isDirectory: () => true }
@@ -428,8 +428,9 @@ describe('Streams Routes', () => {
                 .get('/available')
                 .set('Authorization', `Bearer ${signToken(13)}`);
 
-            expect(owner.body).toHaveLength(1);
-            expect(owner.body[0].streamId).toBe('bob');
+            // Private streams belong on the owner's profile, not in the
+            // public home/discover/followed listings.
+            expect(owner.body).toEqual([]);
         });
 
         test('does not expose a user folder without settings', async () => {

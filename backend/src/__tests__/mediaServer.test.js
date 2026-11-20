@@ -159,6 +159,7 @@ describe('Media server lifecycle', () => {
 
         expect(response.status).toBe(200);
         expect(response.body.streamId).toBe('u12');
+        expect(response.body.srtUrl).toContain('connect_timeout=15000');
         expect(response.body.hlsUrl).toBe('/api/hls/u12/0/playlist.m3u8');
         expect(resolveStreamKey).toHaveBeenCalledWith(streamKey);
         expect(ffmpegProcesses.has('u12')).toBe(true);

@@ -142,6 +142,32 @@ describe('ProfileViewComponent', () => {
       expect(link?.textContent).toContain('Ranked grind');
     });
 
+    it('should render the owner private stream with a private badge', () => {
+      authService.isAuthenticated.and.returnValue(true);
+      authService.getCurrentUser.and.returnValue({ username: 'alice' } as AuthUser);
+      userService.loadProfile.and.returnValue(
+        of({
+          ...mockProfile,
+          stream: {
+            streamId: 'alice',
+            title: 'Private stream',
+            description: '',
+            thumbnailUrl: '',
+            category: '',
+            visibility: 'private',
+            isLive: true,
+          },
+        }),
+      );
+
+      fixture.detectChanges();
+
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.profile-stream')).toBeTruthy();
+      expect(host.querySelector('.stream-visibility')?.textContent)
+        .toContain('Privé');
+    });
+
     it('should not render a stream section without a public stream', () => {
       fixture.detectChanges();
 

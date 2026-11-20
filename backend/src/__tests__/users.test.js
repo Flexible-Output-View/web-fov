@@ -98,13 +98,14 @@ describe('Users Routes', () => {
                 streamId: 'alice',
                 title: 'Ranked grind',
                 description: 'Climbing the ladder',
+                visibility: 'public',
                 thumbnailUrl: 'thumb.png',
                 category: 'Just Chatting',
                 isLive: false
             });
         });
 
-        test('omits unlisted and private streams from the profile', async () => {
+        test('shows the owner their own unlisted and private streams', async () => {
             for (const visibility of ['unlisted', 'private']) {
                 db.query
                     .mockReset()
@@ -121,7 +122,12 @@ describe('Users Routes', () => {
                 const response = await request(app).get('/me').set(AUTH_HEADER);
 
                 expect(response.status).toBe(200);
-                expect(response.body).not.toHaveProperty('stream');
+                expect(response.body.stream).toMatchObject({
+                    streamId: 'alice',
+                    title: 'Hidden',
+                    visibility,
+                    isLive: false
+                });
             }
         });
 
@@ -549,15 +555,45 @@ describe('Users Routes', () => {
             expect(response.body.stream).toMatchObject({
                 streamId: 'bob',
                 title: 'Chill stream',
+                visibility: 'public',
                 isLive: false
             });
         });
 
-        test('hides unlisted and private streams from the public profile', async () => {
+        test('shows the owner their own unlisted and private streams on the public profile route', async () => {
+            for (const visibility of ['unlisted', 'private']) {
+                db.query
+                    .mockReset()
+                    .mockResolvedValueOnce([profileRow({ id: 1, username: 'alice' })])
+                    .mockResolvedValueOnce([{
+                        title: 'My hidden stream',
+                        description: '',
+                        visibility,
+                        thumbnail_url: '',
+                        category: null,
+                        username: 'alice'
+                    }]);
+
+                const response = await request(app).get('/alice').set(AUTH_HEADER);
+
+                expect(response.status).toBe(200);
+                expect(response.body.stream).toMatchObject({
+                    streamId: 'alice',
+                    title: 'My hidden stream',
+                    visibility,
+                    isLive: false
+                });
+            }
+        });
+
+        test('hides unlisted and private streams from other visitors', async () => {
+            authUtils.verifyToken.mockReturnValue({ userId: 3 });
+
             for (const visibility of ['unlisted', 'private']) {
                 db.query
                     .mockReset()
                     .mockResolvedValueOnce([profileRow({ id: 2, username: 'bob' })])
+                    .mockResolvedValueOnce([])
                     .mockResolvedValueOnce([{
                         title: 'Hidden',
                         description: '',
@@ -567,7 +603,7 @@ describe('Users Routes', () => {
                         username: 'bob'
                     }]);
 
-                const response = await request(app).get('/bob');
+                const response = await request(app).get('/bob').set(AUTH_HEADER);
 
                 expect(response.status).toBe(200);
                 expect(response.body).not.toHaveProperty('stream');

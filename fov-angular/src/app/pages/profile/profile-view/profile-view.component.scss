@@ -199,6 +199,17 @@
       opacity: 0.8;
     }
 
+    .stream-visibility {
+      align-self: flex-start;
+      padding: 2px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background-color: var(--bg-primary);
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
     .stream-description {
       display: -webkit-box;
       -webkit-line-clamp: 2;

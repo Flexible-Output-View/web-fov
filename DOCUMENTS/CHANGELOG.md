@@ -18,11 +18,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Swagger documentation for auth endpoints (`/api-docs`)
 - Angular `AuthService` with `/login` and `/register` pages (token persisted as `fov_auth_token` / `fov_auth_user`)
 - Postgres 18 as the documented and deployed database (`pg` Pool, `fovwebdb.sql` Postgres schema)
-- Public streams now appear on their owner's profile; unlisted and private streams stay hidden from it while remaining reachable by direct link (unlisted) or by the owner (private)
+- Public streams now appear on their owner's profile; unlisted and private streams are shown only when the owner views their own profile, while other visitors never see them
+- Discovery listings (`/available`, used by home/discover/followed) contain public streams only; private streams no longer leak into them for the owner
 
 ### Changed
 - Stream URLs are now `/stream/<username>` instead of `/stream/u<userId>`. The internal `u<userId>` id is kept for HLS directories and legacy links, and old `/stream/u<userId>` URLs redirect to the username.
 - Direct links (`/api/streams/:id/live`) resolve usernames case-insensitively, so hand-typed or re-shared unlisted links keep working.
+- SRT registration appends `connect_timeout=15000` so OBS waits for the first Docker Desktop UDP flow, and the demo publisher is now opt-in so it no longer occupies the first ingest port.
 
 ### Planned Features
 - Input validation & sanitization middleware (beyond auth)

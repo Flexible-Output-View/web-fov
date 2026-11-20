@@ -49,11 +49,11 @@ function toProfile(row, { includeEmail = false, isFollowing = false, stream = nu
 /**
  * Stream block shown on a profile.
  *
- * Only public streams are listed: unlisted and private streams stay reachable
- * by their direct link (unlisted) or by their owner (private) but never appear
- * on the profile page.
+ * Public streams are visible to everyone. Unlisted and private streams are
+ * only returned when the viewer is the owner, so the owner sees their own
+ * stream on their profile while other visitors do not.
  */
-async function getProfileStream(userId) {
+async function getProfileStream(userId, { includeHidden = false } = {}) {
     const rows = await db.query(
         `SELECT
             ss.title,
@@ -75,7 +75,8 @@ async function getProfileStream(userId) {
     }
 
     const row = rows[0];
-    if ((row.visibility || 'public') !== 'public') {
+    const visibility = row.visibility || 'public';
+    if (visibility !== 'public' && !includeHidden) {
         return null;
     }
 
@@ -83,6 +84,7 @@ async function getProfileStream(userId) {
         streamId: row.username,
         title: row.title || '',
         description: row.description || '',
+        visibility,
         thumbnailUrl: row.thumbnail_url || '',
         category: row.category || '',
         isLive: ffmpegProcesses.has(toPublicStreamId(userId))
@@ -101,7 +103,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
         if (!rows || rows.length === 0) {
             return res.status(401).json({ error: 'Authentication required' });
         }
-        const stream = await getProfileStream(req.userId);
+        const stream = await getProfileStream(req.userId, { includeHidden: true });
         res.json(toProfile(rows[0], { includeEmail: true, stream }));
     } catch (err) {
         next(err);
@@ -137,7 +139,7 @@ router.put('/me', requireAuth, async (req, res, next) => {
         }
 
         const profileRows = await db.query(`${PROFILE_SELECT} WHERE u.id = ?`, [req.userId]);
-        const stream = await getProfileStream(req.userId);
+        const stream = await getProfileStream(req.userId, { includeHidden: true });
         res.json(toProfile(profileRows[0], { includeEmail: true, stream }));
     } catch (err) {
         next(err);
@@ -343,7 +345,8 @@ router.get('/:username', optionalAuth, async (req, res, next) => {
             isFollowing = followRows.length > 0;
         }
 
-        const stream = await getProfileStream(row.id);
+        const isOwner = Boolean(req.userId) && req.userId === Number(row.id);
+        const stream = await getProfileStream(row.id, { includeHidden: isOwner });
         res.json(toProfile(row, { isFollowing, stream }));
     } catch (err) {
         next(err);
