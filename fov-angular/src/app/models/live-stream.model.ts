@@ -1,3 +1,5 @@
+import type { StreamVisibility } from './stream-config';
+
 export interface LiveStreamTrack {
   trackId: string;
   name: string;
@@ -14,6 +16,8 @@ export interface LiveStreamInfo {
   tracks: LiveStreamTrack[];
   title: string;
   description?: string;
+  /** Access level enforced by the backend on `/streams/:id/live`. */
+  visibility?: StreamVisibility;
   category: string;
   viewers: number;
   /** Channel name as stored on the stream row. */

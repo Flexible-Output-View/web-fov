@@ -154,7 +154,7 @@ export class StreamConfigComponent implements OnInit, OnDestroy {
 
   get streamLink(): string {
     const streamId = this.streamSettings?.streamId || 'me';
-    return `${window.location.origin}/stream/${streamId}`;
+    return `${window.location.origin}/stream/${encodeURIComponent(streamId)}`;
   }
 
   copyStreamLink() {

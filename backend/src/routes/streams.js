@@ -236,12 +236,32 @@ async function fetchUserStreamInfoByUsername(username) {
         return null;
     }
 
+    const handle = username.trim();
+
+    // Exact match first: usernames are stored as registered and this keeps
+    // `Alice` and `alice` distinct when both accounts exist.
     const rows = await db.query(
         `${USER_STREAM_SELECT} WHERE u.username = ? LIMIT 1`,
-        [username.trim()]
+        [handle]
     );
 
-    return rows.length > 0 ? toUserStreamInfo(rows[0]) : null;
+    if (rows?.length > 0) {
+        return toUserStreamInfo(rows[0]);
+    }
+
+    // Direct links are shared and typed by hand, so fall back to a
+    // case-insensitive match. Without this, an unlisted stream (which is only
+    // reachable through its direct link) returns 404 when the link casing
+    // differs from the registered username.
+    const insensitiveRows = await db.query(
+        `${USER_STREAM_SELECT}
+         WHERE LOWER(u.username) = LOWER(?)
+         ORDER BY u.id
+         LIMIT 1`,
+        [handle]
+    );
+
+    return insensitiveRows?.length > 0 ? toUserStreamInfo(insensitiveRows[0]) : null;
 }
 
 async function fetchStreamInfo(streamId) {
@@ -297,6 +317,12 @@ function streamPublicId(streamId, streamInfo) {
     return streamId;
 }
 
+/** Normalize a user id coming from the DB or a JWT for safe comparisons. */
+function normalizeUserId(value) {
+    const userId = Number(value);
+    return Number.isSafeInteger(userId) && userId > 0 ? userId : null;
+}
+
 /** Whether a stream may appear in discovery listings (`/available`). */
 function canDiscover(streamInfo, viewerId) {
     const visibility = streamInfo?.visibility || 'public';
@@ -304,7 +330,8 @@ function canDiscover(streamInfo, viewerId) {
         return true;
     }
     if (visibility === 'private') {
-        return Boolean(viewerId) && streamInfo?.user_id === viewerId;
+        const ownerId = normalizeUserId(streamInfo?.user_id);
+        return Boolean(ownerId) && ownerId === normalizeUserId(viewerId);
     }
     return false; // unlisted streams are only reachable via a direct link
 }
@@ -315,7 +342,8 @@ function canView(streamInfo, viewerId) {
     if (visibility === 'public' || visibility === 'unlisted') {
         return true;
     }
-    return Boolean(viewerId) && streamInfo?.user_id === viewerId;
+    const ownerId = normalizeUserId(streamInfo?.user_id);
+    return Boolean(ownerId) && ownerId === normalizeUserId(viewerId);
 }
 
 function buildStreamEntry(streamId, tracks, streamInfo) {
