@@ -65,12 +65,21 @@ describe('stream visibility with real HLS files', () => {
     afterAll(() => {
         fs.rmSync(mediaRoot, { recursive: true, force: true });
 
-        if (previousMediaRoot === undefined) delete process.env.MEDIA_ROOT;
-        else process.env.MEDIA_ROOT = previousMediaRoot;
-        if (previousApiHostname === undefined) delete process.env.API_HOSTNAME;
-        else process.env.API_HOSTNAME = previousApiHostname;
-        if (previousApiProtocol === undefined) delete process.env.API_PROTOCOL;
-        else process.env.API_PROTOCOL = previousApiProtocol;
+        if (previousMediaRoot === undefined) {
+            delete process.env.MEDIA_ROOT;
+        } else {
+            process.env.MEDIA_ROOT = previousMediaRoot;
+        }
+        if (previousApiHostname === undefined) {
+            delete process.env.API_HOSTNAME;
+        } else {
+            process.env.API_HOSTNAME = previousApiHostname;
+        }
+        if (previousApiProtocol === undefined) {
+            delete process.env.API_PROTOCOL;
+        } else {
+            process.env.API_PROTOCOL = previousApiProtocol;
+        }
     });
 
     test('does not list an unlisted stream in discovery', async () => {
