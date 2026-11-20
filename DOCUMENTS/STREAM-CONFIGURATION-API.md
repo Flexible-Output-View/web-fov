@@ -366,7 +366,9 @@ These are used by the streaming client / encoder, **not** by the configuration p
 ### Start ingest
 
 The encoder uses the stream key shown on the configuration page as its
-`streamId`. The backend links the stream to its owner when it arrives.
+`streamId`. The backend links the stream to its owner when it arrives. Ingest is
+key-only: missing, malformed, unknown, revoked, or legacy arbitrary ids are
+refused with `401` before any SRT listener is created.
 
 ```http
 POST /ffmpeg/register
@@ -417,7 +419,9 @@ Content-Type: application/json
 ```
 
 Send the same key the stream arrived with; the backend resolves it to `u<userId>`
-internally. Stopping with the public `u<userId>` id also works for compatibility.
+internally. An invalid or revoked key returns `401 { "error": "Invalid stream key" }`
+and does not stop any running stream. The public `u<userId>` id is not a
+credential and is refused.
 
 ---
 
