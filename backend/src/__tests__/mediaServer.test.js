@@ -22,6 +22,7 @@ jest.unstable_mockModule('child_process', () => ({
 
 const {
     createMediaRoutes,
+    startFFmpegListener,
     ffmpegProcesses,
     registeredStreams,
     killFFmpegProcess,
@@ -476,6 +477,7 @@ describe('Media server lifecycle', () => {
             timeoutMs: expect.any(Number),
             isAlive: expect.any(Function)
         }));
+        expect(isSrtListenerReady.mock.calls[0][1].isAlive()).toBe(true);
         expect(settled).toBe(false);
         expect(registeredStreams.get('slow-listener')).toMatchObject({ port: 9999, pending: true });
 
@@ -483,6 +485,28 @@ describe('Media server lifecycle', () => {
         const response = await pending;
         expect(response.status).toBe(200);
         expect(registeredStreams.get('slow-listener').pending).toBe(false);
+    });
+
+    test('returns 500 and cleans up when readiness probing throws', async () => {
+        const process = createProcess();
+        spawnMock.mockReturnValue(process);
+        const isSrtListenerReady = jest.fn(async () => {
+            throw new Error('probe exploded');
+        });
+        const app = createApp({ isSrtListenerReady });
+
+        const response = await request(app).post('/ffmpeg/register').send({
+            streamId: keyFor('probe-throws'),
+            tracks: 1,
+            audioTracks: 1
+        });
+
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ error: 'Failed to register stream' });
+        expect(process.kill).toHaveBeenCalledWith('SIGKILL');
+        expect(ffmpegProcesses.has('probe-throws')).toBe(false);
+        expect(registeredStreams.has('probe-throws')).toBe(false);
+        expect(fs.existsSync(path.join(mediaRoot, 'hls', 'probe-throws'))).toBe(false);
     });
 
     test('returns 503 and cleans up when the SRT listener never binds', async () => {
@@ -567,5 +591,17 @@ describe('Media server lifecycle', () => {
 
         expect(await isUdpPortBound(freePort)).toBe(false);
         expect(await waitForSrtListener(freePort, { timeoutMs: 25 })).toBe(false);
+        expect(await waitForSrtListener(freePort, { timeoutMs: 100, isAlive: () => false })).toBe(false);
+    });
+
+    test('startFFmpegListener rejects an empty video track set without spawning', async () => {
+        const socket = { destroy: jest.fn() };
+
+        const result = startFFmpegListener('zero-tracks', 0, 1, socket, 'srt://0.0.0.0:9999', {});
+
+        expect(result).toBeNull();
+        expect(socket.destroy).toHaveBeenCalledTimes(1);
+        expect(spawnMock).not.toHaveBeenCalled();
+        expect(ffmpegProcesses.has('zero-tracks')).toBe(false);
     });
 });

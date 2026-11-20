@@ -101,13 +101,8 @@ function delay(ms) {
 function isUdpPortBound(port) {
     return new Promise((resolve) => {
         const socket = dgram.createSocket('udp4');
-        let settled = false;
 
         const finish = (bound) => {
-            if (settled) {
-                return;
-            }
-            settled = true;
             try {
                 socket.close();
             } catch (err) {
@@ -576,11 +571,6 @@ function createMediaRoutes(options = {}) {
 
             writeStreamMeta(streamId, trackVNum, trackANum, nameOptions, HLS_DIR);
             const started = startFFmpegListener(streamId, trackVNum, trackANum, null, srtUrl, nameOptions);
-            if (!started) {
-                registeredStreams.delete(streamId);
-                clearStreamHLSFiles(streamId);
-                return res.status(503).json({ error: 'Failed to start the SRT listener' });
-            }
 
             // Do not acknowledge before the listener owns its UDP port: an
             // encoder that connects too early can lose the handshake (and on
@@ -821,7 +811,6 @@ async function startMediaServer() {
     console.log(`   📝 Register stream: POST ${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/register with {"tracks": 2}`);
     console.log(`   🐛 Debug register: POST ${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/register/debug (returns VLC listener URL on port ${debugSrtPort})`);
     console.log('   🔗 FFmpeg starts immediately with its own SRT URL');
-    console.log(`   🌐 SRT endpoint host: ${normalizeSrtHost(process.env.SRT_URL || '127.0.0.1')}`);
     console.log(`   📊 Check status: GET ${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/status`);
 
     // Periodic check for zombie processes (every 30 seconds)
@@ -877,6 +866,7 @@ async function startMediaServer() {
 export {
     createMediaRoutes,
     startMediaServer,
+    startFFmpegListener,
     ffmpegProcesses,
     registeredStreams,
     killFFmpegProcess,
