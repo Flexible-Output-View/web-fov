@@ -71,11 +71,6 @@ services:
   demo:
     build: ./demo-publisher
     restart: unless-stopped
-    # Opt-in only: `docker compose --profile demo up -d`.
-    # The demo occupies the first SRT ingest port (9999), which would push a
-    # real FOV OBS encoder onto the next dynamic port.
-    profiles:
-      - demo
     depends_on:
       - backend
       - frontend

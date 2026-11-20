@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 - Stream URLs are now `/stream/<username>` instead of `/stream/u<userId>`. The internal `u<userId>` id is kept for HLS directories and legacy links, and old `/stream/u<userId>` URLs redirect to the username.
 - Direct links (`/api/streams/:id/live`) resolve usernames case-insensitively, so hand-typed or re-shared unlisted links keep working.
-- SRT registration appends `connect_timeout=15000` so OBS waits for the first Docker Desktop UDP flow, and the demo publisher is now opt-in so it no longer occupies the first ingest port.
+- SRT registration appends `connect_timeout=15000` so OBS waits for the first Docker Desktop UDP flow.
 
 ### Planned Features
 - Input validation & sanitization middleware (beyond auth)

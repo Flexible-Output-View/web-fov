@@ -137,11 +137,8 @@ web-fov/
 # Clone repository
 git clone <repo> && cd web-fov
 
-# Start all services (backend, frontend, Postgres)
+# Start all services (backend, frontend, Postgres, demo stream)
 docker-compose up --build
-
-# Optional: start the demo publisher as well (uses SRT port 9999)
-docker-compose --profile demo up --build
 
 # Services will be available at:
 # - Frontend: http://localhost:4200
@@ -214,10 +211,7 @@ The returned URL includes `connect_timeout=15000`. On Docker Desktop the first
 host-to-container UDP flow can take several seconds to establish; the longer
 timeout keeps OBS from aborting during that first connection. Use the exact
 `srtUrl` returned by the register endpoint rather than hardcoding port 9999:
-a second concurrent stream receives the next port.
-
-The demo publisher is opt-in (`docker compose --profile demo up -d`) so it does
-not occupy the first ingest port when you want to stream from OBS.
+the always-running demo uses `9999`, so a real encoder receives the next port.
 
 ---
 
