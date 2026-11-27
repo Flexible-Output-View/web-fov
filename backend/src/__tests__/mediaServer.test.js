@@ -106,7 +106,7 @@ describe('Media server lifecycle', () => {
         spawnMock.mockReturnValue(process);
         const app = createApp();
 
-        const response = await request(app).post('/ffmpeg/register').send({
+        const response = await request(app).post('/api/ffmpeg/register').send({
             streamId: keyFor('spawn-error'),
             tracks: 1,
             audioTracks: 1
@@ -122,7 +122,7 @@ describe('Media server lifecycle', () => {
 
         const replacement = createProcess();
         spawnMock.mockReturnValue(replacement);
-        const reused = await request(app).post('/ffmpeg/register').send({
+        const reused = await request(app).post('/api/ffmpeg/register').send({
             streamId: keyFor('replacement'),
             tracks: 1,
             audioTracks: 1
@@ -134,11 +134,11 @@ describe('Media server lifecycle', () => {
     test('validates registration requests and supports debug registration', async () => {
         const app = createApp();
 
-        const invalid = await request(app).post('/ffmpeg/register').send({ tracks: 0, audioTracks: 1 });
+        const invalid = await request(app).post('/api/ffmpeg/register').send({ tracks: 0, audioTracks: 1 });
         expect(invalid.status).toBe(400);
 
         const debugKey = keyFor('debug-stream');
-        const debug = await request(app).post('/ffmpeg/register/debug').send({
+        const debug = await request(app).post('/api/ffmpeg/register/debug').send({
             streamId: debugKey,
             tracks: 1,
             audioTracks: 1
@@ -146,7 +146,7 @@ describe('Media server lifecycle', () => {
         expect(debug.status).toBe(200);
         expect(debug.body.srtUrl).toBe('srt://0.0.0.0:5555?mode=listener');
 
-        const duplicate = await request(app).post('/ffmpeg/register/debug').send({
+        const duplicate = await request(app).post('/api/ffmpeg/register/debug').send({
             streamId: debugKey,
             tracks: 1,
             audioTracks: 1
@@ -161,7 +161,7 @@ describe('Media server lifecycle', () => {
         const app = createApp({ resolveStreamKey });
         const streamKey = `fov_${'a'.repeat(43)}`;
 
-        const response = await request(app).post('/ffmpeg/register').send({
+        const response = await request(app).post('/api/ffmpeg/register').send({
             streamId: streamKey,
             tracks: 1,
             audioTracks: 1
@@ -180,7 +180,7 @@ describe('Media server lifecycle', () => {
         const resolveStreamKey = jest.fn(async () => null);
         const app = createApp({ resolveStreamKey });
 
-        const response = await request(app).post('/ffmpeg/register').send({
+        const response = await request(app).post('/api/ffmpeg/register').send({
             streamId: `fov_${'c'.repeat(43)}`,
             tracks: 1,
             audioTracks: 1
@@ -197,7 +197,7 @@ describe('Media server lifecycle', () => {
         const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
         const app = createApp({ resolveStreamKey });
 
-        const response = await request(app).post('/ffmpeg/register').send({
+        const response = await request(app).post('/api/ffmpeg/register').send({
             streamId: 'u12',
             tracks: 1,
             audioTracks: 1
@@ -213,7 +213,7 @@ describe('Media server lifecycle', () => {
         const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
         const app = createApp({ resolveStreamKey });
 
-        const response = await request(app).post('/ffmpeg/register').send({
+        const response = await request(app).post('/api/ffmpeg/register').send({
             tracks: 1,
             audioTracks: 1
         });
@@ -231,7 +231,7 @@ describe('Media server lifecycle', () => {
         const app = createApp({ resolveStreamKey });
 
         for (const streamId of ['FOVDemo', 'alice', 'stream-0', 'u12']) {
-            const response = await request(app).post('/ffmpeg/register').send({
+            const response = await request(app).post('/api/ffmpeg/register').send({
                 streamId,
                 tracks: 1,
                 audioTracks: 1
@@ -259,7 +259,7 @@ describe('Media server lifecycle', () => {
             `fov_${'a'.repeat(42)}!`,
             `FOV_${'a'.repeat(43)}`
         ]) {
-            const response = await request(app).post('/ffmpeg/register').send({
+            const response = await request(app).post('/api/ffmpeg/register').send({
                 streamId,
                 tracks: 1,
                 audioTracks: 1
@@ -278,7 +278,7 @@ describe('Media server lifecycle', () => {
         const resolveStreamKey = jest.fn(async () => ({ userId: 12, streamId: 'u12' }));
         const app = createApp({ resolveStreamKey });
 
-        const response = await request(app).post('/ffmpeg/register/debug').send({
+        const response = await request(app).post('/api/ffmpeg/register/debug').send({
             streamId: 'debug-stream',
             tracks: 1,
             audioTracks: 1
@@ -300,7 +300,7 @@ describe('Media server lifecycle', () => {
         ));
         const app = createApp({ resolveStreamKey });
 
-        await request(app).post('/ffmpeg/register').send({
+        await request(app).post('/api/ffmpeg/register').send({
             streamId: validKey,
             tracks: 1,
             audioTracks: 1
@@ -308,7 +308,7 @@ describe('Media server lifecycle', () => {
         expect(registeredStreams.has('u12')).toBe(true);
 
         for (const streamId of ['u12', 'alice', `fov_${'z'.repeat(43)}`]) {
-            const refused = await request(app).post('/ffmpeg/stop').send({ streamId });
+            const refused = await request(app).post('/api/ffmpeg/stop').send({ streamId });
             expect(refused.status).toBe(401);
             expect(refused.body).toEqual({ error: 'Invalid stream key' });
         }
@@ -325,14 +325,14 @@ describe('Media server lifecycle', () => {
         const app = createApp({ resolveStreamKey });
         const streamKey = `fov_${'d'.repeat(43)}`;
 
-        await request(app).post('/ffmpeg/register').send({
+        await request(app).post('/api/ffmpeg/register').send({
             streamId: streamKey,
             tracks: 1,
             audioTracks: 1
         });
         expect(registeredStreams.has('u12')).toBe(true);
 
-        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: streamKey });
+        const stopped = await request(app).post('/api/ffmpeg/stop').send({ streamId: streamKey });
         expect(stopped.status).toBe(200);
         expect(stopped.body.streamId).toBe('u12');
         expect(registeredStreams.has('u12')).toBe(false);
@@ -343,9 +343,9 @@ describe('Media server lifecycle', () => {
         spawnMock.mockReturnValue(process);
         const app = createApp();
 
-        await request(app).post('/ffmpeg/register').send({ streamId: keyFor('status-stream'), tracks: 1, audioTracks: 1 });
+        await request(app).post('/api/ffmpeg/register').send({ streamId: keyFor('status-stream'), tracks: 1, audioTracks: 1 });
 
-        const active = await request(app).get('/ffmpeg/status').query({ streamId: 'status-stream' });
+        const active = await request(app).get('/api/ffmpeg/status').query({ streamId: 'status-stream' });
         expect(active.status).toBe(200);
         expect(active.body).toMatchObject({
             streamId: 'status-stream',
@@ -355,27 +355,27 @@ describe('Media server lifecycle', () => {
             srtUrl: expect.stringContaining(':9999?mode=caller')
         });
 
-        const all = await request(app).get('/ffmpeg/status');
+        const all = await request(app).get('/api/ffmpeg/status');
         expect(all.status).toBe(200);
         expect(all.body).toMatchObject({ totalStreams: 1, activeStreams: 1 });
         expect(all.body.streams['status-stream'].srtPort).toBe(9999);
 
-        const missing = await request(app).get('/ffmpeg/status').query({ streamId: 'missing' });
+        const missing = await request(app).get('/api/ffmpeg/status').query({ streamId: 'missing' });
         expect(missing.body).toEqual({ streamId: 'missing', status: 'not_found' });
     });
 
     test('handles stop requests for missing and registration-only streams', async () => {
         const app = createApp();
 
-        const missingParameter = await request(app).post('/ffmpeg/stop').send({});
+        const missingParameter = await request(app).post('/api/ffmpeg/stop').send({});
         expect(missingParameter.status).toBe(400);
 
-        const missing = await request(app).post('/ffmpeg/stop').send({ streamId: keyFor('missing') });
+        const missing = await request(app).post('/api/ffmpeg/stop').send({ streamId: keyFor('missing') });
         expect(missing.status).toBe(200);
         expect(missing.body).toEqual({ status: 'not_found', streamId: 'missing' });
 
-        await request(app).post('/ffmpeg/register/debug').send({ streamId: keyFor('debug-stop'), tracks: 1, audioTracks: 1 });
-        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: keyFor('debug-stop') });
+        await request(app).post('/api/ffmpeg/register/debug').send({ streamId: keyFor('debug-stop'), tracks: 1, audioTracks: 1 });
+        const stopped = await request(app).post('/api/ffmpeg/stop').send({ streamId: keyFor('debug-stop') });
         expect(stopped.status).toBe(200);
         expect(registeredStreams.has('debug-stop')).toBe(false);
     });
@@ -401,12 +401,12 @@ describe('Media server lifecycle', () => {
         spawnMock.mockReturnValue(oldProcess);
         const app = createApp();
 
-        await request(app).post('/ffmpeg/register').send({ streamId: keyFor('same-id'), tracks: 1, audioTracks: 1 });
-        await request(app).post('/ffmpeg/stop').send({ streamId: keyFor('same-id') });
+        await request(app).post('/api/ffmpeg/register').send({ streamId: keyFor('same-id'), tracks: 1, audioTracks: 1 });
+        await request(app).post('/api/ffmpeg/stop').send({ streamId: keyFor('same-id') });
 
         const newProcess = createProcess();
         spawnMock.mockReturnValue(newProcess);
-        await request(app).post('/ffmpeg/register').send({ streamId: keyFor('same-id'), tracks: 1, audioTracks: 1 });
+        await request(app).post('/api/ffmpeg/register').send({ streamId: keyFor('same-id'), tracks: 1, audioTracks: 1 });
         const hlsFolder = path.join(mediaRoot, 'hls', 'same-id');
 
         oldProcess.emit('exit', 0, 'SIGINT');
@@ -424,7 +424,7 @@ describe('Media server lifecycle', () => {
             const process = createProcess();
             processes.push(process);
             spawnMock.mockReturnValueOnce(process);
-            const response = await request(app).post('/ffmpeg/register').send({
+            const response = await request(app).post('/api/ffmpeg/register').send({
                 streamId: keyFor(`stream-${index}`),
                 tracks: 1,
                 audioTracks: 1
@@ -433,7 +433,7 @@ describe('Media server lifecycle', () => {
             expect(response.body.srtUrl).toContain(`:${9999 + index}?`);
         }
 
-        const exhausted = await request(app).post('/ffmpeg/register').send({ streamId: keyFor('exhausted'), tracks: 1, audioTracks: 1 });
+        const exhausted = await request(app).post('/api/ffmpeg/register').send({ streamId: keyFor('exhausted'), tracks: 1, audioTracks: 1 });
         expect(exhausted.status).toBe(503);
 
         processes[0].kill.mockImplementation(signal => {
@@ -442,12 +442,12 @@ describe('Media server lifecycle', () => {
                 processes[0].emit('exit', 0, signal);
             }
         });
-        const stopped = await request(app).post('/ffmpeg/stop').send({ streamId: keyFor('stream-0') });
+        const stopped = await request(app).post('/api/ffmpeg/stop').send({ streamId: keyFor('stream-0') });
         expect(stopped.status).toBe(200);
 
         const replacement = createProcess();
         spawnMock.mockReturnValue(replacement);
-        const reused = await request(app).post('/ffmpeg/register').send({ streamId: keyFor('reused'), tracks: 1, audioTracks: 1 });
+        const reused = await request(app).post('/api/ffmpeg/register').send({ streamId: keyFor('reused'), tracks: 1, audioTracks: 1 });
         expect(reused.status).toBe(200);
         expect(reused.body.srtUrl).toContain(':9999?');
     });
@@ -463,7 +463,7 @@ describe('Media server lifecycle', () => {
         const app = createApp({ isSrtListenerReady });
 
         let settled = false;
-        const pending = request(app).post('/ffmpeg/register').send({
+        const pending = request(app).post('/api/ffmpeg/register').send({
             streamId: keyFor('slow-listener'),
             tracks: 1,
             audioTracks: 1
@@ -495,7 +495,7 @@ describe('Media server lifecycle', () => {
         });
         const app = createApp({ isSrtListenerReady });
 
-        const response = await request(app).post('/ffmpeg/register').send({
+        const response = await request(app).post('/api/ffmpeg/register').send({
             streamId: keyFor('probe-throws'),
             tracks: 1,
             audioTracks: 1
@@ -515,7 +515,7 @@ describe('Media server lifecycle', () => {
         const isSrtListenerReady = jest.fn(async () => false);
         const app = createApp({ isSrtListenerReady, srtReadyTimeoutMs: 25 });
 
-        const response = await request(app).post('/ffmpeg/register').send({
+        const response = await request(app).post('/api/ffmpeg/register').send({
             streamId: keyFor('not-ready'),
             tracks: 1,
             audioTracks: 1
@@ -553,7 +553,7 @@ describe('Media server lifecycle', () => {
                 spawnMock.mockReturnValue(createProcess());
 
                 const app = createApp();
-                const response = await request(app).post('/ffmpeg/register').send({
+                const response = await request(app).post('/api/ffmpeg/register').send({
                     streamId: keyFor(`host-${index}`),
                     tracks: 1,
                     audioTracks: 1

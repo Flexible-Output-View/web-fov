@@ -408,7 +408,7 @@ const swaggerDocument = {
                 }
             }
         },
-        '/ffmpeg/register': {
+        '/api/ffmpeg/register': {
             post: {
                 tags: ['FFmpeg'],
                 summary: 'Register an arriving stream and create an SRT listener',
@@ -422,7 +422,7 @@ const swaggerDocument = {
                 }
             }
         },
-        '/ffmpeg/stop': {
+        '/api/ffmpeg/stop': {
             post: {
                 tags: ['FFmpeg'],
                 summary: 'Stop an FFmpeg stream',
@@ -435,7 +435,7 @@ const swaggerDocument = {
                 }
             }
         },
-        '/ffmpeg/status': {
+        '/api/ffmpeg/status': {
             get: {
                 tags: ['FFmpeg'],
                 summary: 'Get FFmpeg status for all or one stream',

@@ -19,8 +19,6 @@ const probeTrackHasAudio = jest.fn();
 const sortTrackIds = jest.fn(trackIds => [...trackIds].sort((a, b) => Number(a) - Number(b)));
 
 process.env.MEDIA_ROOT = mediaRoot;
-delete process.env.API_HOSTNAME;
-delete process.env.API_PROTOCOL;
 
 jest.unstable_mockModule('../db.js', () => ({
     default: { query: dbQuery }
@@ -97,8 +95,6 @@ describe('Streams Routes', () => {
         probeTrackHasVideo.mockResolvedValue(true);
         probeTrackHasAudio.mockResolvedValue(true);
         setDirectoryEntries([]);
-        delete process.env.API_HOSTNAME;
-        delete process.env.API_PROTOCOL;
     });
 
     test('lists streams from the database', async () => {

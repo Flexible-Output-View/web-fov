@@ -33,7 +33,7 @@ class Stream(TypedDict):
 
 ApiResponse = List[Stream]
 
-API_URL: str = "http://localhost:4000/api/streams/available"
+API_URL: str = "http://localhost:4200/api/streams/available"
 EXPECTED_TITLE: str = "Automated E2E Integration Test Stream"
 EXPECTED_DESC: str = "Testing multi-track streaming, titles, descriptions, and authentication."
 MAX_RETRIES: int = 180

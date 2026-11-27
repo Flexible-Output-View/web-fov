@@ -119,7 +119,7 @@ web-fov/
 | **Jest / Supertest (dev)** | `29.7.0` / `6.3.4` | `backend/package-lock.json` |
 | **Image Node (Docker)** | `node:22.12.0-bookworm-slim` | `backend/Dockerfile`, `fov-angular/Dockerfile` |
 | **Postgres (Docker)** | `postgres:18-bookworm` | `docker-compose.yml` |
-| **Nginx (prod frontend)** | `nginx:1.27.4-alpine` | `fov-angular/Dockerfile` |
+| **Nginx (prod frontend)** | `nginx:1.31.10-alpine` | `docker-compose.yml` |
 | **FFmpeg** | via `apt` sur base `bookworm` (non pinné côté apt) | `backend/Dockerfile` — `which ffmpeg` pour vérifier |
 
 ---
@@ -137,12 +137,12 @@ web-fov/
 # Clone repository
 git clone <repo> && cd web-fov
 
-# Start all services (backend, frontend, Postgres, demo stream)
+# Start all services (backend, frontend, Postgres, demo stream, nginx)
 docker-compose up --build
 
 # Services will be available at:
 # - Frontend: http://localhost:4200
-# - Backend API: http://localhost:4000
+# - Backend API: http://localhost:4200/api
 # - Postgres: localhost:5432
 ```
 
@@ -190,7 +190,7 @@ npm start  # Runs on http://localhost:4200
 ### SRT Configuration
 
 Encoders must first register with the stream key shown on the stream
-configuration page (`POST /ffmpeg/register`, with the key in `streamId`). The
+configuration page (`POST api/ffmpeg/register`, with the key in `streamId`). The
 register request is refused with `401 { "error": "Invalid stream key" }` when
 the key is missing, malformed, unknown, or revoked, and only then is an SRT
 listener created for that stream.
@@ -201,7 +201,7 @@ Encoders should use these settings:
 |---------|-------|
 | **Protocol** | SRT |
 | **Host** | backend server IP/domain |
-| **Port** | returned by `POST /ffmpeg/register` (starts at 9999) |
+| **Port** | returned by `POST api/ffmpeg/register` (starts at 9999) |
 | **Mode** | Caller |
 | **Bitrate** | 5000-10000 kbps (adjust for quality) |
 | **FPS** | 30 or 60 |
@@ -242,7 +242,7 @@ the always-running demo uses `9999`, so a real encoder receives the next port.
 **Register:**
 
 ```bash
-curl -X POST http://localhost:4000/api/auth/register \
+curl -X POST http://localhost:4200/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"username":"jane_smith","email":"jane@example.com","password":"secret123"}'
 ```
@@ -252,7 +252,7 @@ Validation rules: username `3-30 chars, letters/numbers/underscores only`; valid
 **Login:**
 
 ```bash
-curl -X POST http://localhost:4000/api/auth/login \
+curl -X POST http://localhost:4200/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"login":"jane_smith","password":"secret123"}'
 ```

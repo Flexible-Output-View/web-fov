@@ -743,7 +743,7 @@ The encoder uses the key shown on the configuration page as its `streamId`.
 The backend resolves it when the stream arrives:
 
 ```bash
-curl -X POST http://localhost:4000/ffmpeg/register \
+curl -X POST http://localhost:4000/api/ffmpeg/register \
   -H "Content-Type: application/json" \
   -d '{"streamId": "fov_...", "tracks": 2, "audioTracks": 2}'
 ```
@@ -767,7 +767,7 @@ To stop an owned stream, send the same key back. An invalid or revoked key is
 refused with `401` and does not stop any running stream:
 
 ```bash
-curl -X POST http://localhost:4000/ffmpeg/stop \
+curl -X POST http://localhost:4000/api/ffmpeg/stop \
   -H "Content-Type: application/json" \
   -d '{"streamId": "fov_..."}'
 ```

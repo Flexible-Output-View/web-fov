@@ -361,11 +361,11 @@ function buildStreamEntry(streamId, tracks, streamInfo) {
 
 function buildBaseUrl(req) {
     const port = process.env.PORT || 4000;
-    const rawHost = process.env.API_HOSTNAME || req.get('host') || `localhost:${port}`;
+    const rawHost = req.get('host') || `localhost:${port}`;
     const normalizedHost = rawHost.trim().replace(/:\s*/, ':');
     const hostUrl = new URL(/^https?:\/\//i.test(normalizedHost) ? normalizedHost : `http://${normalizedHost}`);
     const host = hostUrl.host.replace(/\/api(?:\/.*)?$/i, '');
-    const protocol = process.env.API_PROTOCOL || req.protocol || hostUrl.protocol.replace(':', '') || 'http';
+    const protocol = req.protocol || hostUrl.protocol.replace(':', '') || 'http';
     return `${protocol}://${host}`;
 }
 

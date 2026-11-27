@@ -376,7 +376,7 @@ key-only: missing, malformed, unknown, revoked, or legacy arbitrary ids are
 refused with `401` before any SRT listener is created.
 
 ```http
-POST /ffmpeg/register
+POST api/ffmpeg/register
 Content-Type: application/json
 ```
 
@@ -413,7 +413,7 @@ Content-Type: application/json
 ### Stop ingest
 
 ```http
-POST /ffmpeg/stop
+POST api/ffmpeg/stop
 Content-Type: application/json
 ```
 
