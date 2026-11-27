@@ -6,7 +6,6 @@ services:
     volumes:
       - ./backend/media:/var/media:z
     ports:
-      - "4000:4000" # API
       - "9999-10010:9999-10010"
       - "9999-10010:9999-10010/udp" # SRT
     networks:
@@ -15,7 +14,6 @@ services:
     depends_on:
       fov-db:
         condition: service_healthy
-
     environment:
       - PORT=4000
       - DB_HOST=fov-db
@@ -27,7 +25,6 @@ services:
       - FFMPEG_PATH=/usr/bin/ffmpeg
       - MEDIA_ROOT=/var/media
       - SRT_URL=${SRT_URL}
-      - API_HOSTNAME=${API_URL}
       - TWITCH_ID=${TWITCH_ID}
       - TWITCH_SECRET=${TWITCH_SECRET}
       - JWT_SECRET=${JWT_SECRET}
@@ -36,17 +33,12 @@ services:
   frontend:
     build:
       context: ./fov-angular
-
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_started
-    ports:
-      - "4200:80"
     networks:
       - frontend
-    environment:
-      - API_URL=http://backend:4000
 
   fov-db:
     image: postgres:18-bookworm
@@ -56,13 +48,11 @@ services:
       - ./fovwebdb.sql:/docker-entrypoint-initdb.d/init.sql:z
     networks:
       - backend
-
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U root -d fovwebdb" ]
       interval: 10s
       timeout: 5s
       retries: 10
-
     environment:
       POSTGRES_DB: fovwebdb
       POSTGRES_USER: root
@@ -79,6 +69,19 @@ services:
     environment:
       API_URL: http://backend:4000
       SRT_URL: srt://backend:9999?mode=caller&latency=4000000&rcvbuf=134217728&sndbuf=134217728&peerlatency=4000000&tlpktdrop=0&nakreport=1
+
+  nginx:
+    image: nginx:1.31.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "4200:80"
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro,z
+    networks:
+      - frontend
 
 networks:
   frontend:

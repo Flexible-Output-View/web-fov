@@ -38,7 +38,7 @@ class StreamKeyResponse(TypedDict):
     updatedAt: str
 
 
-API_BASE: str = "http://localhost:4000"
+API_BASE: str = "http://localhost:4200/api"
 USERNAME: str = "TestStreamer"
 EMAIL: str = "teststreamer@integration.local"
 PASSWORD: str = "SecurePassword123!"

@@ -22,7 +22,6 @@ jobs:
             cat <<EOF > .env
             # Backend Variables
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            API_HOSTNAME=${{vars.API_HOSTNAME}}
             SRT_URL=${{vars.SRT_ENDPOINT_HOSTNAME}}
             # Frontend Variables
             API_URL=${{ vars.API_FULL_URL }}

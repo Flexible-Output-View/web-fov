@@ -506,8 +506,8 @@ function createMediaRoutes(options = {}) {
 
     router.use(express.json());
 
-    // POST /ffmpeg/register — register a stream and create a unique SRT listener
-    router.post('/ffmpeg/register', async (req, res) => {
+    // POST api/ffmpeg/register — register a stream and create a unique SRT listener
+    router.post('/api/ffmpeg/register', async (req, res) => {
         const parsed = parseRegisterRequest(req.body);
         if (parsed.error) {
             return res.status(400).json({ error: parsed.error });
@@ -627,8 +627,8 @@ function createMediaRoutes(options = {}) {
         }
     });
 
-    // POST /ffmpeg/register/debug — same as register but returns a hardcoded SRT listener URL for VLC (no FFmpeg)
-    router.post('/ffmpeg/register/debug', async (req, res) => {
+    // POST api//ffmpeg/register/debug — same as register but returns a hardcoded SRT listener URL for VLC (no FFmpeg)
+    router.post('/api/ffmpeg/register/debug', async (req, res) => {
         const parsed = parseRegisterRequest(req.body);
         if (parsed.error) {
             return res.status(400).json({ error: parsed.error });
@@ -682,8 +682,8 @@ function createMediaRoutes(options = {}) {
         }
     });
 
-    // POST /ffmpeg/stop — request FFmpeg to stop for a specific stream
-    router.post('/ffmpeg/stop', async (req, res) => {
+    // POST api/ffmpeg/stop — request FFmpeg to stop for a specific stream
+    router.post('/api/ffmpeg/stop', async (req, res) => {
         const { streamId: requestedStreamId } = req.body ?? {};
 
         if (!requestedStreamId) {
@@ -747,8 +747,8 @@ function createMediaRoutes(options = {}) {
         }
     });
 
-    // GET /ffmpeg/status — get current FFmpeg state for all or a specific stream
-    router.get('/ffmpeg/status', (req, res) => {
+    // GET api/ffmpeg/status — get current FFmpeg state for all or a specific stream
+    router.get('/api/ffmpeg/status', (req, res) => {
         const { streamId } = req.query;
 
         if (streamId) {
@@ -808,10 +808,8 @@ async function startMediaServer() {
     }
 
     console.log('🚀 Media server ready!');
-    console.log(`   📝 Register stream: POST ${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/register with {"tracks": 2}`);
-    console.log(`   🐛 Debug register: POST ${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/register/debug (returns VLC listener URL on port ${debugSrtPort})`);
     console.log('   🔗 FFmpeg starts immediately with its own SRT URL');
-    console.log(`   📊 Check status: GET ${process.env.API_HOSTNAME || 'localhost'}/ffmpeg/status`);
+    console.log('   📊 Check status: GET /api/ffmpeg/status');
 
     // Periodic check for zombie processes (every 30 seconds)
     const healthCheckInterval = setInterval(async () => {

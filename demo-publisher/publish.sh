@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-API_URL="${API_URL:-http://localhost:8080}"
-PUBLISH_URL="${API_URL}/ffmpeg/register"
+API_URL="${API_URL:-http://localhost:4000}"
+PUBLISH_URL="${API_URL}/api/ffmpeg/register"
 SRT_URL="${SRT_URL:-srt://localhost:9999}"
 
 # Ingest is key-only: the demo account is created (or reused) and its real

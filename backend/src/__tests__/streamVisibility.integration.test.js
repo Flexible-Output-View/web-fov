@@ -15,8 +15,6 @@ import { jest } from '@jest/globals';
 
 const mediaRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fov-visibility-'));
 const previousMediaRoot = process.env.MEDIA_ROOT;
-const previousApiHostname = process.env.API_HOSTNAME;
-const previousApiProtocol = process.env.API_PROTOCOL;
 const hlsRoot = path.join(mediaRoot, 'hls');
 const streamDir = path.join(hlsRoot, 'u12');
 
@@ -28,8 +26,7 @@ fs.writeFileSync(
 );
 
 process.env.MEDIA_ROOT = mediaRoot;
-delete process.env.API_HOSTNAME;
-delete process.env.API_PROTOCOL;
+
 
 const dbQuery = jest.fn();
 const streamRow = {
@@ -69,16 +66,6 @@ describe('stream visibility with real HLS files', () => {
             delete process.env.MEDIA_ROOT;
         } else {
             process.env.MEDIA_ROOT = previousMediaRoot;
-        }
-        if (previousApiHostname === undefined) {
-            delete process.env.API_HOSTNAME;
-        } else {
-            process.env.API_HOSTNAME = previousApiHostname;
-        }
-        if (previousApiProtocol === undefined) {
-            delete process.env.API_PROTOCOL;
-        } else {
-            process.env.API_PROTOCOL = previousApiProtocol;
         }
     });
 
